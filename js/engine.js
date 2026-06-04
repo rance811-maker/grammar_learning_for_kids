@@ -85,6 +85,7 @@ export const engine = {
       currentIndex: 0,
       answers: [],
       energy: 3,
+      maxEnergy: 3,
       score: 0,
       combo: 0,
       maxCombo: 0,
@@ -132,6 +133,107 @@ export const engine = {
     }
 
     return shuffle(combined).slice(0, count);
+  },
+
+  // Build a session from the error notebook + weakest skills, for focused review.
+  createReviewSession(count = 12) {
+    const mistakes = store.getMistakes();
+    const seen = new Set();
+    const questions = [];
+
+    // Most recent mistakes first.
+    for (let i = mistakes.length - 1; i >= 0 && questions.length < count; i--) {
+      const q = mistakes[i].question;
+      if (q && !seen.has(q.id)) {
+        questions.push(q);
+        seen.add(q.id);
+      }
+    }
+
+    // Top up with questions targeting the weakest skills.
+    if (questions.length < count) {
+      const weakSkills = store.getWeakestSkills(8);
+      const pool = [];
+      for (const { skill } of weakSkills) {
+        for (const [uid, unit] of Object.entries(units || {})) {
+          if (!store.isUnitUnlocked(Number(uid))) continue;
+          for (const level of Object.values(unit.levels || {})) {
+            for (const q of level.questions || []) {
+              if (q.subSkill === skill && !seen.has(q.id)) {
+                pool.push(q);
+              }
+            }
+          }
+        }
+      }
+      for (const q of shuffle(pool)) {
+        if (questions.length >= count) break;
+        if (!seen.has(q.id)) {
+          questions.push(q);
+          seen.add(q.id);
+        }
+      }
+    }
+
+    return {
+      unitId: 'review',
+      level: null,
+      questions: shuffle(questions),
+      currentIndex: 0,
+      answers: [],
+      energy: 3,
+      maxEnergy: 3,
+      score: 0,
+      combo: 0,
+      maxCombo: 0,
+      startTime: Date.now(),
+    };
+  },
+
+  // Comprehensive PET mock: pull a balanced spread of questions from every
+  // unlocked unit, cross-grammar, as the final milestone challenge.
+  createBossSession(count = 15) {
+    const unlockedUnits = [];
+    for (let unitId = 1; unitId <= 12; unitId++) {
+      if (store.isUnitUnlocked(unitId) && getAllQuestionsForUnit(unitId).length) {
+        unlockedUnits.push(unitId);
+      }
+    }
+
+    const questions = [];
+    const seen = new Set();
+
+    // Round-robin one question per unit until we reach the target count.
+    const perUnitPools = unlockedUnits.map((uid) =>
+      shuffle(getAllQuestionsForUnit(uid))
+    );
+    let added = true;
+    while (questions.length < count && added) {
+      added = false;
+      for (const pool of perUnitPools) {
+        if (questions.length >= count) break;
+        const q = pool.find((x) => !seen.has(x.id));
+        if (q) {
+          questions.push(q);
+          seen.add(q.id);
+          added = true;
+        }
+      }
+    }
+
+    return {
+      unitId: 'boss',
+      level: null,
+      questions: shuffle(questions),
+      currentIndex: 0,
+      answers: [],
+      energy: 5,
+      maxEnergy: 5,
+      score: 0,
+      combo: 0,
+      maxCombo: 0,
+      startTime: Date.now(),
+    };
   },
 
   checkAnswer(question, userAnswer) {

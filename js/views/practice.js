@@ -1,5 +1,7 @@
 import { store } from '../store.js';
 import { engine } from '../engine.js';
+import { sound } from '../sound.js';
+import { confetti } from '../celebrate.js';
 
 let session = null;
 let feedbackVisible = false;
@@ -10,10 +12,13 @@ let reorderAnswer = [];   // current reorder answer word indices
 let selectedErrorIdx = null;
 
 export function render(unitId, level) {
-  unitId = Number(unitId);
-  level = Number(level);
-
-  session = engine.createSession(unitId, level);
+  if (unitId === 'review') {
+    session = engine.createReviewSession();
+  } else if (unitId === 'boss') {
+    session = engine.createBossSession();
+  } else {
+    session = engine.createSession(Number(unitId), Number(level));
+  }
   feedbackVisible = false;
   sessionEnded = false;
   selectedMatch = null;
@@ -45,7 +50,7 @@ export function render(unitId, level) {
           </div>
         </div>
         <div class="energy-bar" id="energyBar">
-          ${renderHearts(session.energy)}
+          ${renderHearts(session.energy, session.maxEnergy)}
         </div>
         <div class="practice-header__score" id="practiceScore">⭐ 0</div>
       </div>
@@ -56,14 +61,15 @@ export function render(unitId, level) {
 }
 
 export function mount(unitId, level) {
-  unitId = Number(unitId);
-  level = Number(level);
+  const backTarget = unitId === 'review' ? 'review'
+    : unitId === 'boss' ? ''
+    : `unit/${unitId}`;
 
   // Back button for empty sessions
   const backBtn = document.getElementById('practiceBackBtn');
   if (backBtn) {
     backBtn.addEventListener('click', () => {
-      location.hash = `unit/${unitId}`;
+      location.hash = backTarget;
     });
     return;
   }
@@ -72,11 +78,11 @@ export function mount(unitId, level) {
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
       if (sessionEnded) {
-        location.hash = `unit/${unitId}`;
+        location.hash = backTarget;
         return;
       }
       if (confirm('确定要退出练习吗？当前进度不会保存。')) {
-        location.hash = `unit/${unitId}`;
+        location.hash = backTarget;
       }
     });
   }
@@ -465,9 +471,12 @@ function submitAnswer(question, userAnswer) {
     const multiplier = session.combo >= 10 ? 3 : session.combo >= 5 ? 2 : session.combo >= 3 ? 1.5 : 1;
     const points = Math.round(10 * multiplier);
     session.score += points;
+    if (session.combo >= 3) sound.combo(session.combo);
+    else sound.correct();
   } else {
     session.combo = 0;
     session.energy -= 1;
+    sound.wrong();
   }
 
   session.answers.push({
@@ -480,6 +489,14 @@ function submitAnswer(question, userAnswer) {
   // Record mastery
   if (question.subSkill) {
     store.recordAnswer(question.subSkill, isCorrect);
+  }
+
+  // Error notebook (错题本): collect wrong answers, retire them once answered
+  // correctly during a review session.
+  if (!isCorrect) {
+    store.addMistake(question, session.unitId, session.level);
+  } else if (session.unitId === 'review') {
+    store.removeMistake(question.id);
   }
 
   // Visual feedback on the question elements
@@ -579,10 +596,23 @@ function showFeedback(isCorrect, question, userAnswer, result) {
 
 function showResults() {
   sessionEnded = true;
+  const isReview = session.unitId === 'review';
+  const isBoss = session.unitId === 'boss';
   const results = engine.calculateResults(session);
 
   // Save results
-  store.completeLevel(session.unitId, session.level, results.stars, results.score);
+  let bossPassed = false;
+  if (isBoss) {
+    store.addScore(results.score);
+    bossPassed = store.recordBossResult(results.accuracy);
+    store.advanceLearningPlan({ isBoss: true });
+  } else if (isReview) {
+    // Review still earns points, just no level/unit progression.
+    store.addScore(results.score);
+  } else {
+    store.completeLevel(session.unitId, session.level, results.stars, results.score);
+    store.advanceLearningPlan({ unitId: session.unitId, level: session.level });
+  }
   store.updateStreak();
   store.recordSession({
     unitId: session.unitId,
@@ -596,13 +626,23 @@ function showResults() {
   });
 
   const accuracyPct = Math.round(results.accuracy * 100);
-  const starsHtml = [1, 2, 3].map(i =>
-    `<span class="result-star ${i <= results.stars ? 'result-star--earned' : ''}">⭐</span>`
-  ).join('');
 
-  const titleText = results.stars === 3 ? '太棒了！完美通关！' :
-    results.stars === 2 ? '做得不错！' :
-    results.stars === 1 ? '通关成功！' : '再试一次吧';
+  let titleText, subtitleText, starsHtml;
+  if (isBoss) {
+    starsHtml = `<div style="font-size:3.5rem;">${bossPassed ? '🎓' : '💪'}</div>`;
+    titleText = bossPassed ? 'PET 模拟通过！' : '再接再厉！';
+    subtitleText = bossPassed
+      ? `综合正确率 ${accuracyPct}% · 已达标(≥70%)`
+      : `综合正确率 ${accuracyPct}% · 距达标还差一点`;
+  } else {
+    starsHtml = [1, 2, 3].map(i =>
+      `<span class="result-star ${i <= results.stars ? 'result-star--earned' : ''}">⭐</span>`
+    ).join('');
+    titleText = results.stars === 3 ? '太棒了！完美通关！' :
+      results.stars === 2 ? '做得不错！' :
+      results.stars === 1 ? '通关成功！' : '再试一次吧';
+    subtitleText = isReview ? '复习巩固' : `Unit ${session.unitId} - Lv.${session.level}`;
+  }
 
   const weakHtml = results.weakPoints.length > 0
     ? `<div class="result-weakness">
@@ -617,7 +657,7 @@ function showResults() {
       <div class="view-result">
         <div class="result-stars">${starsHtml}</div>
         <div class="result-title">${titleText}</div>
-        <div class="result-subtitle">Unit ${session.unitId} - Lv.${session.level}</div>
+        <div class="result-subtitle">${subtitleText}</div>
         <div class="result-xp">+${results.score} 积分</div>
         <div class="result-breakdown">
           <div class="result-breakdown__row">
@@ -647,6 +687,17 @@ function showResults() {
   const comboArea = document.getElementById('comboArea');
   if (comboArea) comboArea.innerHTML = '';
 
+  // Celebrate strong finishes.
+  if (isBoss && bossPassed) {
+    sound.victory();
+    confetti({ count: 140, duration: 3200 });
+  } else if (!isBoss && results.stars >= 3) {
+    sound.finish(results.stars);
+    confetti({ count: 90 });
+  } else if (results.stars >= 1) {
+    sound.finish(results.stars);
+  }
+
   // Attach result button listeners
   setTimeout(() => {
     const continueBtn = document.getElementById('resultContinue');
@@ -654,12 +705,14 @@ function showResults() {
 
     if (continueBtn) {
       continueBtn.addEventListener('click', () => {
-        location.hash = `unit/${session.unitId}`;
+        location.hash = isBoss ? '' : isReview ? 'review' : `unit/${session.unitId}`;
       });
     }
     if (retryBtn) {
       retryBtn.addEventListener('click', () => {
-        location.hash = `practice/${session.unitId}/${session.level}`;
+        location.hash = isBoss ? 'practice/boss'
+          : isReview ? 'practice/review'
+          : `practice/${session.unitId}/${session.level}`;
         // Force re-render by triggering hashchange
         window.dispatchEvent(new HashChangeEvent('hashchange'));
       });
@@ -667,9 +720,9 @@ function showResults() {
   }, 0);
 }
 
-function renderHearts(count) {
+function renderHearts(count, max = 3) {
   let html = '';
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < max; i++) {
     const lostClass = i >= count ? ' energy-bar__heart--lost' : '';
     html += `<span class="energy-bar__heart${lostClass}" data-heart="${i}">❤️</span>`;
   }
@@ -695,7 +748,7 @@ function updateEnergy(isCorrect) {
   if (isCorrect) return;
   const energyBar = document.getElementById('energyBar');
   if (energyBar && session) {
-    energyBar.innerHTML = renderHearts(session.energy);
+    energyBar.innerHTML = renderHearts(session.energy, session.maxEnergy);
     // Trigger breaking animation on the lost heart
     const hearts = energyBar.querySelectorAll('.energy-bar__heart');
     const lostIdx = session.energy; // the one that just broke

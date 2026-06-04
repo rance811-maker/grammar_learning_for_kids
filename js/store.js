@@ -46,6 +46,11 @@ function createDefaultState() {
       dailyGoal: 2,
       soundEnabled: true,
     },
+    placementCompleted: false,
+    learningPlan: null,
+    mistakes: [],
+    bossCleared: false,
+    bossBestAccuracy: 0,
   };
 }
 
@@ -74,6 +79,20 @@ export const store = {
     if (!this.state) {
       this.state = createDefaultState();
       this.save();
+    }
+    // Migration for existing saved states
+    if (this.state.placementCompleted === undefined) {
+      this.state.placementCompleted = false;
+    }
+    if (this.state.learningPlan === undefined) {
+      this.state.learningPlan = null;
+    }
+    if (this.state.mistakes === undefined) {
+      this.state.mistakes = [];
+    }
+    if (this.state.bossCleared === undefined) {
+      this.state.bossCleared = false;
+      this.state.bossBestAccuracy = 0;
     }
     return this.state;
   },
@@ -348,5 +367,237 @@ export const store = {
 
   getBadges() {
     return [...this.state.badges];
+  },
+
+  // --- Placement Test & Learning Plan ---
+
+  isPlacementNeeded() {
+    return !this.state.placementCompleted && this.state.history.length === 0;
+  },
+
+  completePlacement(results) {
+    const correctUnitIds = new Set();
+
+    for (const result of results) {
+      const { unitId, correct, subSkill } = result;
+
+      if (correct) {
+        correctUnitIds.add(unitId);
+
+        // Mark discover as completed and unlock the unit
+        const unit = this.state.units[unitId];
+        if (unit) {
+          unit.unlocked = true;
+          unit.discoverCompleted = true;
+          unit.practiceLevels[1].unlocked = true;
+        }
+
+        // Also unlock the NEXT unit (child clearly knows the material)
+        const nextUnitId = unitId + 1;
+        if (nextUnitId <= 12 && this.state.units[nextUnitId]) {
+          this.state.units[nextUnitId].unlocked = true;
+          this.state.units[nextUnitId].practiceLevels[1].unlocked = true;
+        }
+
+        // Record mastery as correct
+        this.recordAnswer(subSkill, true);
+      } else {
+        // Record mastery as incorrect
+        this.recordAnswer(subSkill, false);
+      }
+    }
+
+    // Unit 1 is always unlocked
+    this.state.units[1].unlocked = true;
+    this.state.units[1].practiceLevels[1].unlocked = true;
+
+    this.state.placementCompleted = true;
+    this.generateLearningPlan(results);
+    this.save();
+  },
+
+  generateLearningPlan(placementResults) {
+    const masteredUnits = [];
+    const weakUnits = [];
+
+    const correctSet = new Set();
+    if (placementResults) {
+      for (const r of placementResults) {
+        if (r.correct) correctSet.add(r.unitId);
+      }
+    }
+
+    for (let i = 1; i <= 12; i++) {
+      if (correctSet.has(i)) {
+        masteredUnits.push(i);
+      } else {
+        weakUnits.push(i);
+      }
+    }
+
+    const sessions = [];
+    let sessionId = 1;
+
+    // Distribute weak units across sessions, progressing from level 1 to 3
+    for (const unitId of weakUnits) {
+      for (let level = 1; level <= 3; level++) {
+        if (sessionId >= 10) break; // Reserve session 10 for comprehensive review
+        sessions.push({
+          id: sessionId,
+          label: `第${sessionId}天`,
+          unitId,
+          level,
+          type: "practice",
+          completed: false,
+        });
+        sessionId++;
+      }
+      if (sessionId >= 10) break;
+    }
+
+    // If fewer than 9 sessions used, add review sessions for mastered units
+    let masteredIndex = 0;
+    let reviewLevel = 2; // Start reviews at higher levels
+    while (sessionId < 10 && masteredUnits.length > 0) {
+      const unitId = masteredUnits[masteredIndex % masteredUnits.length];
+      sessions.push({
+        id: sessionId,
+        label: `第${sessionId}天`,
+        unitId,
+        level: reviewLevel,
+        type: "review",
+        completed: false,
+      });
+      sessionId++;
+      masteredIndex++;
+      if (masteredIndex % masteredUnits.length === 0) {
+        reviewLevel = Math.min(reviewLevel + 1, 5);
+      }
+    }
+
+    // Session 10: comprehensive review
+    sessions.push({
+      id: 10,
+      label: "第10天",
+      unitId: null,
+      level: null,
+      type: "综合测试",
+      completed: false,
+    });
+
+    this.state.learningPlan = {
+      totalSessions: 10,
+      completedSessions: 0,
+      sessions,
+      masteredUnits,
+      weakUnits,
+      certificateEarned: false,
+    };
+  },
+
+  completeSession(sessionId) {
+    if (!this.state.learningPlan) return;
+
+    const session = this.state.learningPlan.sessions.find(
+      (s) => s.id === sessionId
+    );
+    if (session && !session.completed) {
+      session.completed = true;
+      this.state.learningPlan.completedSessions += 1;
+
+      if (this.state.learningPlan.completedSessions >= 10) {
+        this.state.learningPlan.certificateEarned = true;
+      }
+    }
+    this.save();
+  },
+
+  getCurrentSession() {
+    if (!this.state.learningPlan) return null;
+    return (
+      this.state.learningPlan.sessions.find((s) => !s.completed) || null
+    );
+  },
+
+  // --- Error Notebook (错题本) ---
+
+  addMistake(question, unitId, level) {
+    if (!question || !question.id) return;
+    // Avoid duplicates: if already in the notebook, just refresh the date.
+    const existing = this.state.mistakes.find((m) => m.question.id === question.id);
+    if (existing) {
+      existing.date = toDateString(new Date());
+      this.save();
+      return;
+    }
+    this.state.mistakes.push({
+      question,
+      unitId,
+      level,
+      date: toDateString(new Date()),
+    });
+    // Cap the notebook so it stays focused on recent errors.
+    if (this.state.mistakes.length > 60) {
+      this.state.mistakes.shift();
+    }
+    this.save();
+  },
+
+  removeMistake(questionId) {
+    this.state.mistakes = this.state.mistakes.filter(
+      (m) => m.question.id !== questionId
+    );
+    this.save();
+  },
+
+  getMistakes() {
+    return [...this.state.mistakes];
+  },
+
+  clearMistakes() {
+    this.state.mistakes = [];
+    this.save();
+  },
+
+  // --- PET Mock Challenge (BOSS) & plan progress ---
+
+  // The BOSS is unlocked once the child has cleared Lv.3 of enough units to
+  // have broad grammar coverage.
+  isBossUnlocked() {
+    let lv3Count = 0;
+    for (let i = 1; i <= 12; i++) {
+      if (this.state.units[i]?.practiceLevels[3]?.completed) lv3Count++;
+    }
+    return lv3Count >= 6;
+  },
+
+  recordBossResult(accuracy) {
+    const passed = accuracy >= 0.7;
+    if (accuracy > this.state.bossBestAccuracy) {
+      this.state.bossBestAccuracy = accuracy;
+    }
+    if (passed && !this.state.bossCleared) {
+      this.state.bossCleared = true;
+      this.earnBadge({
+        id: 'boss_pet_clear',
+        unitId: 0,
+        name: 'PET 模拟通关',
+        icon: '🎓',
+      });
+    }
+    this.save();
+    return passed;
+  },
+
+  // After finishing a practice/review/boss, advance the learning plan if the
+  // completed activity matches the current planned session.
+  advanceLearningPlan({ unitId, level, isBoss }) {
+    const cur = this.getCurrentSession();
+    if (!cur) return;
+    if (isBoss) {
+      if (cur.type === '综合测试') this.completeSession(cur.id);
+    } else if (cur.unitId === unitId && cur.level === level) {
+      this.completeSession(cur.id);
+    }
   },
 };

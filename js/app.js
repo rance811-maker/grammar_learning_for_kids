@@ -6,6 +6,9 @@ import * as practice from './views/practice.js';
 import * as mission from './views/mission.js';
 import * as portfolio from './views/portfolio.js';
 import * as stats from './views/stats.js';
+import * as placement from './views/placement.js';
+import * as review from './views/review.js';
+import * as settings from './views/settings.js';
 
 const app = document.getElementById('app');
 
@@ -17,6 +20,9 @@ const routes = {
   'mission': mission,
   'portfolio': portfolio,
   'stats': stats,
+  'placement': placement,
+  'review': review,
+  'settings': settings,
 };
 
 const titles = {
@@ -27,6 +33,9 @@ const titles = {
   'mission': '任务',
   'portfolio': '我的作品集',
   'stats': '我的',
+  'placement': '摸底测试',
+  'review': '复习中心',
+  'settings': '设置',
 };
 
 function router() {
@@ -34,6 +43,11 @@ function router() {
   const parts = hash.split('/');
   const route = parts[0] || '';
   const params = parts.slice(1);
+
+  if (route === '' && store.isPlacementNeeded()) {
+    location.hash = 'placement';
+    return;
+  }
 
   const view = routes[route];
   if (!view) {
@@ -48,55 +62,86 @@ function router() {
     view.mount(...params);
   }
 
-  mountTabBar();
+  mountNav();
   mountBackButton();
 }
 
+const NAV_ITEMS = [
+  { route: '', icon: '🗺️', label: '学习地图' },
+  { route: 'review', icon: '🎯', label: '复习中心' },
+  { route: 'portfolio', icon: '📁', label: '我的作品集' },
+  { route: 'stats', icon: '📊', label: '我的进度' },
+  { route: 'settings', icon: '⚙️', label: '设置' },
+];
+
+const RANKS = {
+  bronze: { icon: '🥉', name: '青铜' },
+  silver: { icon: '🥈', name: '白银' },
+  gold: { icon: '🥇', name: '黄金' },
+  diamond: { icon: '💎', name: '钻石' },
+  master: { icon: '👑', name: '大师' },
+};
+
+// Map sub-routes (unit/practice/discover/mission) back to the 地图 nav item.
+function activeNavRoute(route) {
+  if (route === 'practice') {
+    // The review-mode practice session belongs under the 复习中心 tab.
+    return location.hash.startsWith('#practice/review') ? 'review' : '';
+  }
+  return ['review', 'portfolio', 'stats', 'settings'].includes(route) ? route : '';
+}
+
 function renderShell(route, content) {
-  const showTabBar = !['practice', 'discover', 'mission'].includes(route);
-  const showBackBtn = route !== '' && route !== 'portfolio' && route !== 'stats';
+  const topLevelRoutes = ['', 'review', 'portfolio', 'stats', 'settings'];
+  const showBackBtn = !topLevelRoutes.includes(route);
   const title = titles[route] || 'Grammar Quest';
 
-  const navRight = route === ''
-    ? ''
-    : '';
+  return `
+    <div class="layout">
+      ${renderSidebar(route)}
+      <div class="main-col">
+        <header class="topbar">
+          ${showBackBtn
+            ? `<button class="topbar__back" id="navBackBtn">← 返回</button>`
+            : '<span class="topbar__back-placeholder"></span>'}
+          <h1 class="topbar__title">${title}</h1>
+          <span class="topbar__spacer"></span>
+        </header>
+        <main class="content">${content}</main>
+      </div>
+    </div>`;
+}
+
+function renderSidebar(route) {
+  const active = activeNavRoute(route);
+  const items = NAV_ITEMS.map(item => `
+    <button class="sidebar__item${item.route === active ? ' active' : ''}" data-route="${item.route}">
+      <span class="sidebar__item-icon">${item.icon}</span>
+      <span class="sidebar__item-label">${item.label}</span>
+    </button>`).join('');
+
+  const p = store.state.player;
+  const rank = RANKS[p.rank] || RANKS.bronze;
 
   return `
-    <nav class="nav-bar">
-      ${showBackBtn
-        ? `<button class="nav-bar__back" id="navBackBtn" aria-label="返回">←</button>`
-        : '<div style="width:36px;"></div>'}
-      <span class="nav-bar__title">${title}</span>
-      <div class="nav-bar__right">${navRight}</div>
-    </nav>
-    <main>${content}</main>
-    ${showTabBar ? renderTabBar(route) : ''}`;
+    <aside class="sidebar">
+      <div class="sidebar__brand">
+        <span class="sidebar__brand-logo">🏆</span>
+        <span class="sidebar__brand-text">Grammar Quest<small>语法冒险</small></span>
+      </div>
+      <nav class="sidebar__nav">${items}</nav>
+      <div class="sidebar__footer">
+        <div class="sidebar__rank">${rank.icon} ${rank.name}</div>
+        <div class="sidebar__score">⭐ ${p.totalScore} 积分</div>
+        <div class="sidebar__streak">🔥 连续 ${p.currentStreak} 天</div>
+      </div>
+    </aside>`;
 }
 
-function renderTabBar(route) {
-  const tabs = [
-    { route: '', icon: '🗺️', label: '地图' },
-    { route: 'portfolio', icon: '📁', label: '作品集' },
-    { route: 'stats', icon: '📊', label: '我的' },
-  ];
-
-  const items = tabs.map(tab => {
-    const active = tab.route === route ? ' active' : '';
-    return `
-      <button class="tab-bar__item${active}" data-route="${tab.route}">
-        <span class="tab-bar__icon">${tab.icon}</span>
-        <span class="tab-bar__label">${tab.label}</span>
-      </button>`;
-  }).join('');
-
-  return `<nav class="tab-bar">${items}</nav>`;
-}
-
-function mountTabBar() {
-  document.querySelectorAll('.tab-bar__item').forEach(btn => {
+function mountNav() {
+  document.querySelectorAll('.sidebar__item').forEach(btn => {
     btn.addEventListener('click', () => {
-      const route = btn.dataset.route;
-      location.hash = route;
+      location.hash = btn.dataset.route;
     });
   });
 }
@@ -110,6 +155,10 @@ function mountBackButton() {
       const parts = hash.split('/');
       const route = parts[0];
 
+      if (route === 'practice' && parts[1] === 'review') {
+        location.hash = 'review';
+        return;
+      }
       if (route === 'discover' || route === 'practice' || route === 'mission') {
         const unitId = parts[1];
         if (unitId) {
