@@ -51,12 +51,16 @@ export const sound = {
     tone(155.56, { start: 0.08, duration: 0.26, type: 'sawtooth', gain: 0.12 });
   },
 
-  // Pitch climbs with the combo count for a satisfying streak feel.
+  // Cheerful ascending arpeggio that grows with the combo count.
   combo(n) {
     if (!enabled()) return;
-    const base = 660;
-    const freq = base + Math.min(n, 10) * 45;
-    tone(freq, { start: 0, duration: 0.1, type: 'square', gain: 0.1 });
+    const base = 523.25 + Math.min(n, 10) * 30;
+    const intervals = [0, 4, 7, 12];
+    const semitone = Math.pow(2, 1 / 12);
+    intervals.forEach((s, i) => {
+      const freq = base * Math.pow(semitone, s);
+      tone(freq, { start: i * 0.08, duration: 0.18, type: 'triangle', gain: 0.13 });
+    });
   },
 
   // Little ascending fanfare; longer for more stars.

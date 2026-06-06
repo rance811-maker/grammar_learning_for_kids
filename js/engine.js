@@ -250,10 +250,12 @@ export const engine = {
         break;
 
       case "reorder": {
-        const stripPunct = (s) => s.replace(/[.,!?;:'"]+/g, "").replace(/\s+/g, " ");
-        correct =
-          stripPunct(normalizeStr(userAnswer)) ===
-          stripPunct(normalizeStr(question.correctSentence));
+        const clean = (s) =>
+          String(s).trim().toLowerCase()
+            .replace(/[.,!?;:'"，。！？；：''""]+/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+        correct = clean(userAnswer) === clean(question.correctSentence);
         correctAnswer = question.correctSentence;
         break;
       }
