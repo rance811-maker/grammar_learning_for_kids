@@ -328,7 +328,7 @@ function updateReorderDisplay(words) {
   }
 
   if (submitBtn) {
-    submitBtn.disabled = reorderAnswer.length === 0;
+    submitBtn.disabled = reorderAnswer.length < words.length;
   }
 }
 
