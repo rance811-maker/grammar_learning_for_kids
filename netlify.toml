@@ -5,3 +5,15 @@
   for = "/*"
   [headers.values]
     X-Content-Type-Options = "nosniff"
+
+# Always revalidate HTML and JS so code fixes take effect immediately
+# instead of being masked by the browser's cached modules.
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "no-cache"
