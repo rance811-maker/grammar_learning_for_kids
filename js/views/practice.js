@@ -3,6 +3,24 @@ import { engine } from '../engine.js';
 import { sound } from '../sound.js';
 import { confetti } from '../celebrate.js';
 
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function extractUnitFromQuestionId(questionId, fallback) {
+  if (!questionId) return fallback;
+  const parts = String(questionId).split('-');
+  const unitId = Number(parts[0]);
+  return Number.isFinite(unitId) ? unitId : fallback;
+}
+
+function extractLevelFromQuestionId(questionId, fallback) {
+  if (!questionId) return fallback;
+  const parts = String(questionId).split('-');
+  const level = Number(parts[1]);
+  return Number.isFinite(level) ? level : fallback;
+}
+
 let session = null;
 let feedbackVisible = false;
 let sessionEnded = false;
@@ -491,10 +509,10 @@ function submitAnswer(question, userAnswer) {
     store.recordAnswer(question.subSkill, isCorrect);
   }
 
-  // Error notebook (错题本): collect wrong answers, retire them once answered
-  // correctly during a review session.
   if (!isCorrect) {
-    store.addMistake(question, session.unitId, session.level);
+    const origUnit = extractUnitFromQuestionId(question.id, session.unitId);
+    const origLevel = extractLevelFromQuestionId(question.id, session.level);
+    store.addMistake(question, origUnit, origLevel);
   } else if (session.unitId === 'review') {
     store.removeMistake(question.id);
   }

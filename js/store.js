@@ -185,7 +185,9 @@ export const store = {
     const lv = unit.practiceLevels[level];
     if (!lv) return;
 
-    lv.completed = true;
+    if (stars >= 1) {
+      lv.completed = true;
+    }
     if (stars > lv.bestStars) {
       lv.bestStars = stars;
     }

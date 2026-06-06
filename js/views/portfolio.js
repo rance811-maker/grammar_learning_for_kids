@@ -1,6 +1,10 @@
 import { store } from '../store.js';
 import { units } from '../data/units.js';
 
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 const UNIT_ICONS = ['📗', '📘', '📙', '📕', '📒', '📓', '📔', '📖', '🔖', '📚', '🏅', '🏆'];
 
 export function render() {
@@ -18,11 +22,11 @@ export function render() {
     const missionTitle = unitData?.mission?.title || `Unit ${uid} 作品`;
 
     if (entry) {
-      const preview = (entry.content || '').slice(0, 80);
+      const preview = escapeHtml((entry.content || '').slice(0, 80));
       cardsHtml += `
         <div class="portfolio-card" data-unit-id="${uid}">
           <div style="font-size:1.5rem;">${icon}</div>
-          <div class="portfolio-card__title">${entry.title || missionTitle}</div>
+          <div class="portfolio-card__title">${escapeHtml(entry.title || missionTitle)}</div>
           <div class="portfolio-card__date">${entry.date || ''}</div>
           <div class="portfolio-card__preview">${preview}${preview.length >= 80 ? '...' : ''}</div>
         </div>`;
@@ -69,10 +73,10 @@ function showModal(entry) {
   modalContainer.innerHTML = `
     <div class="modal-overlay" id="portfolioOverlay">
       <div class="modal">
-        <div class="modal__title" style="font-size:var(--text-lg);">${entry.title || '我的作品'}</div>
+        <div class="modal__title" style="font-size:var(--text-lg);">${escapeHtml(entry.title || '我的作品')}</div>
         <div style="font-size:var(--text-xs);color:var(--color-muted);margin-bottom:var(--space-md);">${entry.date || ''}</div>
         <div style="text-align:left;font-size:var(--text-sm);line-height:1.8;padding:var(--space-md);background:var(--color-bg);border-radius:var(--radius-md);border-left:4px solid var(--color-primary);margin-bottom:var(--space-lg);">
-          ${entry.content || ''}
+          ${escapeHtml(entry.content || '')}
         </div>
         <button class="btn-secondary" id="closePortfolioModal">关闭</button>
       </div>

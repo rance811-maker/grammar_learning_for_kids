@@ -1,6 +1,10 @@
 import { store } from '../store.js';
 import { units } from '../data/units.js';
 
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 let submitted = false;
 
 export function render(unitId) {
@@ -133,6 +137,7 @@ function handleSubmit(unitId, mission) {
   });
 
   const fullArticle = articleParts.join(' ');
+  const safeArticle = escapeHtml(fullArticle);
 
   // Show result
   const resultArea = document.getElementById('missionResult');
@@ -140,7 +145,7 @@ function handleSubmit(unitId, mission) {
     resultArea.innerHTML = `
       <div class="mission-complete-card mt-lg">
         <div class="mission-complete-card__title">🎉 你的作品</div>
-        <div class="mission-complete-card__article">${fullArticle}</div>
+        <div class="mission-complete-card__article">${safeArticle}</div>
       </div>
       <div class="mt-md">
         <button class="btn-primary" id="missionSaveBtn">保存到作品集 📁</button>

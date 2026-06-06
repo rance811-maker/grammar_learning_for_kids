@@ -2,6 +2,12 @@ import { store } from '../store.js';
 import { units } from '../data/units.js';
 import { skillName } from '../data/skill-names.js';
 
+function parseUnitIdFromQuestionId(questionId, fallback) {
+  if (!questionId) return fallback;
+  const unitId = Number(String(questionId).split('-')[0]);
+  return Number.isFinite(unitId) ? unitId : fallback;
+}
+
 const TYPE_LABELS = {
   choice: '选择',
   reorder: '排序',
@@ -21,7 +27,8 @@ export function render() {
     const items = mistakes.slice().reverse().map((m) => {
       const q = m.question;
       const typeLabel = TYPE_LABELS[q.type] || q.type;
-      const unitTitle = units[m.unitId]?.title || `Unit ${m.unitId}`;
+      const effectiveUnitId = typeof m.unitId === 'number' ? m.unitId : parseUnitIdFromQuestionId(q.id, m.unitId);
+      const unitTitle = units[effectiveUnitId]?.title || `Unit ${effectiveUnitId}`;
       const skill = q.subSkill ? skillName(q.subSkill) : '';
       const preview = (q.sentence || q.instruction || q.context || '')
         .replace(/_+/g, '____')

@@ -145,10 +145,13 @@ export function render() {
     const rows = history.map(h => {
       const stars = '⭐'.repeat(h.stars || 0);
       const pct = h.total > 0 ? Math.round((h.correct / h.total) * 100) : 0;
+      const label = h.unitId === 'review' ? '专项复习'
+        : h.unitId === 'boss' ? 'PET 模拟挑战'
+        : `Unit ${h.unitId} - Lv.${h.level}`;
       return `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-sm) 0;border-bottom:1px solid var(--color-border);">
           <div>
-            <div style="font-size:var(--text-sm);font-weight:600;">Unit ${h.unitId} - Lv.${h.level}</div>
+            <div style="font-size:var(--text-sm);font-weight:600;">${label}</div>
             <div style="font-size:var(--text-xs);color:var(--color-muted);">${h.date || ''}</div>
           </div>
           <div style="text-align:right;">
