@@ -365,10 +365,34 @@ function attachMatchListeners(q) {
   document.querySelectorAll('.match-item[data-type="match"]').forEach(item => {
     item.addEventListener('click', () => {
       if (feedbackVisible) return;
-      if (item.classList.contains('match-item--matched')) return;
 
       const side = item.dataset.side;
       const idx = Number(item.dataset.index);
+
+      // Click on a matched item → un-pair it
+      if (item.classList.contains('match-item--matched')) {
+        const itemText = side === 'left' ? (q.left || [])[idx] : (q.right || [])[idx];
+        const pairIdx = matchPairs.findIndex(p =>
+          side === 'left' ? p[0] === itemText : p[1] === itemText
+        );
+        if (pairIdx !== -1) {
+          const pair = matchPairs[pairIdx];
+          const leftIdx = (q.left || []).indexOf(pair[0]);
+          const rightIdx = (q.right || []).indexOf(pair[1]);
+          const leftEl = document.querySelector(`.match-item[data-side="left"][data-index="${leftIdx}"]`);
+          const rightEl = document.querySelector(`.match-item[data-side="right"][data-index="${rightIdx}"]`);
+          if (leftEl) leftEl.classList.remove('match-item--matched');
+          if (rightEl) rightEl.classList.remove('match-item--matched');
+          matchPairs.splice(pairIdx, 1);
+          const submitBtn = document.getElementById('matchSubmit');
+          if (submitBtn) submitBtn.disabled = true;
+        }
+        selectedMatch = null;
+        document.querySelectorAll('.match-item--selected').forEach(el =>
+          el.classList.remove('match-item--selected')
+        );
+        return;
+      }
 
       if (!selectedMatch) {
         // First selection
@@ -377,6 +401,10 @@ function attachMatchListeners(q) {
         );
         selectedMatch = { side, index: idx };
         item.classList.add('match-item--selected');
+      } else if (selectedMatch.side === side && selectedMatch.index === idx) {
+        // Click same item again → deselect
+        item.classList.remove('match-item--selected');
+        selectedMatch = null;
       } else if (selectedMatch.side === side) {
         // Same side, switch selection
         document.querySelectorAll('.match-item--selected').forEach(el =>

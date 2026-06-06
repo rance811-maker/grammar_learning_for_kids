@@ -934,7 +934,7 @@ ul, ol {
 .match-item--matched {
   border-color: var(--color-primary);
   background: rgba(88, 204, 2, 0.08);
-  pointer-events: none;
+  cursor: pointer;
 }
 .match-item--wrong {
   animation: shake 0.4s ease;
