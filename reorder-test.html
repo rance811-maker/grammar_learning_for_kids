@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>排序题判分自测 - Grammar Quest</title>
+  <style>
+    body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+           max-width: 760px; margin: 0 auto; padding: 20px; color: #3c3c3c; background:#f7f7f7; }
+    h1 { font-size: 20px; }
+    .build { font: 13px monospace; color:#fff; background:#58CC02; padding:3px 8px; border-radius:6px; }
+    .card { background:#fff; border:2px solid #e5e5e5; border-radius:12px; padding:16px; margin:14px 0; }
+    .summary { font-size: 22px; font-weight: 800; padding:14px; border-radius:12px; text-align:center; }
+    .ok { background:#e6f9d5; color:#3a8a02; border:2px solid #58CC02; }
+    .bad{ background:#ffe1e1; color:#c01919; border:2px solid #FF4B4B; }
+    .chip { display:inline-block; margin:4px; padding:8px 14px; border-radius:10px; border:2px solid #1CB0F6;
+            background:#fff; color:#1CB0F6; font-weight:700; cursor:pointer; font-size:15px; }
+    .chip.placed { opacity:.35; pointer-events:none; }
+    .ansbox { min-height:48px; border:2px dashed #1CB0F6; border-radius:10px; padding:6px; background:rgba(28,176,246,.05); }
+    .ansbox .chip { background:#1CB0F6; color:#fff; }
+    .btn { margin-top:12px; padding:12px 20px; border:none; border-radius:12px; background:#58CC02; color:#fff;
+           font-weight:800; font-size:16px; cursor:pointer; }
+    .verdict { margin-top:12px; font-weight:800; font-size:18px; }
+    .row { padding:6px 0; border-bottom:1px solid #eee; font-size:14px; }
+    .pass { color:#3a8a02; } .fail { color:#c01919; }
+    .mono { font-family: monospace; font-size:13px; color:#555; }
+    .label { color:#777; font-size:13px; margin-bottom:6px; }
+  </style>
+</head>
+<body>
+  <h1>排序题判分自测 <span class="build" id="build">build ?</span></h1>
+  <p class="mono">这个页面直接调用游戏真正的判分代码（<code>js/engine.js</code>），单独测"把单词排列成正确的句子"题型，无需打通关卡。</p>
+
+  <div id="summary" class="summary">正在加载…</div>
+
+  <div class="card">
+    <div class="label">① 手动试一题（和游戏里完全一样的判分）</div>
+    <div id="qinstruction" style="font-weight:700;margin-bottom:8px;"></div>
+    <div class="label">你的答案：</div>
+    <div id="answer" class="ansbox"></div>
+    <div class="label" style="margin-top:10px;">可用单词：</div>
+    <div id="bank"></div>
+    <button class="btn" id="check">检查答案</button>
+    <button class="btn" id="reset" style="background:#999;">重置</button>
+    <div id="verdict" class="verdict"></div>
+  </div>
+
+  <div class="card">
+    <div class="label">② 自动测全部排序题（用每题的正确答案喂给判分函数）</div>
+    <div id="auto"></div>
+  </div>
+
+  <script type="module">
+    import { engine } from './js/engine.js';
+    import { units } from './js/data/units.js';
+
+    const BUILD = '20260606d';
+    document.getElementById('build').textContent = 'build ' + BUILD;
+
+    // Collect every reorder question across all units/levels.
+    const reorderQs = [];
+    for (const unit of Object.values(units)) {
+      for (const lvl of Object.values(unit.levels || {})) {
+        for (const q of lvl.questions || []) {
+          if (q.type === 'reorder') reorderQs.push(q);
+        }
+      }
+    }
+
+    // ---- ② Auto-test: build the correct answer from words, run real checkAnswer ----
+    const clean = s => String(s).trim().toLowerCase()
+      .replace(/[.,!?;:'"]+/g, '').replace(/\s+/g, ' ').trim();
+
+    let pass = 0, fail = 0;
+    const autoEl = document.getElementById('auto');
+    for (const q of reorderQs) {
+      // find a permutation of words matching the correct sentence
+      const tgt = clean(q.correctSentence).split(' ');
+      const used = new Set(); const perm = [];
+      for (const w of tgt) {
+        for (let i = 0; i < q.words.length; i++) {
+          if (!used.has(i) && clean(q.words[i]) === w) { perm.push(i); used.add(i); break; }
+        }
+      }
+      const answer = perm.map(i => q.words[i]).join(' ');
+      const r = engine.checkAnswer(q, answer);
+      r.correct ? pass++ : fail++;
+      const row = document.createElement('div');
+      row.className = 'row ' + (r.correct ? 'pass' : 'fail');
+      row.innerHTML = (r.correct ? '✅ ' : '❌ ') +
+        '<span class="mono">' + answer + '</span> → ' + (r.correct ? '判对' : '判错（应为正确）');
+      autoEl.appendChild(row);
+    }
+
+    const sum = document.getElementById('summary');
+    if (fail === 0) {
+      sum.className = 'summary ok';
+      sum.textContent = '✅ 全部 ' + pass + ' 道排序题判分正确（0 道误判）';
+    } else {
+      sum.className = 'summary bad';
+      sum.textContent = '❌ 有 ' + fail + ' 道被误判（共 ' + reorderQs.length + ' 道）';
+    }
+
+    // ---- ① Interactive: pick the "have lunch every day" question (or first) ----
+    const demo = reorderQs.find(q => /have lunch every day/i.test(q.correctSentence)) || reorderQs[0];
+    document.getElementById('qinstruction').textContent =
+      (demo.instruction || '把单词排列成正确的句子') + '  （正确答案：' + demo.correctSentence + '）';
+
+    let answerIdx = [];
+    const bankEl = document.getElementById('answer'); // answer area
+    const ansEl = document.getElementById('answer');
+    const wordBankEl = document.getElementById('bank');
+    const verdictEl = document.getElementById('verdict');
+
+    function renderDemo() {
+      // answer area
+      ansEl.innerHTML = '';
+      answerIdx.forEach(idx => {
+        const c = document.createElement('span');
+        c.className = 'chip';
+        c.textContent = demo.words[idx];
+        c.onclick = () => { answerIdx = answerIdx.filter(i => i !== idx); renderDemo(); };
+        ansEl.appendChild(c);
+      });
+      // word bank
+      wordBankEl.innerHTML = '';
+      demo.words.forEach((w, idx) => {
+        const c = document.createElement('span');
+        c.className = 'chip' + (answerIdx.includes(idx) ? ' placed' : '');
+        c.textContent = w;
+        c.onclick = () => { if (!answerIdx.includes(idx)) { answerIdx.push(idx); renderDemo(); } };
+        wordBankEl.appendChild(c);
+      });
+    }
+    renderDemo();
+
+    document.getElementById('check').onclick = () => {
+      // EXACTLY how the game builds the answer string:
+      const answer = answerIdx.map(i => demo.words[i]).join(' ');
+      const r = engine.checkAnswer(demo, answer);
+      verdictEl.className = 'verdict ' + (r.correct ? 'pass' : 'fail');
+      verdictEl.innerHTML = (r.correct ? '✅ 回答正确！' : '❌ 回答错误')
+        + '<br><span class="mono">你的答案: "' + answer + '"</span>';
+    };
+    document.getElementById('reset').onclick = () => { answerIdx = []; verdictEl.textContent = ''; renderDemo(); };
+  </script>
+</body>
+</html>
