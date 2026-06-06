@@ -907,6 +907,17 @@ ul, ol {
 .match-columns {
   display: flex;
   gap: var(--space-md);
+  position: relative;
+}
+
+.match-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .match-column {
@@ -1116,7 +1127,7 @@ ul, ol {
   left: 50%;
   transform: translateX(-50%);
   z-index: 250;
-  background: linear-gradient(135deg, #FF6B35, #FF4B4B);
+  background: linear-gradient(135deg, #FFD700, #FF9600, #CE82FF);
   color: #fff;
   font-weight: 800;
   font-size: var(--text-xl);

@@ -195,6 +195,7 @@ function renderMatchQuestion(q) {
     <div class="question-instruction">${instruction}</div>
     <div class="match-columns mt-md">
       <div class="match-column" id="matchLeft">${leftHtml}</div>
+      <svg class="match-lines" id="matchLines"></svg>
       <div class="match-column" id="matchRight">${rightHtml}</div>
     </div>
     <div class="practice-action mt-md">
@@ -359,6 +360,46 @@ function attachErrorListeners(q) {
   }
 }
 
+const PAIR_COLORS = ['#1CB0F6', '#58CC02', '#CE82FF', '#FF9600', '#FF4B4B', '#00CD9C'];
+
+function drawMatchLines(q) {
+  const svg = document.getElementById('matchLines');
+  if (!svg) return;
+  const container = svg.closest('.match-columns');
+  if (!container) return;
+  const rect = container.getBoundingClientRect();
+  svg.setAttribute('width', rect.width);
+  svg.setAttribute('height', rect.height);
+  svg.innerHTML = '';
+
+  matchPairs.forEach((pair, i) => {
+    const leftIdx = (q.left || []).indexOf(pair[0]);
+    const rightIdx = (q.right || []).indexOf(pair[1]);
+    const leftEl = container.querySelector(`.match-item[data-side="left"][data-index="${leftIdx}"]`);
+    const rightEl = container.querySelector(`.match-item[data-side="right"][data-index="${rightIdx}"]`);
+    if (!leftEl || !rightEl) return;
+
+    const lr = leftEl.getBoundingClientRect();
+    const rr = rightEl.getBoundingClientRect();
+    const x1 = lr.right - rect.left;
+    const y1 = lr.top + lr.height / 2 - rect.top;
+    const x2 = rr.left - rect.left;
+    const y2 = rr.top + rr.height / 2 - rect.top;
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    const color = PAIR_COLORS[i % PAIR_COLORS.length];
+    line.setAttribute('x1', x1);
+    line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2);
+    line.setAttribute('y2', y2);
+    line.setAttribute('stroke', color);
+    line.setAttribute('stroke-width', '3');
+    line.setAttribute('stroke-linecap', 'round');
+    line.setAttribute('opacity', '0.7');
+    svg.appendChild(line);
+  });
+}
+
 function attachMatchListeners(q) {
   const totalPairs = (q.correctPairs || []).length;
 
@@ -391,6 +432,7 @@ function attachMatchListeners(q) {
         document.querySelectorAll('.match-item--selected').forEach(el =>
           el.classList.remove('match-item--selected')
         );
+        drawMatchLines(q);
         return;
       }
 
@@ -444,6 +486,8 @@ function attachMatchListeners(q) {
         if (submitBtn && matchPairs.length >= totalPairs) {
           submitBtn.disabled = false;
         }
+
+        drawMatchLines(q);
       }
     });
   });
@@ -793,7 +837,7 @@ function showCombo(isCorrect) {
   if (isCorrect && session.combo >= 3) {
     comboArea.innerHTML = `
       <div class="combo-display">
-        <span class="combo-display__fire">🔥</span>
+        <span class="combo-display__fire">⭐</span>
         x${session.combo} 连击!
       </div>`;
     setTimeout(() => {
