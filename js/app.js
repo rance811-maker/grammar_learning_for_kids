@@ -10,6 +10,23 @@ import * as placement from './views/placement.js';
 import * as review from './views/review.js';
 import * as settings from './views/settings.js';
 
+// Bump this on every deploy so we can confirm which code is actually live.
+const BUILD_VERSION = '20260606c';
+console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
+
+// Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
+// version at a glance instead of guessing about stale caches.
+function showBuildBadge() {
+  if (document.getElementById('buildBadge')) return;
+  const badge = document.createElement('div');
+  badge.id = 'buildBadge';
+  badge.textContent = 'build ' + BUILD_VERSION;
+  badge.style.cssText =
+    'position:fixed;bottom:3px;right:5px;z-index:9999;font:10px/1 monospace;' +
+    'color:#bbb;pointer-events:none;user-select:none;';
+  document.body.appendChild(badge);
+}
+
 const app = document.getElementById('app');
 
 const routes = {
@@ -180,3 +197,4 @@ function mountBackButton() {
 store.init();
 window.addEventListener('hashchange', router);
 router();
+showBuildBadge();
