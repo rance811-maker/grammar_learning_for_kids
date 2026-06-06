@@ -249,11 +249,14 @@ export const engine = {
         correctAnswer = question.options?.[question.correctIndex] ?? "";
         break;
 
-      case "reorder":
+      case "reorder": {
+        const stripPunct = (s) => s.replace(/[.,!?;:'"]+/g, "").replace(/\s+/g, " ");
         correct =
-          normalizeStr(userAnswer) === normalizeStr(question.correctSentence);
+          stripPunct(normalizeStr(userAnswer)) ===
+          stripPunct(normalizeStr(question.correctSentence));
         correctAnswer = question.correctSentence;
         break;
+      }
 
       case "error":
         correct = userAnswer === question.errorIndex;
