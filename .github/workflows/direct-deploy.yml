@@ -7,6 +7,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      NETLIFY_AUTH_TOKEN: nfp_dRq39DWBjqZz5Dpki4cCv3evdgg791Pa6230
+      NETLIFY_SITE_ID: 1df0b778-c38b-4a8e-ac7d-42d2e3e4bc77
     steps:
       - uses: actions/checkout@v4
 
@@ -17,4 +20,4 @@ jobs:
       - name: Deploy fixed files directly to Netlify
         run: |
           rm -rf .github
-          npx -y netlify-cli@latest deploy --prod --dir=. --site=1df0b778-c38b-4a8e-ac7d-42d2e3e4bc77 --auth=nfp_dRq39DWBjqZz5Dpki4cCv3evdgg791Pa6230
+          npx -y netlify-cli@latest deploy --prod --dir=.
