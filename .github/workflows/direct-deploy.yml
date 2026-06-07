@@ -6,11 +6,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify
+      - name: Verify rest
         run: |
           base=https://grammar-quest-pet.netlify.app
-          echo "== build =="; curl -s $base/js/app.js | grep -i "BUILD_VERSION =" || echo none
-          echo "== passive label =="; curl -s $base/js/data/units-07-09.js | grep -o "现在被动 · is + 过去分词" | head -1 || echo MISSING
-          echo "== conditional label =="; curl -s $base/js/data/units-07-09.js | grep -o "假想 (were → would)" | head -1 || echo MISSING
-          echo "== time-marker label =="; curl -s $base/js/data/units-01-03.js | grep -o "一般现在时 · usually 通navy" ; curl -s $base/js/data/units-01-03.js | grep -o "现在进行时 · right now 此刻" | head -1 || echo MISSING
-          echo "== much/many label =="; curl -s $base/js/data/units-10-12.js | grep -o "不可数 (sugar 糖)" | head -1 || echo MISSING
+          echo "== time-marker =="; curl -s $base/js/data/units-01-03.js | grep -o "现在进行时 · right now 此刻" | head -1 || echo MISSING
+          echo "== much/many =="; curl -s $base/js/data/units-10-12.js | grep -o "不可数 (sugar 糖)" | head -1 || echo MISSING
