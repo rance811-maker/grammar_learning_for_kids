@@ -1,0 +1,20 @@
+name: Deploy to Netlify
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/deploy-netlify.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Deploy to Netlify
+        run: npx -y @netlify/mcp@latest --site-id 1df0b778-c38b-4a8e-ac7d-42d2e3e4bc77 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..XRxEaCGGpzjBEF9m.IGYYpMTmdTmVOHcUk9WTY6rNtU0F7iScS25ePVjQp2ZQWnmLuDUbEDs-CPXxz5AiPnQ_yrIWDRJPMFpnRTC6M_CLkao8S7cO9OVfAT1KM9czNJCLQkeyi_IULYVH9Dx67LQPVc1wH8wRfhnJZzKfVTX5pyJI47780LO_IoHTn5uGdAabdl-jmRDfff3S2JhNsi6fZEOCiKNzPff-NlN24hgPxW9hSJsSfUUeb1N5hOCeBJy74tTiHmWSfBHwRRM8AAorgZ_Xbi10hu9QFDftJuJC6NeMiHmyZShmnqTPGg-0KtlhRcAvSD8cAxIv3kbQySINbmmiOMr4H3Faatp_GUyvVxTFTXMrZKviyydtQ3BFrb1KO7SzJ9PwnOymKGdCZRBHdwEL.vuyDRi3ygW-Jm172O6FFgg"
