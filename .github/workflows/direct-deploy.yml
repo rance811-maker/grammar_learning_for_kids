@@ -8,15 +8,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify live site
+      - name: Confirm sound.js
         run: |
-          echo '== app.js BUILD_VERSION =='
-          curl -s https://grammar-quest-pet.netlify.app/js/app.js | grep -i 'BUILD_VERSION =' || echo 'none'
-          echo '== index.html app.js ref =='
-          curl -s https://grammar-quest-pet.netlify.app/ | grep -i 'app.js' || echo 'none'
-          echo '== sound.js combo melody marker =='
-          curl -s https://grammar-quest-pet.netlify.app/js/sound.js | grep -i 'level-up jingle' || echo 'OLD sound.js'
-          echo '== practice.js auto-advance marker =='
-          curl -s https://grammar-quest-pet.netlify.app/js/views/practice.js | grep -i 'AUTO_ADVANCE_MS' | head -1 || echo 'OLD practice.js'
-          echo '== engine.js correction marker =='
-          curl -s https://grammar-quest-pet.netlify.app/js/engine.js | grep -i 'correction' | head -1 || echo 'OLD engine.js'
+          echo '== sound.js new combo markers =='
+          curl -s https://grammar-quest-pet.netlify.app/js/sound.js | grep -iE 'major-pentatonic|Sparkle on top|level-up' || echo 'OLD sound.js'
