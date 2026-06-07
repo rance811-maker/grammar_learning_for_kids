@@ -9,5 +9,5 @@
 //
 // 这两个值留空时，应用会自动以"纯访客 / 仅本机"模式运行，登录入口会隐藏。
 
-export const SUPABASE_URL = "";
-export const SUPABASE_ANON_KEY = "";
+export const SUPABASE_URL = "https://womdtayzftvaggjyyaej.supabase.co";
+export const SUPABASE_ANON_KEY = "sb_publishable_EMMRx_9BBdXO5vWoFApk4w_tLhg2sv1";
