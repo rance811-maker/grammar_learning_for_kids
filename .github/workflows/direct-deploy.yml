@@ -9,15 +9,18 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NETLIFY_AUTH_TOKEN: nfp_dRq39DWBjqZz5Dpki4cCv3evdgg791Pa6230
-      NETLIFY_SITE_ID: 1df0b778-c38b-4a8e-ac7d-42d2e3e4bc77
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Deploy fixed files directly to Netlify
+      - name: Diagnose token access
         run: |
-          rm -rf .github
-          npx -y netlify-cli@latest deploy --prod --dir=.
+          npm install -g netlify-cli >/dev/null 2>&1
+          echo "===== current user (token owner) ====="
+          netlify api getCurrentUser 2>&1 | tr ',' '\n' | grep -iE '"email"|"full_name"|"slug"' | head -20 || true
+          echo ""
+          echo "===== sites visible to this token ====="
+          netlify api listSites --data '{}' 2>&1 | tr '}' '\n' | grep -iE '"name":|"id":' | grep -iE 'grammar|quest' | head -40 || true
+          echo ""
+          echo "===== total site count visible ====="
+          netlify api listSites --data '{}' 2>&1 | grep -o '"id"' | wc -l || true
+          echo ""
+          echo "===== try getSite on target id ====="
+          netlify api getSite --data '{"site_id":"1df0b778-c38b-4a8e-ac7d-42d2e3e4bc77"}' 2>&1 | head -c 400 || true
