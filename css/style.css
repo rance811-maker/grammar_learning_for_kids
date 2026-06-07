@@ -2032,6 +2032,18 @@ ul, ol {
   border-color: var(--color-primary);
 }
 .account-submit { width: 100%; }
+.account-link {
+  display: block;
+  margin: var(--space-sm) auto 0;
+  background: none;
+  border: none;
+  color: var(--color-secondary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.account-link:disabled { opacity: 0.5; cursor: default; }
 .account-msg {
   font-size: var(--text-sm);
   font-weight: 700;

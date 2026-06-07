@@ -1,131 +1,52 @@
 -- ============================================================================
--- Grammar Quest · Supabase 账号系统建表脚本
+-- Grammar Quest · Supabase 账号系统建表脚本（v2：基于 Supabase Auth）
 -- ----------------------------------------------------------------------------
 -- 在 Supabase 控制台 -> SQL Editor 里，把本文件全部内容粘贴进去，点 "Run"。
--- 只需要运行一次。运行后会创建：
---   1. kids 表（保存每个小朋友的账号和学习数据）
---   2. 4 个安全函数：注册 / 登录 / 读取 / 保存
+-- 可以重复运行（幂等）。
 --
--- 安全说明：
---   - 密码用 bcrypt 加密存储，数据库里看不到明文。
---   - kids 表开启了 RLS 且不开放任何直接读写策略，所以即使别人拿到
---     公开的 anon key，也无法直接读取别人的密码或数据。
---   - 所有访问都只能通过下面 4 个 SECURITY DEFINER 函数进行。
+-- 这一版改用 Supabase 自带的账号系统（Auth）：
+--   - 注册/登录/找回密码都由 Supabase Auth 负责，找回密码邮件原生发送。
+--   - 学习数据存在 profiles 表，每行对应一个账号(auth.users.id)。
+--   - 靠行级安全(RLS)保证：每个人只能读写自己的那一行。
+--
+-- 运行完这段 SQL 后，还需要在控制台做两个设置（详见 docs/账号系统说明.md）：
+--   1. Authentication -> URL Configuration -> Site URL 填成站点网址
+--   2. （建议）Authentication -> Providers -> Email -> 关闭 "Confirm email"，
+--      这样小朋友注册后可以立即开始玩。
 -- ============================================================================
 
--- 用于密码加密的扩展
-create extension if not exists pgcrypto with schema extensions;
-
--- 账号表
-create table if not exists public.kids (
-  name          text primary key,
-  password_hash text not null,
-  token         text not null default gen_random_uuid()::text,
-  state         jsonb,
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
+-- 学习数据表：id 直接引用 Auth 用户，删号时级联删除数据。
+create table if not exists public.profiles (
+  id         uuid primary key references auth.users(id) on delete cascade,
+  state      jsonb,
+  updated_at timestamptz not null default now()
 );
 
--- 锁住表：开启 RLS，且不创建任何策略 -> anon / authenticated 角色无法直接读写。
-alter table public.kids enable row level security;
-revoke all on public.kids from anon, authenticated;
+-- 打开行级安全。
+alter table public.profiles enable row level security;
+
+-- 让登录用户(authenticated)能对 profiles 做读写（具体哪一行由下面的策略限制）。
+grant select, insert, update on public.profiles to authenticated;
+
+-- 策略：每个人只能读/写/建自己的那一行（auth.uid() = id）。
+-- 先 drop 再 create，保证脚本可重复运行。
+drop policy if exists "profiles_select_own" on public.profiles;
+create policy "profiles_select_own" on public.profiles
+  for select using (auth.uid() = id);
+
+drop policy if exists "profiles_insert_own" on public.profiles;
+create policy "profiles_insert_own" on public.profiles
+  for insert with check (auth.uid() = id);
+
+drop policy if exists "profiles_update_own" on public.profiles;
+create policy "profiles_update_own" on public.profiles
+  for update using (auth.uid() = id) with check (auth.uid() = id);
 
 -- ----------------------------------------------------------------------------
--- 注册：成功返回登录令牌(token)，名字已存在则报错 NAME_TAKEN
+-- 可选清理：v1 的自建账号表/函数已不再使用，可取消下面注释来删除它们。
 -- ----------------------------------------------------------------------------
-create or replace function public.kid_register(p_name text, p_password text)
-returns text
-language plpgsql
-security definer
-set search_path = public, extensions
-as $$
-declare
-  v_token text;
-  v_name  text := trim(p_name);
-begin
-  if length(v_name) = 0 then
-    raise exception 'EMPTY_NAME';
-  end if;
-  if length(coalesce(p_password, '')) < 3 then
-    raise exception 'WEAK_PASSWORD';
-  end if;
-  if exists (select 1 from public.kids where lower(name) = lower(v_name)) then
-    raise exception 'NAME_TAKEN';
-  end if;
-  v_token := gen_random_uuid()::text;
-  insert into public.kids (name, password_hash, token)
-  values (v_name, crypt(p_password, gen_salt('bf')), v_token);
-  return v_token;
-end;
-$$;
-
--- ----------------------------------------------------------------------------
--- 登录：成功返回令牌(token)，否则报错 NO_USER / BAD_PASSWORD
--- ----------------------------------------------------------------------------
-create or replace function public.kid_login(p_name text, p_password text)
-returns text
-language plpgsql
-security definer
-set search_path = public, extensions
-as $$
-declare
-  v_row public.kids%rowtype;
-begin
-  select * into v_row from public.kids where lower(name) = lower(trim(p_name));
-  if not found then
-    raise exception 'NO_USER';
-  end if;
-  if v_row.password_hash <> crypt(p_password, v_row.password_hash) then
-    raise exception 'BAD_PASSWORD';
-  end if;
-  return v_row.token;
-end;
-$$;
-
--- ----------------------------------------------------------------------------
--- 读取学习数据：需要正确的 name + token
--- ----------------------------------------------------------------------------
-create or replace function public.kid_load(p_name text, p_token text)
-returns jsonb
-language plpgsql
-security definer
-set search_path = public, extensions
-as $$
-declare
-  v_row public.kids%rowtype;
-begin
-  select * into v_row from public.kids where lower(name) = lower(trim(p_name));
-  if not found or v_row.token <> p_token then
-    raise exception 'AUTH';
-  end if;
-  return v_row.state;
-end;
-$$;
-
--- ----------------------------------------------------------------------------
--- 保存学习数据：需要正确的 name + token
--- ----------------------------------------------------------------------------
-create or replace function public.kid_save(p_name text, p_token text, p_state jsonb)
-returns void
-language plpgsql
-security definer
-set search_path = public, extensions
-as $$
-declare
-  v_row public.kids%rowtype;
-begin
-  select * into v_row from public.kids where lower(name) = lower(trim(p_name));
-  if not found or v_row.token <> p_token then
-    raise exception 'AUTH';
-  end if;
-  update public.kids
-     set state = p_state, updated_at = now()
-   where name = v_row.name;
-end;
-$$;
-
--- 只把这 4 个函数的执行权限开放给公开(anon)和登录(authenticated)角色。
-grant execute on function public.kid_register(text, text)         to anon, authenticated;
-grant execute on function public.kid_login(text, text)            to anon, authenticated;
-grant execute on function public.kid_load(text, text)             to anon, authenticated;
-grant execute on function public.kid_save(text, text, jsonb)      to anon, authenticated;
+-- drop function if exists public.kid_register(text, text);
+-- drop function if exists public.kid_login(text, text);
+-- drop function if exists public.kid_load(text, text);
+-- drop function if exists public.kid_save(text, text, jsonb);
+-- drop table if exists public.kids;

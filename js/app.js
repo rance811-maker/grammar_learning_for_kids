@@ -1,4 +1,5 @@
 import { store } from './store.js';
+import { cloud } from './cloud.js';
 import * as home from './views/home.js';
 import * as unit from './views/unit.js';
 import * as discover from './views/discover.js';
@@ -12,7 +13,7 @@ import * as settings from './views/settings.js';
 import * as account from './views/account.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260608a';
+const BUILD_VERSION = '20260608b';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -207,14 +208,47 @@ function mountBackButton() {
   }
 }
 
+// Supabase 在确认/找回密码邮件的链接里，会把令牌放在 URL 的 # 片段中
+// （形如 #access_token=...&type=recovery）。这会和我们的 hash 路由冲突，
+// 所以要在路由之前把它"消费"掉。
+async function consumeAuthCallback() {
+  const h = location.hash.slice(1);
+  if (!h.includes('access_token=')) return;
+  const p = new URLSearchParams(h);
+  const access_token = p.get('access_token');
+  const refresh_token = p.get('refresh_token');
+  const type = p.get('type');
+  if (!access_token) return;
+
+  if (type === 'recovery') {
+    // 进入"设置新密码"界面，令牌交给 account 视图使用。
+    window.__gqRecovery = { access_token, refresh_token };
+    history.replaceState(null, '', '#account/reset');
+    return;
+  }
+
+  // 邮箱确认 / 魔法链接：直接登录并回到首页。
+  try {
+    cloud.applyRecoverySession({ access_token, refresh_token });
+    await cloud.fetchUser();
+    store._refreshAccount();
+    await store.syncFromCloud();
+  } catch (e) {
+    console.warn('Auth callback failed:', e.message);
+  }
+  history.replaceState(null, '', '#');
+}
+
 // Initialize
 store.init();
 window.addEventListener('hashchange', router);
-router();
-showBuildBadge();
 
-// If logged in, pull the latest cloud state in the background and re-render
-// once it arrives (the local cached copy was already shown above).
-if (store.isLoggedIn()) {
-  store.syncFromCloud().then(changed => { if (changed) router(); });
-}
+consumeAuthCallback().then(() => {
+  router();
+  showBuildBadge();
+  // If logged in, pull the latest cloud state in the background and re-render
+  // once it arrives (the local cached copy was already shown above).
+  if (store.isLoggedIn()) {
+    store.syncFromCloud().then(changed => { if (changed) router(); });
+  }
+});

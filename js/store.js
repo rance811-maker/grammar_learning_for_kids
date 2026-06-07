@@ -1,7 +1,6 @@
 import { cloud, cloudEnabled } from "./cloud.js";
 
 const STORAGE_KEY = "grammar-quest-state";
-const ACCOUNT_KEY = "grammar-quest-account";
 
 const RANK_THRESHOLDS = [
   { rank: "master", min: 20000 },
@@ -69,12 +68,12 @@ function daysBetween(dateStrA, dateStrB) {
 
 export const store = {
   state: null,
-  // 当前账号：{ name, token } 表示已登录(云端模式)；null 表示访客(仅本机)。
+  // 当前账号：{ name, email, userId } 表示已登录(云端)；null 表示访客(仅本机)。
+  // 这是从云端会话派生的缓存，真正的会话(令牌)由 cloud.js 管理。
   account: null,
   _pushTimer: null,
 
   init() {
-    this._loadAccount();
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
@@ -88,6 +87,7 @@ export const store = {
       this._saveLocal();
     }
     this._migrate();
+    this._refreshAccount();
     return this.state;
   },
 
@@ -131,33 +131,20 @@ export const store = {
   // --- Accounts & Cloud Sync ---
 
   isLoggedIn() {
-    return Boolean(this.account && this.account.token);
+    return cloudEnabled() && cloud.hasSession();
   },
 
-  _loadAccount() {
-    try {
-      const raw = localStorage.getItem(ACCOUNT_KEY);
-      this.account = raw ? JSON.parse(raw) : null;
-    } catch {
-      this.account = null;
-    }
-  },
-
-  _persistAccount() {
-    try {
-      if (this.account) {
-        localStorage.setItem(ACCOUNT_KEY, JSON.stringify(this.account));
-      } else {
-        localStorage.removeItem(ACCOUNT_KEY);
-      }
-    } catch {
-      // ignore
-    }
+  // Refresh the cached account info from the cloud session.
+  _refreshAccount() {
+    const u = cloudEnabled() ? cloud.currentUser() : null;
+    this.account = u && u.id
+      ? { name: u.display_name || u.email, email: u.email, userId: u.id }
+      : null;
   },
 
   // Debounced push so a burst of save() calls turns into a single upload.
   _scheduleCloudPush() {
-    if (!this.isLoggedIn() || !cloudEnabled()) return;
+    if (!this.isLoggedIn()) return;
     if (this._pushTimer) clearTimeout(this._pushTimer);
     this._pushTimer = setTimeout(() => this._pushNow(), 1500);
   },
@@ -167,62 +154,61 @@ export const store = {
       clearTimeout(this._pushTimer);
       this._pushTimer = null;
     }
-    if (!this.isLoggedIn() || !cloudEnabled()) return;
+    if (!this.isLoggedIn()) return;
     try {
-      await cloud.save(this.account.name, this.account.token, this.state);
+      await cloud.saveState(this.state);
     } catch (e) {
       console.warn("Cloud save failed:", e.message);
     }
   },
 
-  // Register a new account; current (guest) progress is carried into it.
-  async register(name, password) {
-    const token = await cloud.register(name, password);
-    this.account = { name: name.trim(), token };
-    this._persistAccount();
-    this.state.player.name = this.account.name;
+  // Register a new account (email + password + 名字).
+  // 返回 { needsConfirm }: true 表示需要去邮箱点确认链接后才能登录。
+  async register(name, email, password) {
+    const res = await cloud.signUp(email, password, name.trim());
+    if (!res.confirmed) {
+      return { needsConfirm: true };
+    }
+    this._refreshAccount();
+    this.state.player.name = name.trim();
     this._saveLocal();
     await this._pushNow(); // seed the cloud with the guest's existing progress
-    return this.account;
+    return { needsConfirm: false };
   },
 
-  // Log in; the cloud copy becomes the source of truth on this device.
-  async login(name, password) {
-    const token = await cloud.login(name, password);
-    this.account = { name: name.trim(), token };
-    this._persistAccount();
-    const remote = await cloud.load(this.account.name, this.account.token);
+  // Log in with email + password; the cloud copy becomes source of truth.
+  async login(email, password) {
+    await cloud.signIn(email, password);
+    this._refreshAccount();
+    const remote = await cloud.loadState();
     if (remote) {
       this.state = remote;
       this._migrate();
-      this.state.player.name = this.account.name;
-      this._saveLocal();
     } else {
-      // Account exists but has no saved state yet -> seed it with local data.
-      this.state.player.name = this.account.name;
-      this._saveLocal();
+      // First login on a fresh account -> seed it with local (guest) data.
       await this._pushNow();
     }
+    if (this.account) this.state.player.name = this.account.name;
+    this._saveLocal();
     return this.account;
   },
 
   // Pull the latest cloud state. Returns true if local state changed.
   async syncFromCloud() {
-    if (!this.isLoggedIn() || !cloudEnabled()) return false;
+    if (!this.isLoggedIn()) return false;
     try {
-      const remote = await cloud.load(this.account.name, this.account.token);
+      const remote = await cloud.loadState();
       if (remote) {
         this.state = remote;
         this._migrate();
-        this.state.player.name = this.account.name;
+        if (this.account) this.state.player.name = this.account.name;
         this._saveLocal();
         return true;
       }
     } catch (e) {
-      // Invalid/expired token -> drop back to guest mode.
-      if (String(e.message).includes("AUTH")) {
-        this.account = null;
-        this._persistAccount();
+      // Session gone/invalid -> drop back to guest mode.
+      if (String(e.message).includes("NO_SESSION")) {
+        this._refreshAccount();
       }
       console.warn("Cloud sync failed:", e.message);
     }
@@ -231,11 +217,35 @@ export const store = {
 
   // Log out and return to a clean guest state (so a shared device doesn't
   // leak the previous child's progress).
-  logout() {
-    this.account = null;
-    this._persistAccount();
+  async logout() {
+    await cloud.signOut();
+    this._refreshAccount();
     this.state = createDefaultState();
     this._saveLocal();
+  },
+
+  // --- Password recovery ---
+
+  // 发送找回密码邮件到注册邮箱。
+  requestPasswordReset(email) {
+    const redirectTo = location.origin + location.pathname;
+    return cloud.recover(email, redirectTo);
+  },
+
+  // 用户点了恢复邮件链接后，设置新密码并登录。
+  async applyNewPassword(recovery, newPassword) {
+    cloud.applyRecoverySession(recovery);
+    await cloud.updatePassword(newPassword);
+    await cloud.fetchUser();
+    this._refreshAccount();
+    const remote = await cloud.loadState();
+    if (remote) {
+      this.state = remote;
+      this._migrate();
+    }
+    if (this.account) this.state.player.name = this.account.name;
+    this._saveLocal();
+    return this.account;
   },
 
   // --- Player ---
