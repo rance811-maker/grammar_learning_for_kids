@@ -14,7 +14,7 @@
 -- ============================================================================
 
 -- 用于密码加密的扩展
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 
 -- 账号表
 create table if not exists public.kids (
@@ -37,7 +37,7 @@ create or replace function public.kid_register(p_name text, p_password text)
 returns text
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_token text;
@@ -66,7 +66,7 @@ create or replace function public.kid_login(p_name text, p_password text)
 returns text
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_row public.kids%rowtype;
@@ -89,7 +89,7 @@ create or replace function public.kid_load(p_name text, p_token text)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_row public.kids%rowtype;
@@ -109,7 +109,7 @@ create or replace function public.kid_save(p_name text, p_token text, p_state js
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_row public.kids%rowtype;
