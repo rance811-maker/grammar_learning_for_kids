@@ -10,6 +10,26 @@ let selectedMatch = null; // for match questions: { side, index }
 let matchPairs = [];      // completed match pairs
 let reorderAnswer = [];   // current reorder answer word indices
 let selectedErrorIdx = null;
+let advanceTimer = null;  // auto-advance timer for correct answers
+
+// How long the "correct" toast stays before auto-advancing to the next question.
+const AUTO_ADVANCE_MS = 1600;
+
+function clearAdvanceTimer() {
+  if (advanceTimer) {
+    clearTimeout(advanceTimer);
+    advanceTimer = null;
+  }
+}
+
+function advanceToNext() {
+  clearAdvanceTimer();
+  const feedbackArea = document.getElementById('feedbackArea');
+  if (feedbackArea) feedbackArea.innerHTML = '';
+  if (sessionEnded) return;
+  session.currentIndex += 1;
+  renderCurrentQuestion();
+}
 
 export function render(unitId, level) {
   if (unitId === 'review') {
@@ -77,6 +97,7 @@ export function mount(unitId, level) {
   const closeBtn = document.getElementById('practiceClose');
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
+      clearAdvanceTimer();
       if (sessionEnded) {
         location.hash = backTarget;
         return;
@@ -97,6 +118,7 @@ function renderCurrentQuestion() {
     return;
   }
 
+  clearAdvanceTimer();
   feedbackVisible = false;
   selectedMatch = null;
   matchPairs = [];
@@ -636,13 +658,29 @@ function showFeedback(isCorrect, question, userAnswer, result) {
     ? `<span style="margin-left:var(--space-sm);">🔥 x${session.combo} 连击!</span>`
     : '';
 
-  const correctAnswerHtml = !isCorrect && result.correctAnswer
+  // For "error" (click-the-wrong-word) questions, always reveal the right word
+  // — even when the learner answered correctly — so they learn the fix.
+  let correctionHtml = '';
+  if (question.type === 'error' && result.correction) {
+    const wrongWord = question.words?.[question.errorIndex] ?? '';
+    correctionHtml = `<div class="feedback-banner__correct-answer">正确写法：<s>${wrongWord}</s> → <strong>${result.correction}</strong></div>`;
+  }
+
+  // The plain "correct answer" line is only useful on wrong answers, and not for
+  // error questions (whose answer is the wrong word — shown via correctionHtml).
+  const correctAnswerHtml = !isCorrect && result.correctAnswer && question.type !== 'error'
     ? `<div class="feedback-banner__correct-answer">正确答案：${result.correctAnswer}</div>`
     : '';
 
   const explanationHtml = !isCorrect && result.explanation
     ? `<div class="feedback-banner__explanation">${result.explanation}</div>`
     : '';
+
+  // Correct → brief toast that auto-advances (no need to reach for a button).
+  // Wrong → keep a manual 继续 button so there's time to read the explanation.
+  const continueBtnHtml = isCorrect
+    ? ''
+    : `<button class="btn-primary" id="continueBtn" style="background:rgba(255,255,255,0.25);box-shadow:0 4px 0 rgba(0,0,0,0.15);">继续</button>`;
 
   feedbackArea.innerHTML = `
     <div class="feedback-banner ${bannerClass}">
@@ -651,18 +689,20 @@ function showFeedback(isCorrect, question, userAnswer, result) {
         <span>${title}</span>
         ${scoreInfo}${comboInfo}
       </div>
+      ${correctionHtml}
       ${correctAnswerHtml}
       ${explanationHtml}
-      <button class="btn-primary" id="continueBtn" style="background:rgba(255,255,255,0.25);box-shadow:0 4px 0 rgba(0,0,0,0.15);">继续</button>
+      ${continueBtnHtml}
     </div>`;
 
-  const continueBtn = document.getElementById('continueBtn');
-  if (continueBtn) {
-    continueBtn.addEventListener('click', () => {
-      feedbackArea.innerHTML = '';
-      session.currentIndex += 1;
-      renderCurrentQuestion();
-    });
+  if (isCorrect) {
+    clearAdvanceTimer();
+    advanceTimer = setTimeout(advanceToNext, AUTO_ADVANCE_MS);
+  } else {
+    const continueBtn = document.getElementById('continueBtn');
+    if (continueBtn) {
+      continueBtn.addEventListener('click', advanceToNext);
+    }
   }
 }
 

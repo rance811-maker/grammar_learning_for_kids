@@ -51,16 +51,25 @@ export const sound = {
     tone(155.56, { start: 0.08, duration: 0.26, type: 'sawtooth', gain: 0.12 });
   },
 
-  // Cheerful ascending arpeggio that grows with the combo count.
+  // A bright, happy "level-up" jingle that gets longer/higher with the streak.
+  // Uses a major-pentatonic run (no dissonant intervals) so it always reads as
+  // celebratory rather than alarming.
   combo(n) {
     if (!enabled()) return;
-    const base = 523.25 + Math.min(n, 10) * 30;
-    const intervals = [0, 4, 7, 12];
+    const root = 523.25; // C5
     const semitone = Math.pow(2, 1 / 12);
-    intervals.forEach((s, i) => {
-      const freq = base * Math.pow(semitone, s);
-      tone(freq, { start: i * 0.08, duration: 0.18, type: 'triangle', gain: 0.13 });
-    });
+    // C  D  E  G  A  C6 D6 E6 — cheerful ascending melody.
+    const melody = [0, 2, 4, 7, 9, 12, 14, 16];
+    const steps = Math.min(melody.length, 4 + Math.floor(n / 2));
+    const step = 0.1;
+    for (let i = 0; i < steps; i++) {
+      const freq = root * Math.pow(semitone, melody[i]);
+      tone(freq, { start: i * step, duration: 0.26, type: 'triangle', gain: 0.14 });
+    }
+    // Sparkle on top for bigger streaks, ringing out a little longer.
+    if (n >= 5) {
+      tone(root * Math.pow(semitone, 19), { start: steps * step, duration: 0.45, type: 'sine', gain: 0.13 });
+    }
   },
 
   // Little ascending fanfare; longer for more stars.

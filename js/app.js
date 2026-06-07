@@ -11,7 +11,7 @@ import * as review from './views/review.js';
 import * as settings from './views/settings.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260606c';
+const BUILD_VERSION = '20260607a';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed

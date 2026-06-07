@@ -241,6 +241,9 @@ export const engine = {
     let correct = false;
     let correctAnswer = "";
     const explanation = question.explanation || "";
+    // For "error" (click-the-wrong-word) questions, the word that should
+    // replace the mistake — surfaced so learners always see the right word.
+    const correction = question.correction || "";
 
     switch (type) {
       case "choice":
@@ -299,7 +302,7 @@ export const engine = {
         correctAnswer = "";
     }
 
-    return { correct, correctAnswer, explanation };
+    return { correct, correctAnswer, explanation, correction };
   },
 
   calculateResults(session) {
