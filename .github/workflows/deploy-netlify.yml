@@ -14,7 +14,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Deploy to Netlify
-        run: npx -y @netlify/mcp@latest --site-id 1df0b778-c38b-4a8e-ac7d-42d2e3e4bc77 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..XRxEaCGGpzjBEF9m.IGYYpMTmdTmVOHcUk9WTY6rNtU0F7iScS25ePVjQp2ZQWnmLuDUbEDs-CPXxz5AiPnQ_yrIWDRJPMFpnRTC6M_CLkao8S7cO9OVfAT1KM9czNJCLQkeyi_IULYVH9Dx67LQPVc1wH8wRfhnJZzKfVTX5pyJI47780LO_IoHTn5uGdAabdl-jmRDfff3S2JhNsi6fZEOCiKNzPff-NlN24hgPxW9hSJsSfUUeb1N5hOCeBJy74tTiHmWSfBHwRRM8AAorgZ_Xbi10hu9QFDftJuJC6NeMiHmyZShmnqTPGg-0KtlhRcAvSD8cAxIv3kbQySINbmmiOMr4H3Faatp_GUyvVxTFTXMrZKviyydtQ3BFrb1KO7SzJ9PwnOymKGdCZRBHdwEL.vuyDRi3ygW-Jm172O6FFgg"
+        run: npx -y @netlify/mcp@latest --site-id 1df0b778-c38b-4a8e-ac7d-42d2e3e4bc77 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..ToBu0UR51EgU_gOd.2yZw4kdW0ZhIpYKM6bgTMGClLso1faO4mOdZ4E0yrUOEMnVS0L7WNq8bXxQo4NCHCGnwTGN0JQ1FSkS3Xu69FBApmLJ5cNZlBxGT5PUPv-L6fCr3RYapc-I-btbXWqpqpytjY1bguOhiSe316HigqCQGA3jR8N3zt72zeYDddF70HcMpoyYsjvaHvtPx0YMdVjoRobvgzeypD3dtu6X25DN0Xc0D6HTw4JtGtuTi3I1TofqaU1984aDUNgFQevqvbd4OBgIsjiq4qH4_n_gHh7lUWOKRbD7L1mhyUJLlTSHR239FiDogdjo9uivy5xdUIkLClPDvuy4EZa3YqvoH6H-fFoGJyhKZfLoOY2LzgKMNNDVoH_D21MSnR6KMuzhRWMeCnb6k.T68XWzW7YLQlzRJmTLeRXQ"
