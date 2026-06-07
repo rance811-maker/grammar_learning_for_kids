@@ -21,4 +21,4 @@ jobs:
           rm -rf .github
           npm install -g netlify-cli
           netlify link --id 1df0b778-c38b-4a8e-ac7d-42d2e3e4bc77
-          netlify deploy --prod --dir=.
+          netlify deploy --prod --dir=. --no-build
