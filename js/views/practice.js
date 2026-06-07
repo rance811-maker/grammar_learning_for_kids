@@ -36,6 +36,10 @@ export function render(unitId, level) {
     session = engine.createReviewSession();
   } else if (unitId === 'boss') {
     session = engine.createBossSession();
+  } else if (unitId === 'demo') {
+    // Test-only: jump straight to a question by id (e.g. #practice/demo/1-2-4)
+    // or to all questions of a type (e.g. #practice/demo/match).
+    session = engine.createDemoSession(level);
   } else {
     session = engine.createSession(Number(unitId), Number(level));
   }
@@ -83,6 +87,7 @@ export function render(unitId, level) {
 export function mount(unitId, level) {
   const backTarget = unitId === 'review' ? 'review'
     : unitId === 'boss' ? ''
+    : unitId === 'demo' ? ''
     : `unit/${unitId}`;
 
   // Back button for empty sessions
@@ -702,11 +707,14 @@ function showResults() {
   sessionEnded = true;
   const isReview = session.unitId === 'review';
   const isBoss = session.unitId === 'boss';
+  const isDemo = session.unitId === 'demo';
   const results = engine.calculateResults(session);
 
-  // Save results
+  // Save results (demo/test sessions never touch real progress).
   let bossPassed = false;
-  if (isBoss) {
+  if (isDemo) {
+    // no-op
+  } else if (isBoss) {
     store.addScore(results.score);
     bossPassed = store.recordBossResult(results.accuracy);
     store.advanceLearningPlan({ isBoss: true });
@@ -717,17 +725,19 @@ function showResults() {
     store.completeLevel(session.unitId, session.level, results.stars, results.score);
     store.advanceLearningPlan({ unitId: session.unitId, level: session.level });
   }
-  store.updateStreak();
-  store.recordSession({
-    unitId: session.unitId,
-    level: session.level,
-    score: results.score,
-    stars: results.stars,
-    correct: session.answers.filter(a => a.correct).length,
-    total: session.answers.length,
-    accuracy: results.accuracy,
-    maxCombo: results.comboMax,
-  });
+  if (!isDemo) {
+    store.updateStreak();
+    store.recordSession({
+      unitId: session.unitId,
+      level: session.level,
+      score: results.score,
+      stars: results.stars,
+      correct: session.answers.filter(a => a.correct).length,
+      total: session.answers.length,
+      accuracy: results.accuracy,
+      maxCombo: results.comboMax,
+    });
+  }
 
   const accuracyPct = Math.round(results.accuracy * 100);
 

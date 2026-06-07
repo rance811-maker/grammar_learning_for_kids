@@ -93,6 +93,34 @@ export const engine = {
     };
   },
 
+  // Test helper: build a session for one specific question (by id, e.g. "1-2-4")
+  // or all questions of one type (e.g. "match"). Used by the #practice/demo/<x>
+  // route to jump straight to a question without playing through a level.
+  createDemoSession(query) {
+    const all = [];
+    for (const unitId of Object.keys(units)) {
+      all.push(...getAllQuestionsForUnit(Number(unitId)));
+    }
+    const TYPES = ["choice", "match", "fill", "reorder", "error", "scenario"];
+    const questions = TYPES.includes(query)
+      ? all.filter((q) => q.type === query)
+      : all.filter((q) => q.id === query);
+
+    return {
+      unitId: "demo",
+      level: 0,
+      questions,
+      currentIndex: 0,
+      answers: [],
+      energy: 99,
+      maxEnergy: 99,
+      score: 0,
+      combo: 0,
+      maxCombo: 0,
+      startTime: Date.now(),
+    };
+  },
+
   selectQuestions(unitId, level, count) {
     const mainPool = shuffle(getQuestionsForLevel(unitId, level));
     const weakSkills = store.getWeakestSkills(5);
