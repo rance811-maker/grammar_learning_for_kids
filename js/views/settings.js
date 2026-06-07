@@ -38,6 +38,14 @@ export function render() {
         <button class="btn btn--secondary" id="retakePlacementBtn" style="margin-top:var(--space-sm);">重新摸底测试</button>
       </div>
 
+      <div class="settings-group">
+        <div class="settings-group__title">👤 我的账号</div>
+        <div class="settings-group__desc">${store.isLoggedIn()
+          ? `已登录为「${store.account.name}」，学习记录正在云端自动同步`
+          : '登录后可在手机、平板、电脑之间同步学习记录'}</div>
+        <button class="btn btn--secondary" id="goAccountBtn" style="margin-top:var(--space-sm);">${store.isLoggedIn() ? '账号管理' : '登录 / 注册'}</button>
+      </div>
+
       <div class="settings-group settings-group--danger">
         <div class="settings-group__title">⚠️ 重置全部进度</div>
         <div class="settings-group__desc">清空所有积分、星星、错题本、徽章和学习计划，回到全新状态。此操作无法撤销。</div>
@@ -46,7 +54,9 @@ export function render() {
 
       <div class="settings-footer">
         Grammar Quest · 语法冒险<br>
-        <span style="color:var(--color-muted);">数据仅保存在本机浏览器，不上传任何服务器</span>
+        <span style="color:var(--color-muted);">${store.isLoggedIn()
+          ? '已登录，数据云端同步'
+          : '访客模式，数据仅保存在本机浏览器'}</span>
       </div>
     </div>`;
 }
@@ -73,6 +83,14 @@ export function mount() {
       store.save();
       soundToggle.classList.toggle('toggle--on', on);
       soundToggle.setAttribute('aria-checked', String(on));
+    });
+  }
+
+  // Account
+  const goAccountBtn = document.getElementById('goAccountBtn');
+  if (goAccountBtn) {
+    goAccountBtn.addEventListener('click', () => {
+      location.hash = 'account';
     });
   }
 

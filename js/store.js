@@ -1,4 +1,7 @@
+import { cloud, cloudEnabled } from "./cloud.js";
+
 const STORAGE_KEY = "grammar-quest-state";
+const ACCOUNT_KEY = "grammar-quest-account";
 
 const RANK_THRESHOLDS = [
   { rank: "master", min: 20000 },
@@ -66,8 +69,12 @@ function daysBetween(dateStrA, dateStrB) {
 
 export const store = {
   state: null,
+  // 当前账号：{ name, token } 表示已登录(云端模式)；null 表示访客(仅本机)。
+  account: null,
+  _pushTimer: null,
 
   init() {
+    this._loadAccount();
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
@@ -78,9 +85,14 @@ export const store = {
     }
     if (!this.state) {
       this.state = createDefaultState();
-      this.save();
+      this._saveLocal();
     }
-    // Migration for existing saved states
+    this._migrate();
+    return this.state;
+  },
+
+  // Migration for existing saved states (run after any load).
+  _migrate() {
     if (this.state.placementCompleted === undefined) {
       this.state.placementCompleted = false;
     }
@@ -94,10 +106,10 @@ export const store = {
       this.state.bossCleared = false;
       this.state.bossBestAccuracy = 0;
     }
-    return this.state;
   },
 
-  save() {
+  // Write to localStorage only (no cloud push).
+  _saveLocal() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
     } catch {
@@ -105,10 +117,125 @@ export const store = {
     }
   },
 
+  save() {
+    this._saveLocal();
+    this._scheduleCloudPush();
+  },
+
   reset() {
     this.state = createDefaultState();
     this.save();
     return this.state;
+  },
+
+  // --- Accounts & Cloud Sync ---
+
+  isLoggedIn() {
+    return Boolean(this.account && this.account.token);
+  },
+
+  _loadAccount() {
+    try {
+      const raw = localStorage.getItem(ACCOUNT_KEY);
+      this.account = raw ? JSON.parse(raw) : null;
+    } catch {
+      this.account = null;
+    }
+  },
+
+  _persistAccount() {
+    try {
+      if (this.account) {
+        localStorage.setItem(ACCOUNT_KEY, JSON.stringify(this.account));
+      } else {
+        localStorage.removeItem(ACCOUNT_KEY);
+      }
+    } catch {
+      // ignore
+    }
+  },
+
+  // Debounced push so a burst of save() calls turns into a single upload.
+  _scheduleCloudPush() {
+    if (!this.isLoggedIn() || !cloudEnabled()) return;
+    if (this._pushTimer) clearTimeout(this._pushTimer);
+    this._pushTimer = setTimeout(() => this._pushNow(), 1500);
+  },
+
+  async _pushNow() {
+    if (this._pushTimer) {
+      clearTimeout(this._pushTimer);
+      this._pushTimer = null;
+    }
+    if (!this.isLoggedIn() || !cloudEnabled()) return;
+    try {
+      await cloud.save(this.account.name, this.account.token, this.state);
+    } catch (e) {
+      console.warn("Cloud save failed:", e.message);
+    }
+  },
+
+  // Register a new account; current (guest) progress is carried into it.
+  async register(name, password) {
+    const token = await cloud.register(name, password);
+    this.account = { name: name.trim(), token };
+    this._persistAccount();
+    this.state.player.name = this.account.name;
+    this._saveLocal();
+    await this._pushNow(); // seed the cloud with the guest's existing progress
+    return this.account;
+  },
+
+  // Log in; the cloud copy becomes the source of truth on this device.
+  async login(name, password) {
+    const token = await cloud.login(name, password);
+    this.account = { name: name.trim(), token };
+    this._persistAccount();
+    const remote = await cloud.load(this.account.name, this.account.token);
+    if (remote) {
+      this.state = remote;
+      this._migrate();
+      this.state.player.name = this.account.name;
+      this._saveLocal();
+    } else {
+      // Account exists but has no saved state yet -> seed it with local data.
+      this.state.player.name = this.account.name;
+      this._saveLocal();
+      await this._pushNow();
+    }
+    return this.account;
+  },
+
+  // Pull the latest cloud state. Returns true if local state changed.
+  async syncFromCloud() {
+    if (!this.isLoggedIn() || !cloudEnabled()) return false;
+    try {
+      const remote = await cloud.load(this.account.name, this.account.token);
+      if (remote) {
+        this.state = remote;
+        this._migrate();
+        this.state.player.name = this.account.name;
+        this._saveLocal();
+        return true;
+      }
+    } catch (e) {
+      // Invalid/expired token -> drop back to guest mode.
+      if (String(e.message).includes("AUTH")) {
+        this.account = null;
+        this._persistAccount();
+      }
+      console.warn("Cloud sync failed:", e.message);
+    }
+    return false;
+  },
+
+  // Log out and return to a clean guest state (so a shared device doesn't
+  // leak the previous child's progress).
+  logout() {
+    this.account = null;
+    this._persistAccount();
+    this.state = createDefaultState();
+    this._saveLocal();
   },
 
   // --- Player ---
