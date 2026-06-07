@@ -175,10 +175,10 @@ export const unitsBatch = [
             "If she were taller, she'd play basketball."
           ],
           right: [
-            "First (real, possible)",
-            "Second (imaginary)",
-            "First (general truth)",
-            "Second (imaginary)"
+            "First conditional<br><small style='opacity:.65'>第一条件句 · 真实可能 (will)</small>",
+            "Second conditional<br><small style='opacity:.65'>第二条件句 · 假想 (had → would)</small>",
+            "First conditional<br><small style='opacity:.65'>第一条件句 · 普遍事实 (现在时)</small>",
+            "Second conditional<br><small style='opacity:.65'>第二条件句 · 假想 (were → would)</small>"
           ],
           correctPairs: [[0, 0], [1, 1], [2, 2], [3, 3]],
           explanation: "第一条件句用于真实可能/事实（will 或现在时）；第二条件句用于想象（had/were → would）。",
@@ -761,10 +761,10 @@ export const unitsBatch = [
             "The walls were painted last year."
           ],
           right: [
-            "Present passive",
-            "Past passive",
-            "Present passive",
-            "Past passive"
+            "Present passive<br><small style='opacity:.65'>现在被动 · is + 过去分词</small>",
+            "Past passive<br><small style='opacity:.65'>过去被动 · was + 过去分词</small>",
+            "Present passive<br><small style='opacity:.65'>现在被动 · are + 过去分词</small>",
+            "Past passive<br><small style='opacity:.65'>过去被动 · were + 过去分词</small>"
           ],
           correctPairs: [[0, 0], [1, 1], [2, 2], [3, 3]],
           explanation: "is/are + 过去分词 = 现在被动；was/were + 过去分词 = 过去被动。be 动词决定时态。",

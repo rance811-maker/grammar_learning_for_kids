@@ -180,7 +180,12 @@ export const unitsBatch = [
           type: "match",
           instruction: "把时间标志词和对应的时态配对",
           left: ["every day", "right now", "at the moment", "usually"],
-          right: ["Present Simple", "Present Continuous", "Present Continuous", "Present Simple"],
+          right: [
+            "Present Simple<br><small style='opacity:.65'>一般现在时 · every day 每天</small>",
+            "Present Continuous<br><small style='opacity:.65'>现在进行时 · right now 此刻</small>",
+            "Present Continuous<br><small style='opacity:.65'>现在进行时 · at the moment 此刻</small>",
+            "Present Simple<br><small style='opacity:.65'>一般现在时 · usually 通常</small>"
+          ],
           correctPairs: [[0, 0], [1, 1], [2, 2], [3, 3]],
           explanation: "every day/usually → 一般现在时（习惯）；right now/at the moment → 现在进行时（正在进行）。",
           subSkill: "time_markers"
