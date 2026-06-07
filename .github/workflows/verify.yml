@@ -1,0 +1,22 @@
+name: Verify Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/verify.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect live site
+        run: |
+          echo '===== live js/app.js : BUILD_VERSION ====='
+          curl -s https://grammar-quest-pet.netlify.app/js/app.js | grep -i 'BUILD_VERSION' || echo 'NO BUILD_VERSION in live app.js'
+          echo '===== live index.html : app.js reference ====='
+          curl -s https://grammar-quest-pet.netlify.app/ | grep -i 'app.js' || echo 'NO app.js ref in index.html'
+          echo '===== reorder-test.html HTTP status ====='
+          curl -s -o /dev/null -w '%{http_code}\n' https://grammar-quest-pet.netlify.app/reorder-test.html
+          echo '===== live js/app.js HTTP status ====='
+          curl -s -o /dev/null -w '%{http_code}\n' https://grammar-quest-pet.netlify.app/js/app.js
