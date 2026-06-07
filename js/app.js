@@ -13,7 +13,7 @@ import * as settings from './views/settings.js';
 import * as account from './views/account.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260608f';
+const BUILD_VERSION = '20260608g';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -145,8 +145,10 @@ function renderSidebar(route) {
   const p = store.state.player;
   const rank = RANKS[p.rank] || RANKS.bronze;
   const accountLine = store.isLoggedIn()
-    ? `☁️ ${escapeHtml(store.account.name)}`
-    : `👤 访客模式`;
+    ? `<span class="sidebar__account-name">☁️ ${escapeHtml(store.account.name)}</span>
+       <span class="sidebar__account-cta">查看账号 ›</span>`
+    : `<span class="sidebar__account-name">👤 访客模式</span>
+       <span class="sidebar__account-cta">点此登录 / 注册 ›</span>`;
 
   return `
     <aside class="sidebar">

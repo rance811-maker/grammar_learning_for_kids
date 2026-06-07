@@ -1945,19 +1945,29 @@ ul, ol {
 
 /* Account / login */
 .sidebar__account {
-  border: none;
-  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1.5px solid var(--color-secondary);
+  background: rgba(28, 176, 246, 0.08);
   color: var(--color-text);
   font-weight: 700;
   font-size: var(--text-sm);
-  padding: var(--space-xs) var(--space-sm);
+  padding: var(--space-sm);
   border-radius: var(--radius-md);
   cursor: pointer;
   text-align: left;
-  white-space: nowrap;
+  width: 100%;
   transition: background var(--transition-fast);
 }
-.sidebar__account:hover { background: rgba(28, 176, 246, 0.12); }
+.sidebar__account:hover { background: rgba(28, 176, 246, 0.18); }
+.sidebar__account-name { white-space: nowrap; }
+.sidebar__account-cta {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-secondary);
+  white-space: nowrap;
+}
 
 .view-account { max-width: 480px; margin: 0 auto; }
 .account-card {
@@ -2533,9 +2543,11 @@ ul, ol {
     border-top: none;
     padding-top: 0;
     flex-direction: row;
+    align-items: center;
     gap: var(--space-md);
     white-space: nowrap;
   }
+  .sidebar__account { width: auto; padding: var(--space-xs) var(--space-sm); }
   .content { padding: var(--space-md); }
   .topbar { padding: 0 var(--space-md); }
 }
