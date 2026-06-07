@@ -533,10 +533,17 @@ function attachFillListeners(q) {
       submitAnswer(q, input.value);
     });
 
+    // Ignore Enter while an IME composition is active — when typing English
+    // through a Chinese input method, the Enter that confirms the composition
+    // would otherwise submit the answer before the user has finished.
+    let composing = false;
+    input.addEventListener('compositionstart', () => { composing = true; });
+    input.addEventListener('compositionend', () => { composing = false; });
+
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !feedbackVisible) {
-        submitAnswer(q, input.value);
-      }
+      if (e.key !== 'Enter' || feedbackVisible) return;
+      if (composing || e.isComposing || e.keyCode === 229) return; // IME in progress
+      submitAnswer(q, input.value);
     });
   }
 }
