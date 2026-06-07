@@ -1240,11 +1240,9 @@ export const unitsBatch = [
           left: ["apples", "water", "books", "sugar"],
           right: [
             "much<br><small style='opacity:.65'>许多 · 不可数名词</small>",
-            "many<br><small style='opacity:.65'>许多 · 可数名词</small>",
-            "much<br><small style='opacity:.65'>许多 · 不可数名词</small>",
             "many<br><small style='opacity:.65'>许多 · 可数名词</small>"
           ],
-          correctPairs: [[0, 1], [1, 0], [2, 3], [3, 2]],
+          correctPairs: [[0, 1], [1, 0], [2, 1], [3, 0]],
           explanation: "可数名词（apples, books）用 many；不可数名词（water, sugar）用 much。",
           subSkill: "much_many"
         },

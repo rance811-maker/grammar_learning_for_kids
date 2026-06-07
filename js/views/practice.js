@@ -394,11 +394,11 @@ function drawMatchLines(q) {
   svg.setAttribute('height', rect.height);
   svg.innerHTML = '';
 
+  // matchPairs stores [leftIndex, rightIndex]; locate cards by index so that
+  // duplicate right-side labels are still distinguishable.
   matchPairs.forEach((pair, i) => {
-    const leftIdx = (q.left || []).indexOf(pair[0]);
-    const rightIdx = (q.right || []).indexOf(pair[1]);
-    const leftEl = container.querySelector(`.match-item[data-side="left"][data-index="${leftIdx}"]`);
-    const rightEl = container.querySelector(`.match-item[data-side="right"][data-index="${rightIdx}"]`);
+    const leftEl = container.querySelector(`.match-item[data-side="left"][data-index="${pair[0]}"]`);
+    const rightEl = container.querySelector(`.match-item[data-side="right"][data-index="${pair[1]}"]`);
     if (!leftEl || !rightEl) return;
 
     const lr = leftEl.getBoundingClientRect();
@@ -422,8 +422,38 @@ function drawMatchLines(q) {
   });
 }
 
+// Recompute every card's matched state from matchPairs, redraw the lines, and
+// enable submit once every left item is connected.
+function refreshMatchState(q) {
+  const left = q.left || [];
+  document.querySelectorAll('.match-item[data-type="match"]').forEach(el => {
+    const side = el.dataset.side;
+    const idx = Number(el.dataset.index);
+    const matched = side === 'left'
+      ? matchPairs.some(p => p[0] === idx)
+      : matchPairs.some(p => p[1] === idx);
+    el.classList.toggle('match-item--matched', matched);
+  });
+  drawMatchLines(q);
+  const submitBtn = document.getElementById('matchSubmit');
+  if (submitBtn) submitBtn.disabled = matchPairs.length < left.length;
+}
+
 function attachMatchListeners(q) {
-  const totalPairs = (q.correctPairs || []).length;
+  const left = q.left || [];
+  const right = q.right || [];
+  // When there are fewer right cards than left items, several left items share
+  // a right card (e.g. 4 time markers → 2 tenses). In that mode a right card
+  // stays a valid target after being connected, so it is not un-paired on click
+  // — un-pair from the left side instead.
+  const manyToOne = right.length < left.length;
+
+  function clearSelection() {
+    selectedMatch = null;
+    document.querySelectorAll('.match-item--selected').forEach(el =>
+      el.classList.remove('match-item--selected')
+    );
+  }
 
   document.querySelectorAll('.match-item[data-type="match"]').forEach(item => {
     item.addEventListener('click', () => {
@@ -432,84 +462,39 @@ function attachMatchListeners(q) {
       const side = item.dataset.side;
       const idx = Number(item.dataset.index);
 
-      // Click on a matched item → un-pair it
-      if (item.classList.contains('match-item--matched')) {
-        const itemText = side === 'left' ? (q.left || [])[idx] : (q.right || [])[idx];
-        const pairIdx = matchPairs.findIndex(p =>
-          side === 'left' ? p[0] === itemText : p[1] === itemText
-        );
-        if (pairIdx !== -1) {
-          const pair = matchPairs[pairIdx];
-          const leftIdx = (q.left || []).indexOf(pair[0]);
-          const rightIdx = (q.right || []).indexOf(pair[1]);
-          const leftEl = document.querySelector(`.match-item[data-side="left"][data-index="${leftIdx}"]`);
-          const rightEl = document.querySelector(`.match-item[data-side="right"][data-index="${rightIdx}"]`);
-          if (leftEl) leftEl.classList.remove('match-item--matched');
-          if (rightEl) rightEl.classList.remove('match-item--matched');
-          matchPairs.splice(pairIdx, 1);
-          const submitBtn = document.getElementById('matchSubmit');
-          if (submitBtn) submitBtn.disabled = true;
-        }
-        selectedMatch = null;
-        document.querySelectorAll('.match-item--selected').forEach(el =>
-          el.classList.remove('match-item--selected')
-        );
-        drawMatchLines(q);
+      // Un-pair by clicking a connected card.
+      if (side === 'left' && matchPairs.some(p => p[0] === idx)) {
+        matchPairs = matchPairs.filter(p => p[0] !== idx);
+        clearSelection();
+        refreshMatchState(q);
+        return;
+      }
+      if (side === 'right' && !manyToOne && matchPairs.some(p => p[1] === idx)) {
+        matchPairs = matchPairs.filter(p => p[1] !== idx);
+        clearSelection();
+        refreshMatchState(q);
         return;
       }
 
       if (!selectedMatch) {
-        // First selection
-        document.querySelectorAll('.match-item--selected').forEach(el =>
-          el.classList.remove('match-item--selected')
-        );
+        clearSelection();
         selectedMatch = { side, index: idx };
         item.classList.add('match-item--selected');
       } else if (selectedMatch.side === side && selectedMatch.index === idx) {
-        // Click same item again → deselect
-        item.classList.remove('match-item--selected');
-        selectedMatch = null;
+        clearSelection();
       } else if (selectedMatch.side === side) {
-        // Same side, switch selection
-        document.querySelectorAll('.match-item--selected').forEach(el =>
-          el.classList.remove('match-item--selected')
-        );
+        clearSelection();
         selectedMatch = { side, index: idx };
         item.classList.add('match-item--selected');
       } else {
-        // Different side - make a pair
+        // Different side → form a pair. Each left maps to exactly one right,
+        // so replace any existing pair for that left.
         const leftIdx = side === 'left' ? idx : selectedMatch.index;
         const rightIdx = side === 'right' ? idx : selectedMatch.index;
-        const leftText = (q.left || [])[leftIdx];
-        const rightText = (q.right || [])[rightIdx];
-
-        matchPairs.push([leftText, rightText]);
-
-        // Mark both as matched
-        const leftEl = document.querySelector(`.match-item[data-side="left"][data-index="${leftIdx}"]`);
-        const rightEl = document.querySelector(`.match-item[data-side="right"][data-index="${rightIdx}"]`);
-
-        if (leftEl) {
-          leftEl.classList.remove('match-item--selected');
-          leftEl.classList.add('match-item--matched');
-        }
-        if (rightEl) {
-          rightEl.classList.remove('match-item--selected');
-          rightEl.classList.add('match-item--matched');
-        }
-
-        document.querySelectorAll('.match-item--selected').forEach(el =>
-          el.classList.remove('match-item--selected')
-        );
-        selectedMatch = null;
-
-        // Enable submit if all paired
-        const submitBtn = document.getElementById('matchSubmit');
-        if (submitBtn && matchPairs.length >= totalPairs) {
-          submitBtn.disabled = false;
-        }
-
-        drawMatchLines(q);
+        matchPairs = matchPairs.filter(p => p[0] !== leftIdx);
+        matchPairs.push([leftIdx, rightIdx]);
+        clearSelection();
+        refreshMatchState(q);
       }
     });
   });

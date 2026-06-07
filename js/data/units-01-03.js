@@ -182,11 +182,9 @@ export const unitsBatch = [
           left: ["every day", "right now", "at the moment", "usually"],
           right: [
             "Present Simple<br><small style='opacity:.65'>一般现在时</small>",
-            "Present Continuous<br><small style='opacity:.65'>现在进行时</small>",
-            "Present Continuous<br><small style='opacity:.65'>现在进行时</small>",
-            "Present Simple<br><small style='opacity:.65'>一般现在时</small>"
+            "Present Continuous<br><small style='opacity:.65'>现在进行时</small>"
           ],
-          correctPairs: [[0, 0], [1, 1], [2, 2], [3, 3]],
+          correctPairs: [[0, 0], [1, 1], [2, 1], [3, 0]],
           explanation: "every day/usually → 一般现在时（习惯）；right now/at the moment → 现在进行时（正在进行）。",
           subSkill: "time_markers"
         },
