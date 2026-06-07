@@ -182,19 +182,19 @@ export const cloud = {
     return s.user;
   },
 
-  // 读取学习数据（profiles.state）。没有则返回 null。
+  // 读取学习数据（gq_profiles.state）。没有则返回 null。
   async loadState() {
     const u = readSession() && readSession().user;
     if (!u || !u.id) return null;
-    const rows = await restFetch(`/profiles?id=eq.${u.id}&select=state`);
+    const rows = await restFetch(`/gq_profiles?id=eq.${u.id}&select=state`);
     return Array.isArray(rows) && rows[0] ? rows[0].state : null;
   },
 
-  // 保存学习数据（upsert 到 profiles）。
+  // 保存学习数据（upsert 到 gq_profiles）。
   async saveState(state) {
     const u = readSession() && readSession().user;
     if (!u || !u.id) return;
-    await restFetch('/profiles', {
+    await restFetch('/gq_profiles', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: [{ id: u.id, state, updated_at: new Date().toISOString() }],
