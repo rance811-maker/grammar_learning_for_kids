@@ -1,0 +1,22 @@
+name: Direct Deploy
+
+on:
+  push:
+    branches: [deploy-fix-temp3]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      NETLIFY_AUTH_TOKEN: nfp_Y8rrzkg1n43TdAAYYJeP5AqGhJN4Efku53be
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Link and deploy
+        run: |
+          rm -rf .github
+          npm install -g netlify-cli
+          netlify link --id 1df0b778-c38b-4a8e-ac7d-42d2e3e4bc77
+          netlify deploy --prod --dir=. --no-build
