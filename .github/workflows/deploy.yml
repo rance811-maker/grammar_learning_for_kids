@@ -1,0 +1,55 @@
+name: Verify Supabase & Deploy to Netlify
+
+on:
+  push:
+    branches: [deploy-account-temp]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Supabase RPC functions exist
+        run: |
+          echo "== kid_login (expect NO_USER error -> function exists & key works) =="
+          curl -s -X POST "https://womdtayzftvaggjyyaej.supabase.co/rest/v1/rpc/kid_login" \
+            -H "apikey: sb_publishable_EMMRx_9BBdXO5vWoFApk4w_tLhg2sv1" \
+            -H "Authorization: Bearer sb_publishable_EMMRx_9BBdXO5vWoFApk4w_tLhg2sv1" \
+            -H "Content-Type: application/json" \
+            -d '{"p_name":"__ci_probe__","p_password":"x"}' \
+            -w "\n[HTTP %{http_code}]\n" || true
+          echo "== register + login + save + load round trip =="
+          NAME="__ci_$(date +%s)__"
+          echo "-- register $NAME --"
+          TOKEN=$(curl -s -X POST "https://womdtayzftvaggjyyaej.supabase.co/rest/v1/rpc/kid_register" \
+            -H "apikey: sb_publishable_EMMRx_9BBdXO5vWoFApk4w_tLhg2sv1" \
+            -H "Authorization: Bearer sb_publishable_EMMRx_9BBdXO5vWoFApk4w_tLhg2sv1" \
+            -H "Content-Type: application/json" \
+            -d "{\"p_name\":\"$NAME\",\"p_password\":\"abc\"}")
+          echo "token=$TOKEN"
+          TOKEN_CLEAN=$(echo "$TOKEN" | tr -d '"')
+          echo "-- save --"
+          curl -s -X POST "https://womdtayzftvaggjyyaej.supabase.co/rest/v1/rpc/kid_save" \
+            -H "apikey: sb_publishable_EMMRx_9BBdXO5vWoFApk4w_tLhg2sv1" \
+            -H "Authorization: Bearer sb_publishable_EMMRx_9BBdXO5vWoFApk4w_tLhg2sv1" \
+            -H "Content-Type: application/json" \
+            -d "{\"p_name\":\"$NAME\",\"p_token\":\"$TOKEN_CLEAN\",\"p_state\":{\"hello\":\"world\"}}" \
+            -w "\n[HTTP %{http_code}]\n" || true
+          echo "-- load (expect {\"hello\":\"world\"}) --"
+          curl -s -X POST "https://womdtayzftvaggjyyaej.supabase.co/rest/v1/rpc/kid_load" \
+            -H "apikey: sb_publishable_EMMRx_9BBdXO5vWoFApk4w_tLhg2sv1" \
+            -H "Authorization: Bearer sb_publishable_EMMRx_9BBdXO5vWoFApk4w_tLhg2sv1" \
+            -H "Content-Type: application/json" \
+            -d "{\"p_name\":\"$NAME\",\"p_token\":\"$TOKEN_CLEAN\"}" \
+            -w "\n[HTTP %{http_code}]\n" || true
+
+      - name: Install Netlify CLI
+        run: npm install -g netlify-cli@17
+
+      - name: Deploy to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: nfp_Y8rrzkg1n43TdAAYYJeP5AqGhJN4Efku53be
+        run: |
+          netlify link --id 1df0b778-c38b-4a8e-ac7d-42d2e3e4bc77
+          netlify deploy --prod --dir=. --no-build
