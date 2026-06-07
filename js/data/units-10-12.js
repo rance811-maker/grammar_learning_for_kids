@@ -1239,10 +1239,10 @@ export const unitsBatch = [
           instruction: "把名词和正确的数量词配对",
           left: ["apples", "water", "books", "sugar"],
           right: [
-            "much<br><small style='opacity:.65'>许多 · 不可数 (water 水)</small>",
-            "many<br><small style='opacity:.65'>许多 · 可数 (apples 苹果)</small>",
-            "much<br><small style='opacity:.65'>许多 · 不可数 (sugar 糖)</small>",
-            "many<br><small style='opacity:.65'>许多 · 可数 (books 书)</small>"
+            "much<br><small style='opacity:.65'>许多 · 不可数名词</small>",
+            "many<br><small style='opacity:.65'>许多 · 可数名词</small>",
+            "much<br><small style='opacity:.65'>许多 · 不可数名词</small>",
+            "many<br><small style='opacity:.65'>许多 · 可数名词</small>"
           ],
           correctPairs: [[0, 1], [1, 0], [2, 3], [3, 2]],
           explanation: "可数名词（apples, books）用 many；不可数名词（water, sugar）用 much。",

@@ -271,17 +271,27 @@ export const engine = {
       case "match": {
         const userPairs = Array.isArray(userAnswer) ? userAnswer : [];
         const expected = question.correctPairs || [];
+        const left = question.left || [];
+        const right = question.right || [];
+        // Compare by the DISPLAYED values, not the card indices. This way, when
+        // two right-side cards show the same thing (e.g. two "Present
+        // Continuous"), connecting a left item to EITHER matching card counts as
+        // correct — so the right column only needs to explain the concept and
+        // never has to give away which specific card the answer is.
+        const stripTags = (s) => String(s).replace(/<[^>]*>/g, " ");
+        const leftVal = (i) => normalizeStr(stripTags(left[i] ?? i));
+        const rightVal = (i) => normalizeStr(stripTags(right[i] ?? i));
         correct =
           userPairs.length === expected.length &&
           expected.every((pair) =>
             userPairs.some(
               (up) =>
-                normalizeStr(up[0]) === normalizeStr(pair[0]) &&
-                normalizeStr(up[1]) === normalizeStr(pair[1])
+                leftVal(up[0]) === leftVal(pair[0]) &&
+                rightVal(up[1]) === rightVal(pair[1])
             )
           );
         correctAnswer = expected
-          .map((p) => `${p[0]} → ${p[1]}`)
+          .map((p) => `${stripTags(left[p[0]] ?? p[0]).trim()} → ${stripTags(right[p[1]] ?? p[1]).trim()}`)
           .join(", ");
         break;
       }
