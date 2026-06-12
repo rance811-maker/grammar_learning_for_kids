@@ -1,22 +1,28 @@
 import { cloud } from '../cloud.js';
 
 let pack = null;
-let editIdx = -1;
-let formType = '';
 let saving = false;
 let container = null;
-let uploadedFiles = [];   // { name, type:'pdf'|'image', text, dataUrl }
+let uploadedFiles = [];
 let materialText = '';
 let extracting = false;
+let generating = false;
+let showKeyInput = false;
+let genError = '';
+
+const AI_KEY_STORAGE = 'gq-ai-key';
+function getAiKey() { try { return localStorage.getItem(AI_KEY_STORAGE); } catch { return null; } }
+function setAiKey(k) { try { localStorage.setItem(AI_KEY_STORAGE, k); } catch { /* */ } }
 
 export async function init(el, packId) {
   container = el;
-  editIdx = -1;
-  formType = '';
   saving = false;
   uploadedFiles = [];
   materialText = '';
   extracting = false;
+  generating = false;
+  showKeyInput = false;
+  genError = '';
 
   if (packId) {
     container.innerHTML = '<p>加载中…</p>';
@@ -34,7 +40,7 @@ function rerender() {
   mountEditor();
 }
 
-// --- PDF text extraction via pdf.js (loaded on demand from CDN) ---
+// --- PDF text extraction ---
 
 let pdfjsLoaded = null;
 async function loadPdfJs() {
@@ -72,11 +78,9 @@ function fileToDataUrl(file) {
 async function handleFiles(files) {
   extracting = true;
   rerender();
-
   for (const file of files) {
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
     const isImage = file.type.startsWith('image/');
-
     if (isPdf) {
       try {
         const text = await extractPdfText(file);
@@ -91,9 +95,132 @@ async function handleFiles(files) {
       uploadedFiles.push({ name: file.name, type: 'image', text: '', dataUrl });
     }
   }
-
   extracting = false;
   rerender();
+}
+
+// --- Gemini AI ---
+
+const SYSTEM_PROMPT = `你是一个英语语法教学专家，专门为小学3-6年级的中国学生设计练习题。
+
+请根据用户提供的素材或描述，生成 8-10 道英语语法练习题。
+
+规则：
+1. 题型混合使用：选择题(choice)、填空题(fill)、排序题(reorder)，比例大约 5:3:2
+2. 题目和选项用英文，instruction 和 explanation 用中文
+3. 难度循序渐进，从简单到中等
+4. explanation 要简洁，帮助孩子理解语法规则
+5. 返回严格的 JSON 数组（不要用 markdown 代码块包裹）
+
+格式示例：
+[
+  {
+    "type": "choice",
+    "instruction": "选择正确的答案",
+    "sentence": "She ___ to school every day.",
+    "options": ["go", "goes", "going", "went"],
+    "correctIndex": 1,
+    "explanation": "she 是第三人称单数，一般现在时动词加 -es → goes",
+    "subSkill": "present_simple"
+  },
+  {
+    "type": "fill",
+    "instruction": "用括号中单词的正确形式填空",
+    "sentence": "He (play) ___ football now.",
+    "acceptableAnswers": ["is playing"],
+    "explanation": "now 表示正在进行，用现在进行时 is + doing",
+    "subSkill": "present_continuous"
+  },
+  {
+    "type": "reorder",
+    "instruction": "把单词排列成正确的句子",
+    "words": ["is", "she", "reading", "a", "book"],
+    "correctSentence": "She is reading a book.",
+    "explanation": "现在进行时：主语 + is/are + 动词-ing + 宾语",
+    "subSkill": "present_continuous"
+  }
+]
+
+请直接输出 JSON 数组，不要包含任何其他文字、解释或 markdown 标记。`;
+
+async function callGemini(apiKey, userParts) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: userParts }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
+      }),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    const msg = err?.error?.message || `API 返回 ${res.status}`;
+    if (res.status === 400 && msg.includes('API key')) throw new Error('API key 无效，请检查后重新输入');
+    if (res.status === 429) throw new Error('请求太频繁，请稍后再试');
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('AI 未返回内容');
+  return text;
+}
+
+function buildUserParts() {
+  const parts = [];
+  // Add images (Gemini reads them natively)
+  for (const f of uploadedFiles) {
+    if (f.type === 'image' && f.dataUrl) {
+      const [header, base64] = f.dataUrl.split(',');
+      const mimeMatch = header.match(/:(.*?);/);
+      if (mimeMatch && base64) {
+        parts.push({ inlineData: { mimeType: mimeMatch[1], data: base64 } });
+      }
+    }
+  }
+  const userText = materialText.trim();
+  if (userText) {
+    parts.push({ text: userText });
+  } else if (parts.length === 0) {
+    return null;
+  }
+  return parts;
+}
+
+function parseQuestions(raw) {
+  let text = raw.trim();
+  // Strip markdown code fences if present
+  text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+  const arr = JSON.parse(text);
+  if (!Array.isArray(arr)) throw new Error('AI 返回的不是数组');
+  return arr.filter(q => q && q.type);
+}
+
+async function doGenerate() {
+  const key = getAiKey();
+  if (!key) { showKeyInput = true; rerender(); return; }
+
+  const userParts = buildUserParts();
+  if (!userParts) { genError = '请先上传素材或输入描述内容'; rerender(); return; }
+
+  generating = true;
+  genError = '';
+  rerender();
+
+  try {
+    const systemParts = [{ text: SYSTEM_PROMPT }];
+    const allParts = [...systemParts, ...userParts];
+    const raw = await callGemini(key, allParts);
+    pack.questions = parseQuestions(raw);
+    generating = false;
+    rerender();
+  } catch (e) {
+    generating = false;
+    genError = e.message;
+    rerender();
+  }
 }
 
 // --- Render ---
@@ -102,12 +229,12 @@ function renderEditor() {
   return `<div class="parent-card parent-card--wide">
     <div class="parent-header">
       <h2>${pack.id ? '编辑课程包' : '创建课程包'}</h2>
-      <button class="btn btn--small btn--outline" id="ceBack">← 返回</button>
+      <button class="btn btn--small btn--outline" id="ceBack" onclick="location.hash='parent'">← 返回</button>
     </div>
     <div class="ce-meta">
       <div class="parent-field">
         <label>课程名称</label>
-        <input type="text" id="ceTitle" value="${esc(pack.title)}" placeholder="例如：一般现在时选择练习">
+        <input type="text" id="ceTitle" value="${esc(pack.title)}" placeholder="例如：一般现在时练习">
       </div>
       <div class="parent-field">
         <label>课程描述（选填）</label>
@@ -115,12 +242,12 @@ function renderEditor() {
       </div>
     </div>
     ${renderUploadSection()}
-    ${renderQuestionList()}
-    ${formType ? renderQuestionForm() : ''}
-    ${!formType ? renderAddButtons() : ''}
+    ${showKeyInput ? renderKeyInput() : ''}
+    ${renderGenerateButton()}
+    ${renderPreview()}
     <div class="ce-save">
       <div class="parent-msg" id="ceMsg"></div>
-      <button class="btn btn--primary btn--block" id="ceSave">${saving ? '保存中…' : '保存课程包'}</button>
+      ${pack.questions.length ? `<button class="btn btn--primary btn--block" id="ceSave">保存课程包（${pack.questions.length} 题）</button>` : ''}
     </div>
   </div>`;
 }
@@ -142,8 +269,8 @@ function renderUploadSection() {
   }).join('');
 
   return `<div class="ce-upload-section">
-    <h3>📎 上传学习素材</h3>
-    <p class="ce-upload-hint">上传课本照片、练习册或 PDF，系统提取内容后可生成练习题</p>
+    <h3>📎 上传学习素材（可选）</h3>
+    <p class="ce-upload-hint">上传课本照片或 PDF，AI 会从中提取内容生成练习题</p>
     <div class="ce-upload-zone" id="dropZone">
       <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,image/*" multiple hidden>
       <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
@@ -154,107 +281,71 @@ function renderUploadSection() {
     ${extracting ? '<p class="ce-extracting">⏳ 正在提取文字内容…</p>' : ''}
     ${previews ? `<div class="ce-file-list">${previews}</div>` : ''}
     <div class="parent-field" style="margin-top:var(--space-md)">
-      <label>素材文字内容（自动提取或手动粘贴）</label>
-      <textarea id="materialText" rows="5" placeholder="上传 PDF 后自动提取文字；也可以直接粘贴课文或题目内容…">${esc(materialText)}</textarea>
+      <label>描述你想要的练习内容</label>
+      <textarea id="materialText" rows="4" placeholder="例如：&#10;• 生成10道关于一般现在时 vs 现在进行时的题目&#10;• 根据上面的课文，出一套选择题和填空题&#10;• 帮我出一些 there be 句型的练习">${esc(materialText)}</textarea>
     </div>
-    <button class="btn btn--secondary btn--block" id="generateBtn" disabled>
-      🤖 AI 从素材生成题目（配置 AI 服务后可用）
-    </button>
   </div>`;
 }
 
-function renderQuestionList() {
-  const qList = pack.questions.map((q, i) => {
-    const typeLabel = { choice: '选择题', fill: '填空题', match: '配对题', reorder: '排序题', error: '纠错题', scenario: '情景题' }[q.type] || q.type;
-    const preview = q.sentence || q.instruction || '';
+function renderKeyInput() {
+  return `<div class="ce-form">
+    <h3>🔑 配置 AI 服务</h3>
+    <p class="parent-desc">需要一个 Google Gemini API key（免费）来生成题目：</p>
+    <ol class="ce-key-steps">
+      <li>打开 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a></li>
+      <li>登录 Google 账号，点击「Create API Key」</li>
+      <li>复制生成的 key，粘贴到下方</li>
+    </ol>
+    <div class="parent-field">
+      <input type="password" id="aiKeyInput" placeholder="粘贴你的 Gemini API key">
+    </div>
+    <div class="ce-form-btns">
+      <button class="btn btn--primary" id="saveKeyBtn">保存并生成</button>
+      <button class="btn btn--outline" id="cancelKeyBtn">取消</button>
+    </div>
+  </div>`;
+}
+
+function renderGenerateButton() {
+  if (showKeyInput) return '';
+  const hasKey = !!getAiKey();
+  if (generating) {
+    return `<div class="ce-generate">
+      <div class="ce-generating">
+        <span class="ce-spinner"></span>
+        AI 正在生成题目，请稍候…
+      </div>
+    </div>`;
+  }
+  return `<div class="ce-generate">
+    <button class="btn btn--secondary btn--block" id="generateBtn">
+      🤖 AI 生成练习题
+    </button>
+    ${!hasKey ? '<p class="ce-gen-hint">首次使用需配置免费的 AI 服务</p>' : '<p class="ce-gen-hint">基于上方素材/描述自动生成题目</p>'}
+    ${genError ? `<p class="ce-gen-error">❌ ${esc(genError)}</p>` : ''}
+    ${hasKey ? '<button class="btn btn--text" id="changeKeyBtn" style="font-size:0.8rem">更换 API key</button>' : ''}
+  </div>`;
+}
+
+function renderPreview() {
+  if (!pack.questions.length) return '';
+  const typeLabels = { choice: '选择题', fill: '填空题', reorder: '排序题', match: '配对题', error: '纠错题', scenario: '情景题' };
+  const items = pack.questions.map((q, i) => {
+    const label = typeLabels[q.type] || q.type;
+    const text = q.sentence || q.correctSentence || q.instruction || '';
     return `<div class="ce-q-item">
       <span class="ce-q-num">${i + 1}</span>
-      <span class="ce-q-badge">${typeLabel}</span>
-      <span class="ce-q-text">${esc(preview.slice(0, 60))}</span>
-      <span class="ce-q-actions">
-        <button class="btn btn--tiny" data-edit="${i}">编辑</button>
-        <button class="btn btn--tiny btn--danger-text" data-del="${i}">删除</button>
-      </span>
+      <span class="ce-q-badge">${label}</span>
+      <span class="ce-q-text">${esc(text.slice(0, 80))}</span>
     </div>`;
   }).join('');
 
   return `<div class="ce-section">
-    <h3>题目列表${pack.questions.length ? ' (' + pack.questions.length + ' 题)' : ''}</h3>
-    ${qList || '<p class="ce-empty">还没有题目，上传素材用 AI 生成，或手动添加</p>'}
-  </div>`;
-}
-
-function renderAddButtons() {
-  return `<div class="ce-add-btns">
-    <span class="ce-add-label">手动添加：</span>
-    <button class="btn btn--outline btn--small" id="ceAddChoice">+ 选择题</button>
-    <button class="btn btn--outline btn--small" id="ceAddFill">+ 填空题</button>
-  </div>`;
-}
-
-function renderQuestionForm() {
-  const q = editIdx >= 0 ? pack.questions[editIdx] : null;
-  if (formType === 'choice') return renderChoiceForm(q);
-  if (formType === 'fill') return renderFillForm(q);
-  return '';
-}
-
-function renderChoiceForm(q) {
-  return `<div class="ce-form">
-    <h3>${q ? '编辑选择题' : '添加选择题'}</h3>
-    <div class="parent-field">
-      <label>题目指令</label>
-      <input type="text" id="qfInstruction" value="${esc(q?.instruction || '选择正确的答案')}" placeholder="选择正确的答案">
+    <div class="ce-section-header">
+      <h3>✅ 已生成 ${pack.questions.length} 道题目</h3>
+      <button class="btn btn--outline btn--small" id="regenBtn">🔄 重新生成</button>
     </div>
-    <div class="parent-field">
-      <label>题目句子（用 ___ 表示空格）</label>
-      <input type="text" id="qfSentence" value="${esc(q?.sentence || '')}" placeholder="She ___ to school every day.">
-    </div>
-    <div class="parent-field">
-      <label>选项（2~4 个，勾选正确答案）</label>
-      ${[0,1,2,3].map(i => {
-        const val = q?.options?.[i] || '';
-        const checked = q ? q.correctIndex === i : i === 0;
-        return `<div class="ce-option-row">
-          <input type="radio" name="qfCorrect" value="${i}" ${checked ? 'checked' : ''}>
-          <input type="text" class="qf-opt" data-opt="${i}" value="${esc(val)}" placeholder="选项${String.fromCharCode(65+i)}">
-        </div>`;
-      }).join('')}
-    </div>
-    <div class="parent-field">
-      <label>解释（答对/答错后显示）</label>
-      <input type="text" id="qfExplanation" value="${esc(q?.explanation || '')}" placeholder="为什么这个答案是对的">
-    </div>
-    <div class="ce-form-btns">
-      <button class="btn btn--primary" id="qfSave">确认</button>
-      <button class="btn btn--outline" id="qfCancel">取消</button>
-    </div>
-  </div>`;
-}
-
-function renderFillForm(q) {
-  return `<div class="ce-form">
-    <h3>${q ? '编辑填空题' : '添加填空题'}</h3>
-    <div class="parent-field">
-      <label>题目指令</label>
-      <input type="text" id="qfInstruction" value="${esc(q?.instruction || '用括号中单词的正确形式填空')}" placeholder="用括号中单词的正确形式填空">
-    </div>
-    <div class="parent-field">
-      <label>题目句子（用 ___ 表示空格）</label>
-      <input type="text" id="qfSentence" value="${esc(q?.sentence || '')}" placeholder="She (watch) ___ a cartoon now.">
-    </div>
-    <div class="parent-field">
-      <label>可接受的答案（逗号分隔多个）</label>
-      <input type="text" id="qfAnswers" value="${esc((q?.acceptableAnswers || []).join(', '))}" placeholder="is watching">
-    </div>
-    <div class="parent-field">
-      <label>解释</label>
-      <input type="text" id="qfExplanation" value="${esc(q?.explanation || '')}" placeholder="为什么这个答案是对的">
-    </div>
-    <div class="ce-form-btns">
-      <button class="btn btn--primary" id="qfSave">确认</button>
-      <button class="btn btn--outline" id="qfCancel">取消</button>
-    </div>
+    ${items}
   </div>`;
 }
 
@@ -262,8 +353,6 @@ function renderFillForm(q) {
 
 function mountEditor() {
   const $ = id => document.getElementById(id);
-
-  $('ceBack')?.addEventListener('click', () => { location.hash = 'parent'; });
 
   // File upload
   const fileInput = $('fileInput');
@@ -293,78 +382,31 @@ function mountEditor() {
     btn.addEventListener('click', () => {
       const i = Number(btn.dataset.removeFile);
       const removed = uploadedFiles.splice(i, 1)[0];
-      if (removed?.text) {
-        materialText = materialText.replace(removed.text, '').trim();
-      }
+      if (removed?.text) materialText = materialText.replace(removed.text, '').trim();
       rerender();
     });
   });
 
-  // Sync textarea edits to state
-  const textArea = $('materialText');
-  if (textArea) textArea.addEventListener('input', () => { materialText = textArea.value; });
+  // Text area sync
+  $('materialText')?.addEventListener('input', e => { materialText = e.target.value; });
 
-  // Manual question buttons
-  $('ceAddChoice')?.addEventListener('click', () => { editIdx = -1; formType = 'choice'; rerender(); });
-  $('ceAddFill')?.addEventListener('click', () => { editIdx = -1; formType = 'fill'; rerender(); });
+  // Generate button
+  $('generateBtn')?.addEventListener('click', doGenerate);
+  $('regenBtn')?.addEventListener('click', doGenerate);
 
-  // Edit/delete questions
-  container.querySelectorAll('[data-edit]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      editIdx = Number(btn.dataset.edit);
-      formType = pack.questions[editIdx].type;
-      rerender();
-    });
+  // API key
+  $('saveKeyBtn')?.addEventListener('click', () => {
+    const key = $('aiKeyInput')?.value.trim();
+    if (!key) return;
+    setAiKey(key);
+    showKeyInput = false;
+    doGenerate();
   });
-  container.querySelectorAll('[data-del]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const i = Number(btn.dataset.del);
-      if (confirm(`确定删除第 ${i+1} 题？`)) {
-        pack.questions.splice(i, 1);
-        if (editIdx === i) { editIdx = -1; formType = ''; }
-        rerender();
-      }
-    });
-  });
+  $('cancelKeyBtn')?.addEventListener('click', () => { showKeyInput = false; rerender(); });
+  $('changeKeyBtn')?.addEventListener('click', () => { showKeyInput = true; rerender(); });
 
-  $('qfSave')?.addEventListener('click', saveQuestion);
-  $('qfCancel')?.addEventListener('click', () => { editIdx = -1; formType = ''; rerender(); });
+  // Save
   $('ceSave')?.addEventListener('click', savePack);
-}
-
-function saveQuestion() {
-  const $ = id => document.getElementById(id);
-  const instruction = $('qfInstruction')?.value.trim();
-  const sentence = $('qfSentence')?.value.trim();
-  const explanation = $('qfExplanation')?.value.trim();
-
-  if (!sentence) { alert('请填写题目句子'); return; }
-
-  let q;
-  if (formType === 'choice') {
-    const opts = [];
-    document.querySelectorAll('.qf-opt').forEach(inp => {
-      if (inp.value.trim()) opts.push(inp.value.trim());
-    });
-    if (opts.length < 2) { alert('至少填写2个选项'); return; }
-    const correctIndex = Number(document.querySelector('input[name="qfCorrect"]:checked')?.value || 0);
-    if (correctIndex >= opts.length) { alert('正确答案超出选项范围'); return; }
-    q = { type: 'choice', instruction, sentence, options: opts, correctIndex, explanation, subSkill: 'custom' };
-  } else if (formType === 'fill') {
-    const raw = $('qfAnswers')?.value || '';
-    const answers = raw.split(',').map(s => s.trim()).filter(Boolean);
-    if (!answers.length) { alert('请填写至少一个可接受的答案'); return; }
-    q = { type: 'fill', instruction, sentence, acceptableAnswers: answers, explanation, subSkill: 'custom' };
-  }
-
-  if (editIdx >= 0) {
-    pack.questions[editIdx] = q;
-  } else {
-    pack.questions.push(q);
-  }
-  editIdx = -1;
-  formType = '';
-  rerender();
 }
 
 async function savePack() {
@@ -373,7 +415,7 @@ async function savePack() {
   const msg = document.getElementById('ceMsg');
 
   if (!title) { msg.textContent = '请填写课程名称'; msg.className = 'parent-msg parent-msg--error'; return; }
-  if (!pack.questions.length) { msg.textContent = '请至少添加一道题目'; msg.className = 'parent-msg parent-msg--error'; return; }
+  if (!pack.questions.length) { msg.textContent = '请先生成题目'; msg.className = 'parent-msg parent-msg--error'; return; }
 
   pack.title = title;
   pack.description = desc;
