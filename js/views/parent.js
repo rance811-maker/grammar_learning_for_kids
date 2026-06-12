@@ -1,5 +1,6 @@
 import { store } from '../store.js';
 import { cloud, friendlyError } from '../cloud.js';
+import * as courseEditor from './courseEditor.js';
 
 const LOCKOUT_KEY = 'gq-parent-lockout';
 const MAX_ATTEMPTS = 5;
@@ -103,19 +104,38 @@ function renderLocked() {
   </div>`;
 }
 
-function renderDashboard() {
+function renderDashboard(packs) {
+  const packList = packs && packs.length
+    ? packs.map(p => {
+        const count = Array.isArray(p.questions) ? p.questions.length : 0;
+        const date = (p.updated_at || '').slice(0, 10);
+        return `<div class="ce-pack-item">
+          <div class="ce-pack-info">
+            <strong>📦 ${esc(p.title)}</strong>
+            <span class="ce-pack-meta">${count} 题 · ${date}</span>
+            ${p.description ? `<span class="ce-pack-desc">${esc(p.description)}</span>` : ''}
+          </div>
+          <div class="ce-pack-btns">
+            <button class="btn btn--tiny" data-edit-pack="${p.id}">编辑</button>
+            <button class="btn btn--tiny btn--danger-text" data-del-pack="${p.id}">删除</button>
+          </div>
+        </div>`;
+      }).join('')
+    : '<p class="ce-empty">还没有课程包，点上方按钮创建第一个吧</p>';
+
   return `<div class="parent-card parent-card--wide">
     <div class="parent-header">
       <h2>🏠 家长专区</h2>
       <button class="btn btn--small btn--outline" id="lockBtn">🔒 退出专区</button>
     </div>
-    <div class="parent-grid">
-      <div class="parent-feature">
-        <div class="parent-feature-icon">📦</div>
-        <h3>课程包管理</h3>
-        <p>上传素材，创建和管理孩子的学习课程</p>
-        <span class="parent-coming">即将上线</span>
+    <div class="ce-section">
+      <div class="ce-section-header">
+        <h3>我的课程包</h3>
+        <button class="btn btn--primary btn--small" id="newPackBtn">+ 创建课程包</button>
       </div>
+      ${packList}
+    </div>
+    <div class="parent-grid" style="margin-top:var(--space-lg)">
       <div class="parent-feature">
         <div class="parent-feature-icon">🤖</div>
         <h3>AI 生成课程</h3>
@@ -133,6 +153,10 @@ function renderDashboard() {
       <button class="btn btn--small btn--outline" id="changePinBtn">修改家长密码</button>
     </div>
   </div>`;
+}
+
+function esc(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 function renderReset() {
@@ -160,20 +184,26 @@ function renderReset() {
 
 // --- Mount logic ---
 
-export function mount(sub) {
+export function mount(sub, param) {
   if (!store.isLoggedIn()) return;
   if (sub === 'reset') { mountReset(); return; }
-  loadAndRender();
+  loadAndRender(sub, param);
 }
 
-async function loadAndRender() {
+async function loadAndRender(sub, param) {
   const el = document.getElementById('parentContent');
   if (!el) return;
 
   try {
     if (isUnlocked()) {
-      el.outerHTML = renderDashboard();
-      mountDashboard();
+      if (sub === 'new' || sub === 'edit') {
+        el.outerHTML = '<div class="parent-card parent-card--wide" id="ceRoot"></div>';
+        await courseEditor.init(document.getElementById('ceRoot'), sub === 'edit' ? param : null);
+      } else {
+        const packs = await cloud.listCoursePacks();
+        el.outerHTML = renderDashboard(packs);
+        mountDashboard();
+      }
       return;
     }
     const hash = await cloud.loadParentPin();
@@ -283,11 +313,34 @@ function mountLocked(storedHash) {
 }
 
 function mountDashboard() {
-  const lockBtn = document.getElementById('lockBtn');
-  if (lockBtn) lockBtn.addEventListener('click', () => { clearUnlock(); location.hash = ''; });
+  document.getElementById('lockBtn')?.addEventListener('click', () => { clearUnlock(); location.hash = ''; });
+  document.getElementById('changePinBtn')?.addEventListener('click', () => { location.hash = 'parent/reset'; });
+  document.getElementById('newPackBtn')?.addEventListener('click', () => { location.hash = 'parent/new'; });
 
-  const changePinBtn = document.getElementById('changePinBtn');
-  if (changePinBtn) changePinBtn.addEventListener('click', () => { location.hash = 'parent/reset'; });
+  document.querySelectorAll('[data-edit-pack]').forEach(btn => {
+    btn.addEventListener('click', () => { location.hash = 'parent/edit/' + btn.dataset.editPack; });
+  });
+
+  document.querySelectorAll('[data-del-pack]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('确定删除这个课程包？')) return;
+      btn.disabled = true;
+      try {
+        await cloud.deleteCoursePack(btn.dataset.delPack);
+        location.hash = 'parent';
+        const el = document.querySelector('.parent-card');
+        if (el) {
+          el.innerHTML = '<div class="parent-icon">⏳</div><p>刷新中…</p>';
+          const packs = await cloud.listCoursePacks();
+          el.outerHTML = renderDashboard(packs);
+          mountDashboard();
+        }
+      } catch (e) {
+        alert('删除失败：' + e.message);
+        btn.disabled = false;
+      }
+    });
+  });
 }
 
 function mountReset() {

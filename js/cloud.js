@@ -217,4 +217,43 @@ export const cloud = {
       body: [{ id: u.id, parent_pin_hash: hash, updated_at: new Date().toISOString() }],
     });
   },
+
+  // --- Course Packs ---
+
+  async listCoursePacks() {
+    const u = readSession() && readSession().user;
+    if (!u || !u.id) return [];
+    const rows = await restFetch(
+      `/gq_course_packs?owner_id=eq.${u.id}&select=id,title,description,questions,created_at,updated_at&order=updated_at.desc`
+    );
+    return Array.isArray(rows) ? rows : [];
+  },
+
+  async loadCoursePack(id) {
+    const rows = await restFetch(`/gq_course_packs?id=eq.${id}&select=*`);
+    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+  },
+
+  async createCoursePack(pack) {
+    const u = readSession() && readSession().user;
+    if (!u || !u.id) throw new Error('NO_SESSION');
+    const rows = await restFetch('/gq_course_packs', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: [{ owner_id: u.id, title: pack.title, description: pack.description, questions: pack.questions }],
+    });
+    return Array.isArray(rows) ? rows[0] : rows;
+  },
+
+  async updateCoursePack(id, pack) {
+    await restFetch(`/gq_course_packs?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: { title: pack.title, description: pack.description, questions: pack.questions, updated_at: new Date().toISOString() },
+    });
+  },
+
+  async deleteCoursePack(id) {
+    await restFetch(`/gq_course_packs?id=eq.${id}`, { method: 'DELETE' });
+  },
 };
