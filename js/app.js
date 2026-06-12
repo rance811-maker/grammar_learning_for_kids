@@ -14,7 +14,7 @@ import * as account from './views/account.js';
 import * as parent from './views/parent.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260612a';
+const BUILD_VERSION = '20260612b';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -78,6 +78,10 @@ function router() {
     location.hash = '';
     return;
   }
+
+  // 离开家长专区就立即上锁：解锁状态只在专区内有效，切到别的页面后
+  // 再回来必须重新输入 PIN（避免家长进过后把设备交给孩子时仍处于解锁态）。
+  if (route !== 'parent') parent.lock();
 
   const content = view.render(...params);
   app.innerHTML = renderShell(route, content);

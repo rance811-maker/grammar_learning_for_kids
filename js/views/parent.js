@@ -1,39 +1,51 @@
 import { store } from '../store.js';
 import { cloud, friendlyError } from '../cloud.js';
 
-const UNLOCK_KEY = 'gq-parent-unlocked';
 const LOCKOUT_KEY = 'gq-parent-lockout';
-const UNLOCK_MINUTES = 30;
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 10;
+
+// 解锁状态只存在内存里，从不持久化。
+// 刷新/关闭页面，或离开家长专区切到别的页面，都会回到"已上锁"状态。
+// 这样把设备交给孩子时，孩子点开家长专区一定会被要求重新输入 PIN，
+// 不会因为家长刚进过而处于"已登入"状态。
+let unlocked = false;
 
 async function sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function isUnlocked() {
-  try {
-    const d = JSON.parse(sessionStorage.getItem(UNLOCK_KEY));
-    return d && d.until > Date.now();
-  } catch { return false; }
-}
-function setUnlocked() {
-  sessionStorage.setItem(UNLOCK_KEY, JSON.stringify({ until: Date.now() + UNLOCK_MINUTES * 60000 }));
-}
-function clearUnlock() { sessionStorage.removeItem(UNLOCK_KEY); }
+function isUnlocked() { return unlocked; }
+function setUnlocked() { unlocked = true; }
+function clearUnlock() { unlocked = false; }
 
-function getLockout() {
+// 离开家长专区时自动上锁（由 app.js 的路由在切到别的页面时调用）。
+export function lock() { unlocked = false; }
+
+// 失败锁定信息存 localStorage：即使关掉标签页/刷新也照样锁着，
+// 防止用"关页面重开"的方式把连错次数清零来绕过锁定。
+function getActiveLockout() {
   try {
-    const d = JSON.parse(sessionStorage.getItem(LOCKOUT_KEY));
-    return d && d.until > Date.now() ? d : null;
+    const d = JSON.parse(localStorage.getItem(LOCKOUT_KEY));
+    if (d && d.until && d.until > Date.now()) return d;       // 仍在锁定中
+    if (d && d.until && d.until <= Date.now()) clearLockout(); // 锁定期已过，清零
+    return null;
   } catch { return null; }
 }
-function setLockout() {
-  sessionStorage.setItem(LOCKOUT_KEY, JSON.stringify({ until: Date.now() + LOCKOUT_MINUTES * 60000 }));
+// 记一次失败：累加计数，达到上限就开始计时锁定。返回最新记录。
+function recordFailedAttempt() {
+  let count = 0;
+  try { count = (JSON.parse(localStorage.getItem(LOCKOUT_KEY)) || {}).count || 0; } catch { /* ignore */ }
+  count += 1;
+  const rec = { count };
+  if (count >= MAX_ATTEMPTS) rec.until = Date.now() + LOCKOUT_MINUTES * 60000;
+  localStorage.setItem(LOCKOUT_KEY, JSON.stringify(rec));
+  return rec;
 }
-
-let attemptCount = 0;
+function clearLockout() {
+  try { localStorage.removeItem(LOCKOUT_KEY); } catch { /* ignore */ }
+}
 
 export function render(sub) {
   if (!store.isLoggedIn()) {
@@ -69,7 +81,7 @@ function renderSetup() {
 }
 
 function renderLocked() {
-  const lockout = getLockout();
+  const lockout = getActiveLockout();
   if (lockout) {
     const min = Math.ceil((lockout.until - Date.now()) / 60000);
     return `<div class="parent-card">
@@ -230,9 +242,9 @@ function mountLocked(storedHash) {
     msg.textContent = '';
     msg.className = 'parent-msg';
 
-    if (getLockout()) {
-      msg.textContent = '请稍后再试';
-      msg.classList.add('parent-msg--error');
+    if (getActiveLockout()) {
+      const card = btn.closest('.parent-card');
+      if (card) card.outerHTML = renderLocked();
       return;
     }
     if (!pin) {
@@ -243,20 +255,19 @@ function mountLocked(storedHash) {
 
     const h = await sha256(pin);
     if (h === storedHash) {
-      attemptCount = 0;
+      clearLockout();
       setUnlocked();
       const zone = btn.closest('.parent-zone') || btn.closest('.parent-card').parentElement;
       zone.innerHTML = renderDashboard();
       mountDashboard();
     } else {
-      attemptCount++;
-      if (attemptCount >= MAX_ATTEMPTS) {
-        setLockout();
-        attemptCount = 0;
+      const rec = recordFailedAttempt();
+      if (rec.until) {
+        // 刚触发锁定：切到锁定倒计时界面。
         const card = btn.closest('.parent-card');
-        if (card) { card.outerHTML = renderLocked(); }
+        if (card) card.outerHTML = renderLocked();
       } else {
-        msg.textContent = `密码错误（${attemptCount}/${MAX_ATTEMPTS}）`;
+        msg.textContent = `密码错误（${rec.count}/${MAX_ATTEMPTS}）`;
         msg.classList.add('parent-msg--error');
         pinInput.value = '';
         pinInput.focus();
@@ -304,7 +315,7 @@ function mountReset() {
       await cloud.signIn(email, pwd);
       const h = await sha256(pin);
       await cloud.saveParentPin(h);
-      clearUnlock();
+      clearLockout();
       setUnlocked();
       msg.textContent = '家长密码已重置';
       msg.classList.add('parent-msg--success');
