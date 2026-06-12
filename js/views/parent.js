@@ -116,7 +116,7 @@ function renderDashboard(packs) {
             ${p.description ? `<span class="ce-pack-desc">${esc(p.description)}</span>` : ''}
           </div>
           <div class="ce-pack-btns">
-            <button class="btn btn--tiny" data-edit-pack="${p.id}">编辑</button>
+            <button class="btn btn--tiny" onclick="location.hash='parent/edit/${p.id}'">编辑</button>
             <button class="btn btn--tiny btn--danger-text" data-del-pack="${p.id}">删除</button>
           </div>
         </div>`;
@@ -126,12 +126,12 @@ function renderDashboard(packs) {
   return `<div class="parent-card parent-card--wide">
     <div class="parent-header">
       <h2>🏠 家长专区</h2>
-      <button class="btn btn--small btn--outline" id="lockBtn">🔒 退出专区</button>
+      <button class="btn btn--small btn--outline" id="lockBtn" onclick="location.hash=''">🔒 退出专区</button>
     </div>
     <div class="ce-section">
       <div class="ce-section-header">
         <h3>我的课程包</h3>
-        <button class="btn btn--primary btn--small" id="newPackBtn">+ 创建课程包</button>
+        <button class="btn btn--primary btn--small" id="newPackBtn" onclick="location.hash='parent/new'">+ 创建课程包</button>
       </div>
       ${packList}
     </div>
@@ -194,13 +194,29 @@ async function loadAndRender(sub, param) {
   const el = document.getElementById('parentContent');
   if (!el) return;
 
+  function showError(msg) {
+    const target = document.getElementById('ceRoot') || document.getElementById('parentContent') || el;
+    target.innerHTML = `<div class="parent-icon">⚠️</div>
+      <p>加载失败：${msg}</p>
+      <button class="btn btn--primary" onclick="location.reload()">重试</button>`;
+  }
+
   try {
     if (isUnlocked()) {
       if (sub === 'new' || sub === 'edit') {
-        el.outerHTML = '<div class="parent-card parent-card--wide" id="ceRoot"></div>';
-        await courseEditor.init(document.getElementById('ceRoot'), sub === 'edit' ? param : null);
+        el.outerHTML = '<div class="parent-card parent-card--wide" id="ceRoot"><p>加载编辑器…</p></div>';
+        const ceRoot = document.getElementById('ceRoot');
+        try {
+          await courseEditor.init(ceRoot, sub === 'edit' ? param : null);
+        } catch (e2) {
+          console.error('Course editor init failed:', e2);
+          ceRoot.innerHTML = `<div class="parent-icon">⚠️</div>
+            <p>编辑器加载失败：${e2.message}</p>
+            <button class="btn btn--primary" onclick="location.hash='parent'">返回</button>`;
+        }
       } else {
-        const packs = await cloud.listCoursePacks();
+        let packs = [];
+        try { packs = await cloud.listCoursePacks(); } catch (e2) { console.warn('Load packs failed:', e2.message); }
         el.outerHTML = renderDashboard(packs);
         mountDashboard();
       }
@@ -215,9 +231,8 @@ async function loadAndRender(sub, param) {
       mountLocked(hash);
     }
   } catch (e) {
-    el.innerHTML = `<div class="parent-icon">⚠️</div>
-      <p>加载失败：${e.message}</p>
-      <button class="btn btn--primary" onclick="location.reload()">重试</button>`;
+    console.error('Parent zone load failed:', e);
+    showError(e.message);
   }
 }
 
