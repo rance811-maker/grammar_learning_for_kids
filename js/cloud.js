@@ -200,4 +200,21 @@ export const cloud = {
       body: [{ id: u.id, state, updated_at: new Date().toISOString() }],
     });
   },
+
+  async loadParentPin() {
+    const u = readSession() && readSession().user;
+    if (!u || !u.id) return null;
+    const rows = await restFetch(`/gq_profiles?id=eq.${u.id}&select=parent_pin_hash`);
+    return Array.isArray(rows) && rows[0] ? rows[0].parent_pin_hash : null;
+  },
+
+  async saveParentPin(hash) {
+    const u = readSession() && readSession().user;
+    if (!u || !u.id) return;
+    await restFetch('/gq_profiles', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: [{ id: u.id, parent_pin_hash: hash, updated_at: new Date().toISOString() }],
+    });
+  },
 };
