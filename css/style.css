@@ -2623,6 +2623,139 @@ ul, ol {
   padding-top: var(--space-md);
 }
 
+/* --- Upload Section --- */
+.ce-upload-section {
+  background: #fafcff;
+  border: 2px dashed var(--color-border);
+  border-radius: 14px;
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+.ce-upload-section h3 { margin: 0 0 var(--space-xs); }
+.ce-upload-hint {
+  color: var(--color-text-light);
+  font-size: 0.85rem;
+  margin: 0 0 var(--space-md);
+}
+.ce-upload-zone {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.ce-upload-zone.ce-drag-over {
+  background: #e8f4ff;
+  border-color: var(--color-secondary);
+}
+.ce-upload-formats {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+.ce-extracting {
+  color: var(--color-secondary-dark);
+  font-size: 0.85rem;
+  margin: var(--space-sm) 0 0;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse { 50% { opacity: 0.5; } }
+
+.ce-file-list {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-top: var(--space-md);
+}
+.ce-file-preview {
+  position: relative;
+  width: 80px;
+  text-align: center;
+}
+.ce-file-preview img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+.ce-file-preview--pdf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 80px;
+  background: #fff4e6;
+  border-radius: 8px;
+  border: 1px solid #ffd8a8;
+}
+.ce-file-icon { font-size: 28px; }
+.ce-file-name {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--color-text-light);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 80px;
+  margin-top: 2px;
+}
+.ce-file-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+.ce-upload-section textarea {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  resize: vertical;
+  box-sizing: border-box;
+  font-family: var(--font-sans);
+}
+.ce-upload-section textarea:focus {
+  outline: none;
+  border-color: var(--color-secondary);
+}
+
+.btn--secondary {
+  background: var(--color-secondary);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn--secondary:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.ce-add-label {
+  font-size: 0.85rem;
+  color: var(--color-text-light);
+  margin-right: var(--space-xs);
+}
+.ce-q-num {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-width: 20px;
+}
+
 /* --- Course Editor --- */
 .ce-section { margin-bottom: var(--space-lg); }
 .ce-section-header {
