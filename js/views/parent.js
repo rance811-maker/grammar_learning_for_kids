@@ -1,6 +1,8 @@
 import { store } from '../store.js';
 import { cloud, friendlyError } from '../cloud.js';
 import * as courseEditor from './courseEditor.js';
+import { SUB_SKILL_NAMES } from '../data/skill-names.js';
+import { units as unitData } from '../data/units.js';
 
 const LOCKOUT_KEY = 'gq-parent-lockout';
 const MAX_ATTEMPTS = 5;
@@ -141,11 +143,11 @@ function renderDashboard(packs) {
         <p>上传文档或输入主题，AI 自动生成练习题</p>
         <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">+ 创建课程包</span>
       </div>
-      <div class="parent-feature">
+      <div class="parent-feature parent-feature--active" id="reportCard" style="cursor:pointer;">
         <div class="parent-feature-icon">📊</div>
         <h3>学习报告</h3>
         <p>查看孩子的学习进度和薄弱环节分析</p>
-        <span class="parent-coming">即将上线</span>
+        <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">查看报告</span>
       </div>
     </div>
     <div class="parent-actions">
@@ -202,6 +204,11 @@ async function loadAndRender(sub, param) {
 
   try {
     if (isUnlocked()) {
+      if (sub === 'report') {
+        el.outerHTML = renderReport();
+        mountReport();
+        return;
+      }
       if (sub === 'new' || sub === 'edit') {
         el.outerHTML = '<div class="parent-card parent-card--wide" id="ceRoot"><p>加载编辑器…</p></div>';
         const ceRoot = document.getElementById('ceRoot');
@@ -233,6 +240,217 @@ async function loadAndRender(sub, param) {
     console.error('Parent zone load failed:', e);
     showError(e.message);
   }
+}
+
+// --- Learning Report ---
+
+function renderReport() {
+  const player = store.state.player;
+  const history = store.state.history;
+  const mastery = store.state.mastery;
+  const mistakes = store.state.mistakes || [];
+
+  // --- (a) Overview stats ---
+  const totalScore = player.totalScore;
+  const currentStreak = player.currentStreak;
+  const accuracyRate = store.getAccuracyRate();
+  const accuracyPct = Math.round(accuracyRate * 100);
+
+  // Count completed levels across all units
+  let completedLevels = 0;
+  for (let u = 1; u <= 12; u++) {
+    const unit = store.state.units[u];
+    if (!unit) continue;
+    for (let lv = 1; lv <= 5; lv++) {
+      if (unit.practiceLevels[lv]?.completed) completedLevels++;
+    }
+  }
+
+  // --- (b) Last 7 days activity ---
+  const dayLabels = [];
+  const dayCounts = [];
+  let maxDayCount = 0;
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    dayLabels.push(`${month}/${day}`);
+    const count = history.filter(h => h.date === dateStr).length;
+    dayCounts.push(count);
+    if (count > maxDayCount) maxDayCount = count;
+  }
+
+  const chartBarMax = Math.max(maxDayCount, 1);
+  const chartBars = dayCounts.map((count, idx) => {
+    const heightPct = Math.round((count / chartBarMax) * 100);
+    const barColor = count > 0 ? '#4caf50' : '#e0e0e0';
+    return `<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:4px;">
+      <span style="font-size:0.75rem;color:#666;">${count}</span>
+      <div style="width:24px;background:${barColor};border-radius:4px 4px 0 0;height:${Math.max(heightPct, 4)}px;min-height:4px;transition:height 0.3s;"></div>
+      <span style="font-size:0.7rem;color:#999;">${dayLabels[idx]}</span>
+    </div>`;
+  }).join('');
+
+  // --- (c) Mastery breakdown ---
+  const masteryEntries = Object.entries(mastery)
+    .map(([skill, data]) => ({
+      skill,
+      name: SUB_SKILL_NAMES[skill] || skill,
+      mastery: Math.round((data.mastery || 0) * 100),
+      attempts: data.attempts || 0,
+    }))
+    .sort((a, b) => a.mastery - b.mastery);
+
+  const masteryRows = masteryEntries.length > 0
+    ? masteryEntries.map(entry => {
+        let color = '#4caf50'; // green
+        if (entry.mastery < 50) color = '#f44336'; // red
+        else if (entry.mastery < 80) color = '#ff9800'; // yellow/orange
+        return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:0.85rem;font-weight:500;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(entry.name)}</div>
+            <div style="font-size:0.7rem;color:#999;">${entry.attempts} 次练习</div>
+          </div>
+          <div style="width:100px;flex-shrink:0;">
+            <div style="background:#e0e0e0;border-radius:4px;height:8px;overflow:hidden;">
+              <div style="background:${color};height:100%;width:${entry.mastery}%;border-radius:4px;transition:width 0.3s;"></div>
+            </div>
+          </div>
+          <span style="font-size:0.85rem;font-weight:600;color:${color};min-width:40px;text-align:right;">${entry.mastery}%</span>
+        </div>`;
+      }).join('')
+    : '<p style="color:#999;font-size:0.85rem;">还没有掌握度数据，开始练习后这里会显示各技能掌握情况。</p>';
+
+  // --- (d) Weakest skills ---
+  const weakest = store.getWeakestSkills(5);
+  const weakestSection = weakest.length > 0
+    ? `<div style="background:#fff3e0;border:1px solid #ffe0b2;border-radius:8px;padding:16px;">
+        <h3 style="margin:0 0 12px;font-size:1rem;color:#e65100;">⚠️ 薄弱环节（需重点加强）</h3>
+        ${weakest.map(w => {
+          const pct = Math.round((w.mastery || 0) * 100);
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;">
+            <span style="font-size:0.85rem;color:#333;">${esc(SUB_SKILL_NAMES[w.skill] || w.skill)}</span>
+            <span style="font-size:0.85rem;font-weight:600;color:#f44336;">${pct}%</span>
+          </div>`;
+        }).join('')}
+      </div>`
+    : '';
+
+  // --- (e) Recent 10 sessions ---
+  const recentSessions = [...history].reverse().slice(0, 10);
+  const sessionRows = recentSessions.length > 0
+    ? recentSessions.map(s => {
+        const unitTitle = unitData[s.unitId]?.title || `单元 ${s.unitId}`;
+        const starsDisplay = '⭐'.repeat(s.stars || 0);
+        const accPct = s.accuracy != null ? Math.round(s.accuracy * 100) : (s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0);
+        return `<tr>
+          <td style="padding:8px 6px;font-size:0.8rem;color:#666;">${esc(s.date || '')}</td>
+          <td style="padding:8px 6px;font-size:0.8rem;">${esc(unitTitle)} Lv.${s.level || '-'}</td>
+          <td style="padding:8px 6px;font-size:0.8rem;">${starsDisplay || '-'}</td>
+          <td style="padding:8px 6px;font-size:0.8rem;text-align:right;">${accPct}%</td>
+          <td style="padding:8px 6px;font-size:0.8rem;text-align:right;font-weight:600;">${s.score || 0}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="5" style="padding:16px;text-align:center;color:#999;font-size:0.85rem;">暂无练习记录</td></tr>';
+
+  // --- (f) Mistake notebook summary ---
+  const mistakeCount = mistakes.length;
+  const recentMistakes = [...mistakes].reverse().slice(0, 5);
+  const mistakeRows = recentMistakes.length > 0
+    ? recentMistakes.map(m => {
+        const q = m.question || {};
+        const text = q.sentence || q.instruction || q.context || '(无题目内容)';
+        return `<div style="padding:8px 0;border-bottom:1px solid #f0f0f0;">
+          <div style="font-size:0.8rem;color:#333;line-height:1.4;">${esc(text)}</div>
+          <div style="font-size:0.7rem;color:#999;margin-top:2px;">${esc(m.date || '')} · 单元 ${m.unitId || '?'} Lv.${m.level || '?'}</div>
+        </div>`;
+      }).join('')
+    : '<p style="color:#999;font-size:0.85rem;">错题本是空的，太棒了！</p>';
+
+  return `<div class="parent-card parent-card--wide" id="reportContent">
+    <div class="parent-header">
+      <button class="btn btn--small btn--outline" id="reportBackBtn">← 返回</button>
+      <h2 style="margin:0;">📊 学习报告</h2>
+      <div></div>
+    </div>
+
+    <!-- (a) Overview -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:20px;">
+      <div style="background:#f5f5f5;border-radius:8px;padding:16px;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:700;color:#1976d2;">${totalScore}</div>
+        <div style="font-size:0.8rem;color:#666;margin-top:4px;">总积分</div>
+      </div>
+      <div style="background:#f5f5f5;border-radius:8px;padding:16px;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:700;color:#e65100;">${currentStreak}</div>
+        <div style="font-size:0.8rem;color:#666;margin-top:4px;">连续天数</div>
+      </div>
+      <div style="background:#f5f5f5;border-radius:8px;padding:16px;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:700;color:#2e7d32;">${accuracyPct}%</div>
+        <div style="font-size:0.8rem;color:#666;margin-top:4px;">综合正确率</div>
+      </div>
+      <div style="background:#f5f5f5;border-radius:8px;padding:16px;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:700;color:#6a1b9a;">${completedLevels}</div>
+        <div style="font-size:0.8rem;color:#666;margin-top:4px;">已完成课程</div>
+      </div>
+    </div>
+
+    <!-- (b) 7-day trend -->
+    <div style="margin-top:24px;">
+      <h3 style="font-size:1rem;margin:0 0 12px;color:#333;">学习趋势（近7天）</h3>
+      <div style="background:#fafafa;border-radius:8px;padding:16px;">
+        <div style="display:flex;align-items:flex-end;height:100px;gap:4px;">
+          ${chartBars}
+        </div>
+      </div>
+    </div>
+
+    <!-- (c) Mastery breakdown -->
+    <div style="margin-top:24px;">
+      <h3 style="font-size:1rem;margin:0 0 12px;color:#333;">语法掌握度</h3>
+      <div style="max-height:300px;overflow-y:auto;">
+        ${masteryRows}
+      </div>
+    </div>
+
+    <!-- (d) Weakest skills -->
+    ${weakestSection ? `<div style="margin-top:24px;">${weakestSection}</div>` : ''}
+
+    <!-- (e) Recent sessions -->
+    <div style="margin-top:24px;">
+      <h3 style="font-size:1rem;margin:0 0 12px;color:#333;">最近练习记录</h3>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:2px solid #e0e0e0;">
+              <th style="padding:8px 6px;text-align:left;font-size:0.75rem;color:#999;font-weight:600;">日期</th>
+              <th style="padding:8px 6px;text-align:left;font-size:0.75rem;color:#999;font-weight:600;">课程</th>
+              <th style="padding:8px 6px;text-align:left;font-size:0.75rem;color:#999;font-weight:600;">星级</th>
+              <th style="padding:8px 6px;text-align:right;font-size:0.75rem;color:#999;font-weight:600;">正确率</th>
+              <th style="padding:8px 6px;text-align:right;font-size:0.75rem;color:#999;font-weight:600;">得分</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sessionRows}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- (f) Mistakes -->
+    <div style="margin-top:24px;">
+      <h3 style="font-size:1rem;margin:0 0 12px;color:#333;">错题本概况</h3>
+      <p style="font-size:0.85rem;color:#666;margin:0 0 8px;">共 ${mistakeCount} 道错题</p>
+      ${mistakeRows}
+    </div>
+  </div>`;
+}
+
+function mountReport() {
+  document.getElementById('reportBackBtn')?.addEventListener('click', () => {
+    location.hash = 'parent';
+  });
 }
 
 function mountSetup() {
@@ -336,6 +554,7 @@ function mountDashboard() {
   document.getElementById('lockBtn')?.addEventListener('click', () => { clearUnlock(); location.hash = ''; });
   document.getElementById('changePinBtn')?.addEventListener('click', () => { location.hash = 'parent/reset'; });
   document.getElementById('aiGenCard')?.addEventListener('click', () => { location.hash = 'parent/new'; });
+  document.getElementById('reportCard')?.addEventListener('click', () => { location.hash = 'parent/report'; });
 
   document.querySelectorAll('[data-edit-pack]').forEach(btn => {
     btn.addEventListener('click', () => { location.hash = 'parent/edit/' + btn.dataset.editPack; });

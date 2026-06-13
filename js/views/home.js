@@ -266,14 +266,16 @@ async function loadCustomPacks() {
 
     const cardsHtml = packs.map(p => {
       const qCount = Array.isArray(p.questions) ? p.questions.length : 0;
+      const desc = p.description ? `<div class="custom-pack-card__desc">${escapeHtml(p.description)}</div>` : '';
       return `
         <div class="custom-pack-card" data-pack-id="${p.id}">
           <div class="custom-pack-card__icon">📝</div>
           <div class="custom-pack-card__info">
             <div class="custom-pack-card__title">${escapeHtml(p.title)}</div>
+            ${desc}
             <div class="custom-pack-card__meta">${qCount} 道题</div>
           </div>
-          <div class="custom-pack-card__play">开始 ›</div>
+          <div class="custom-pack-card__play">开始练习 ›</div>
         </div>`;
     }).join('');
 
@@ -281,6 +283,7 @@ async function loadCustomPacks() {
       <div class="custom-packs-section">
         <div class="custom-packs-section__header">
           <span>📝 家长自定义课程</span>
+          <span style="font-size:0.8rem;color:var(--color-text-light);font-weight:400;">${packs.length} 个课程包</span>
         </div>
         ${cardsHtml}
       </div>`;

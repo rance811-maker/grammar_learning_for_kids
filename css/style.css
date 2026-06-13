@@ -2941,6 +2941,9 @@ ul, ol {
   margin-top: var(--space-lg);
 }
 .custom-packs-section__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
   font-weight: 700;
   font-size: 1.05rem;
   margin-bottom: var(--space-sm);
@@ -2980,10 +2983,19 @@ ul, ol {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.custom-pack-card__meta {
+.custom-pack-card__desc {
   font-size: 0.8rem;
   color: var(--color-text-light);
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.custom-pack-card__meta {
+  font-size: 0.75rem;
+  color: var(--color-text-light);
+  margin-top: 4px;
+  opacity: 0.7;
 }
 .custom-pack-card__play {
   font-weight: 700;
