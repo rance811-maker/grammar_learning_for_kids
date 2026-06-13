@@ -1,5 +1,5 @@
 import { store } from "./store.js";
-import { units } from "./data/units.js";
+import { curriculum } from "./curriculum.js";
 
 function shuffle(arr) {
   const a = [...arr];
@@ -34,14 +34,18 @@ function calculateStars(wrongCount, energyRemaining) {
   return 1;
 }
 
+function getUnits() {
+  return curriculum.getUnits();
+}
+
 function getQuestionsForLevel(unitId, level) {
-  const unit = units?.[unitId];
+  const unit = getUnits()[unitId];
   if (!unit?.levels?.[level]) return [];
   return unit.levels[level].questions || [];
 }
 
 function getAllQuestionsForUnit(unitId) {
-  const unit = units?.[unitId];
+  const unit = getUnits()[unitId];
   if (!unit?.levels) return [];
   const all = [];
   for (const level of Object.values(unit.levels)) {
@@ -54,9 +58,10 @@ function getAllQuestionsForUnit(unitId) {
 
 function findReviewQuestions(excludeUnitId, weakSkills, count) {
   const candidates = [];
+  const units = getUnits();
 
   for (const { skill } of weakSkills) {
-    for (const [uid, unit] of Object.entries(units || {})) {
+    for (const [uid, unit] of Object.entries(units)) {
       const unitId = Number(uid);
       if (unitId === excludeUnitId) continue;
       if (!store.isUnitUnlocked(unitId)) continue;
@@ -98,7 +103,7 @@ export const engine = {
   // route to jump straight to a question without playing through a level.
   createDemoSession(query) {
     const all = [];
-    for (const unitId of Object.keys(units)) {
+    for (const unitId of Object.keys(getUnits())) {
       all.push(...getAllQuestionsForUnit(Number(unitId)));
     }
     const TYPES = ["choice", "match", "fill", "reorder", "error", "scenario"];
@@ -183,7 +188,7 @@ export const engine = {
       const weakSkills = store.getWeakestSkills(8);
       const pool = [];
       for (const { skill } of weakSkills) {
-        for (const [uid, unit] of Object.entries(units || {})) {
+        for (const [uid, unit] of Object.entries(getUnits())) {
           if (!store.isUnitUnlocked(Number(uid))) continue;
           for (const level of Object.values(unit.levels || {})) {
             for (const q of level.questions || []) {

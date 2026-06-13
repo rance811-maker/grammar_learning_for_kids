@@ -12,9 +12,10 @@ import * as review from './views/review.js';
 import * as settings from './views/settings.js';
 import * as account from './views/account.js';
 import * as parent from './views/parent.js';
+import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260613d';
+const BUILD_VERSION = '20260613e';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -158,12 +159,21 @@ function renderSidebar(route) {
     : `<span class="sidebar__account-name">👤 访客模式</span>
        <span class="sidebar__account-cta">点此登录 / 注册 ›</span>`;
 
+  const currTitle = curriculum.getActiveTitle();
+  const currIsBuiltIn = curriculum.isBuiltIn();
+  const currBadge = currIsBuiltIn ? '' : `
+    <div class="sidebar__curriculum">
+      <span class="sidebar__curriculum-icon">📚</span>
+      <span class="sidebar__curriculum-name">${escapeHtml(currTitle)}</span>
+    </div>`;
+
   return `
     <aside class="sidebar">
       <div class="sidebar__brand">
         <span class="sidebar__brand-logo">🏆</span>
         <span class="sidebar__brand-text">Grammar Quest<small>语法冒险</small></span>
       </div>
+      ${currBadge}
       <nav class="sidebar__nav">${items}</nav>
       <div class="sidebar__footer">
         <button class="sidebar__account" data-route="account">${accountLine}</button>

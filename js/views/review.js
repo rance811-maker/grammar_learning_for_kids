@@ -1,5 +1,5 @@
 import { store } from '../store.js';
-import { units } from '../data/units.js';
+import { curriculum } from '../curriculum.js';
 import { skillName } from '../data/skill-names.js';
 
 const TYPE_LABELS = {
@@ -21,7 +21,7 @@ export function render() {
     const items = mistakes.slice().reverse().map((m) => {
       const q = m.question;
       const typeLabel = TYPE_LABELS[q.type] || q.type;
-      const unitTitle = units[m.unitId]?.title || `Unit ${m.unitId}`;
+      const unitTitle = curriculum.getUnit(m.unitId)?.title || `Unit ${m.unitId}`;
       const skill = q.subSkill ? skillName(q.subSkill) : '';
       const preview = (q.sentence || q.instruction || q.context || '')
         .replace(/_+/g, '____')

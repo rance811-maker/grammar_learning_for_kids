@@ -1,11 +1,11 @@
 import { store } from '../store.js';
-import { units } from '../data/units.js';
+import { curriculum } from '../curriculum.js';
 
 let submitted = false;
 
 export function render(unitId) {
   unitId = Number(unitId);
-  const unitData = units[unitId];
+  const unitData = curriculum.getUnit(unitId);
   const unitState = store.state.units[unitId];
 
   if (!unitData || !unitData.mission) {
@@ -67,7 +67,7 @@ export function render(unitId) {
 
 export function mount(unitId) {
   unitId = Number(unitId);
-  const unitData = units[unitId];
+  const unitData = curriculum.getUnit(unitId);
   const mission = unitData?.mission;
   if (!mission) return;
 

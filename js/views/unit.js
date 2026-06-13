@@ -1,5 +1,6 @@
 import { store } from '../store.js';
-import { units } from '../data/units.js';
+import { curriculum } from '../curriculum.js';
+import { generateUnitContent, hasApiKey } from '../unitGenerator.js';
 
 const LEVEL_NAMES = {
   1: 'Lv.1 认识',
@@ -19,11 +20,33 @@ function renderStars(count) {
 
 export function render(unitId) {
   unitId = Number(unitId);
+  const units = curriculum.getUnits();
   const unitData = units[unitId];
   const unitState = store.state.units[unitId];
 
   if (!unitData || !unitState) {
     return `<div class="view view-unit"><p class="text-center text-muted mt-lg">单元不存在</p></div>`;
+  }
+
+  if (unitData._needsGeneration) {
+    return `
+      <div class="view view-unit">
+        <div class="unit-header">
+          <div class="unit-header__title">${unitData.title || 'Unit ' + unitId}</div>
+          <div class="unit-header__subtitle">${unitData.description || ''}</div>
+        </div>
+        <div class="card" style="text-align:center;padding:var(--space-xl);" id="unitGenArea">
+          <div style="font-size:2.5rem;margin-bottom:var(--space-md);">🤖</div>
+          <div style="font-weight:700;font-size:1.1rem;margin-bottom:var(--space-sm);">课程内容待生成</div>
+          <div style="font-size:var(--text-sm);color:var(--color-text-light);margin-bottom:var(--space-lg);">
+            AI 会为这个单元生成故事、练习题和写作任务
+          </div>
+          <button class="btn btn--primary btn--large" id="genUnitBtn" style="width:100%;font-size:1rem;">
+            🤖 生成本单元内容
+          </button>
+          <div id="genUnitMsg" style="margin-top:var(--space-md);"></div>
+        </div>
+      </div>`;
   }
 
   const discoverDone = unitState.discoverCompleted;
@@ -109,6 +132,30 @@ export function render(unitId) {
 
 export function mount(unitId) {
   unitId = Number(unitId);
+
+  const genBtn = document.getElementById('genUnitBtn');
+  if (genBtn) {
+    genBtn.addEventListener('click', async () => {
+      if (!hasApiKey()) {
+        const msg = document.getElementById('genUnitMsg');
+        if (msg) msg.innerHTML = '<p style="color:var(--color-danger);font-size:var(--text-sm);">请先在家长专区 → AI 生成课程中配置 API key</p>';
+        return;
+      }
+      genBtn.disabled = true;
+      genBtn.innerHTML = '<span class="ce-spinner" style="display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:middle;"></span> 正在生成，请稍候…';
+      const msg = document.getElementById('genUnitMsg');
+      try {
+        await generateUnitContent(unitId);
+        location.hash = `unit/${unitId}`;
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      } catch (e) {
+        genBtn.disabled = false;
+        genBtn.textContent = '🤖 重试生成';
+        if (msg) msg.innerHTML = `<p style="color:var(--color-danger);font-size:var(--text-sm);">生成失败：${e.message}</p>`;
+      }
+    });
+    return;
+  }
 
   document.querySelectorAll('.phase-card:not(.phase-card--locked)').forEach(card => {
     card.addEventListener('click', () => {

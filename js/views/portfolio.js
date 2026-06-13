@@ -1,10 +1,11 @@
 import { store } from '../store.js';
-import { units } from '../data/units.js';
+import { curriculum } from '../curriculum.js';
 
 const UNIT_ICONS = ['📗', '📘', '📙', '📕', '📒', '📓', '📔', '📖', '🔖', '📚', '🏅', '🏆'];
 
 export function render() {
   const portfolio = store.getPortfolio();
+  const units = curriculum.getUnits();
   const unitIds = Object.keys(units).map(Number).sort((a, b) => a - b);
   const completedCount = portfolio.length;
   const totalCount = unitIds.length;

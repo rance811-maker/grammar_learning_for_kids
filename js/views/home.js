@@ -1,5 +1,5 @@
 import { store } from '../store.js';
-import { units } from '../data/units.js';
+import { curriculum } from '../curriculum.js';
 import { engine } from '../engine.js';
 import { cloud } from '../cloud.js';
 
@@ -53,6 +53,10 @@ export function render() {
   const rank = RANK_INFO[player.rank] || RANK_INFO.bronze;
   const todayLessons = store.getTodayLessons();
   const dailyGoal = store.state.settings.dailyGoal;
+  const units = curriculum.getUnits();
+  const currTitle = curriculum.getActiveTitle();
+  const isBuiltIn = curriculum.isBuiltIn();
+  const allCurricula = curriculum.listAll();
 
   let nodesHtml = '';
   const unitIds = Object.keys(units).map(Number).sort((a, b) => a - b);
@@ -79,8 +83,9 @@ export function render() {
       ? `<div class="unit-node__status">🔒 ${statusLabel}</div>`
       : `<div class="unit-node__stars">${renderStars(Math.min(Math.round(stars / 5), 3), 3)}</div>`;
 
+    const needsGen = unitData._needsGeneration ? ' unit-node--needs-gen' : '';
     nodesHtml += `
-      <div class="unit-node ${statusClass}" data-unit-id="${uid}">
+      <div class="unit-node ${statusClass}${needsGen}" data-unit-id="${uid}">
         <div class="unit-node__circle">${circleContent}</div>
         <div class="unit-node__no">Unit ${uid}</div>
         <span class="unit-node__name">${unitData.title || 'Unit ' + uid}</span>
@@ -171,6 +176,33 @@ export function render() {
     }
   }
 
+  // Curriculum switcher
+  let switcherHtml = '';
+  if (allCurricula.length > 1) {
+    const options = allCurricula.map(c => {
+      const active = c.id === curriculum.getActiveId();
+      return `<button class="curr-switch-btn${active ? ' curr-switch-btn--active' : ''}" data-curr-id="${c.id}">
+        ${active ? '✅ ' : ''}${escapeHtml(c.title)}${c.builtIn ? ' (内置)' : ''}
+      </button>`;
+    }).join('');
+    switcherHtml = `
+      <div class="card mb-md curr-switcher">
+        <div class="curr-switcher__header">
+          <span class="curr-switcher__label">📚 当前课程体系</span>
+          <strong>${escapeHtml(currTitle)}</strong>
+        </div>
+        <div class="curr-switcher__list">${options}</div>
+      </div>`;
+  } else if (!isBuiltIn) {
+    switcherHtml = `
+      <div class="card mb-md curr-switcher">
+        <div class="curr-switcher__header">
+          <span class="curr-switcher__label">📚 当前课程体系</span>
+          <strong>${escapeHtml(currTitle)}</strong>
+        </div>
+      </div>`;
+  }
+
   return `
     <div class="view view-map">
       <div class="player-stats">
@@ -188,6 +220,7 @@ export function render() {
         </div>
       </div>
 
+      ${switcherHtml}
       ${planHtml}
       ${quickStartHtml}
       ${bossHtml}
@@ -215,6 +248,17 @@ export function mount() {
       const unitId = node.dataset.unitId;
       if (unitId) {
         location.hash = `unit/${unitId}`;
+      }
+    });
+  });
+
+  document.querySelectorAll('.curr-switch-btn:not(.curr-switch-btn--active)').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.currId;
+      if (id) {
+        store.switchCurriculum(id);
+        location.hash = '';
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
       }
     });
   });
