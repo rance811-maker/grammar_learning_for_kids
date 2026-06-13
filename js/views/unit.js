@@ -1,6 +1,27 @@
 import { store } from '../store.js';
 import { curriculum } from '../curriculum.js';
-import { generateUnitContent, hasApiKey } from '../unitGenerator.js';
+import { generateUnitContent, hasApiKey, friendlyAiError } from '../unitGenerator.js';
+
+// 在元素里轮播一组提示文字，让等待时有"正在进行"的反馈。返回停止函数。
+function startTicker(el, messages, interval = 2200) {
+  if (!el) return () => {};
+  let i = 0;
+  const apply = () => {
+    el.innerHTML = `<p style="color:var(--color-secondary-dark);font-size:var(--text-sm);">${messages[i % messages.length]}</p>`;
+    i++;
+  };
+  apply();
+  const t = setInterval(apply, interval);
+  return () => clearInterval(t);
+}
+
+const UNIT_GEN_STEPS = [
+  '🧠 正在构思单元故事…',
+  '📖 正在编写阅读内容…',
+  '📝 正在出 Lv.1–5 练习题…',
+  '🎯 正在设计写作任务…',
+  '🔍 正在校对内容…',
+];
 
 const LEVEL_NAMES = {
   1: 'Lv.1 认识',
@@ -144,14 +165,17 @@ export function mount(unitId) {
       genBtn.disabled = true;
       genBtn.innerHTML = '<span class="ce-spinner" style="display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:middle;"></span> 正在生成，请稍候…';
       const msg = document.getElementById('genUnitMsg');
+      const stopTicker = startTicker(msg, UNIT_GEN_STEPS);
       try {
         await generateUnitContent(unitId);
+        stopTicker();
         location.hash = `unit/${unitId}`;
         window.dispatchEvent(new HashChangeEvent('hashchange'));
       } catch (e) {
+        stopTicker();
         genBtn.disabled = false;
         genBtn.textContent = '🤖 重试生成';
-        if (msg) msg.innerHTML = `<p style="color:var(--color-danger);font-size:var(--text-sm);">生成失败：${e.message}</p>`;
+        if (msg) msg.innerHTML = `<p style="color:var(--color-danger);font-size:var(--text-sm);">生成失败：${friendlyAiError(e)}</p>`;
       }
     });
     return;
