@@ -270,6 +270,10 @@ export function mount() {
       if (!session) return;
       if (session.type === '综合测试') {
         location.hash = 'practice/boss';
+      } else if (!curriculum.isUnitGenerated(session.unitId)) {
+        // Unit content not generated yet — send to the unit page (which has the
+        // "generate content" button) instead of an empty practice session.
+        location.hash = `unit/${session.unitId}`;
       } else {
         location.hash = `practice/${session.unitId}/${session.level}`;
       }
@@ -288,7 +292,9 @@ export function mount() {
     quickBtn.addEventListener('click', () => {
       const rec = engine.getRecommendation();
       if (!rec) return;
-      if (rec.type === 'mission') {
+      if (!curriculum.isUnitGenerated(rec.unitId)) {
+        location.hash = `unit/${rec.unitId}`;
+      } else if (rec.type === 'mission') {
         location.hash = `mission/${rec.unitId}`;
       } else {
         location.hash = `practice/${rec.unitId}/${rec.level}`;
