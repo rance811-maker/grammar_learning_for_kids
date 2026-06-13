@@ -3032,18 +3032,19 @@ ul, ol {
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  margin: 0 12px;
+  margin: 0 12px 8px;
   background: rgba(88, 204, 2, 0.1);
   border-radius: var(--radius-md);
   font-size: 0.8rem;
   color: var(--color-primary-dark);
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
 }
 .sidebar__curriculum-icon { flex-shrink: 0; }
 .sidebar__curriculum-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -3056,11 +3057,20 @@ ul, ol {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: var(--space-sm);
   margin-bottom: var(--space-sm);
   font-size: var(--text-sm);
 }
 .curr-switcher__label {
   color: var(--color-text-light);
+  flex-shrink: 0;
+}
+.curr-switcher__current {
+  min-width: 0;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .curr-switcher__list {
   display: flex;
@@ -3076,6 +3086,9 @@ ul, ol {
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .curr-switch-btn:hover {
   border-color: var(--color-primary);

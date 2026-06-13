@@ -181,15 +181,16 @@ export function render() {
   if (allCurricula.length > 1) {
     const options = allCurricula.map(c => {
       const active = c.id === curriculum.getActiveId();
-      return `<button class="curr-switch-btn${active ? ' curr-switch-btn--active' : ''}" data-curr-id="${c.id}">
-        ${active ? '✅ ' : ''}${escapeHtml(c.title)}${c.builtIn ? ' (内置)' : ''}
+      const label = `${escapeHtml(c.title)}${c.builtIn ? ' (内置)' : ''}`;
+      return `<button class="curr-switch-btn${active ? ' curr-switch-btn--active' : ''}" data-curr-id="${c.id}" title="${label}">
+        ${active ? '✅ ' : ''}${label}
       </button>`;
     }).join('');
     switcherHtml = `
       <div class="card mb-md curr-switcher">
         <div class="curr-switcher__header">
           <span class="curr-switcher__label">📚 当前课程体系</span>
-          <strong>${escapeHtml(currTitle)}</strong>
+          <strong class="curr-switcher__current" title="${escapeHtml(currTitle)}">${escapeHtml(currTitle)}</strong>
         </div>
         <div class="curr-switcher__list">${options}</div>
       </div>`;
@@ -198,7 +199,7 @@ export function render() {
       <div class="card mb-md curr-switcher">
         <div class="curr-switcher__header">
           <span class="curr-switcher__label">📚 当前课程体系</span>
-          <strong>${escapeHtml(currTitle)}</strong>
+          <strong class="curr-switcher__current" title="${escapeHtml(currTitle)}">${escapeHtml(currTitle)}</strong>
         </div>
       </div>`;
   }

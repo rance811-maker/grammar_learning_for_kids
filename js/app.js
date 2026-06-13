@@ -15,7 +15,7 @@ import * as parent from './views/parent.js';
 import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260613f';
+const BUILD_VERSION = '20260613g';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -162,7 +162,7 @@ function renderSidebar(route) {
   const currTitle = curriculum.getActiveTitle();
   const currIsBuiltIn = curriculum.isBuiltIn();
   const currBadge = currIsBuiltIn ? '' : `
-    <div class="sidebar__curriculum">
+    <div class="sidebar__curriculum" title="${escapeHtml(currTitle)}">
       <span class="sidebar__curriculum-icon">📚</span>
       <span class="sidebar__curriculum-name">${escapeHtml(currTitle)}</span>
     </div>`;
