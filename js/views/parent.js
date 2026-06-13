@@ -3,7 +3,7 @@ import { cloud, friendlyError } from '../cloud.js';
 import * as courseEditor from './courseEditor.js';
 import { SUB_SKILL_NAMES } from '../data/skill-names.js';
 import { curriculum, BUILT_IN_ID } from '../curriculum.js';
-import { generateSyllabus, hasApiKey } from '../unitGenerator.js';
+import { generateSyllabus, generateAllUnits, hasApiKey, friendlyAiError } from '../unitGenerator.js';
 
 const LOCKOUT_KEY = 'gq-parent-lockout';
 const MAX_ATTEMPTS = 5;
@@ -124,6 +124,7 @@ function renderDashboard(packs) {
         ${isActive
           ? '<span class="badge badge--success" style="font-size:0.75rem;">使用中</span>'
           : `<button class="btn btn--tiny btn--primary" data-switch-curr="${c.id}">切换</button>`}
+        ${!c.builtIn && genCount < 12 ? `<button class="btn btn--tiny btn--outline" data-genall-curr="${c.id}">🤖 生成单元</button>` : ''}
         ${!c.builtIn ? `<button class="btn btn--tiny btn--danger-text" data-del-curr="${c.id}">删除</button>` : ''}
       </div>
     </div>`;
@@ -152,7 +153,7 @@ function renderDashboard(packs) {
       </div>`;
   }
 
-  return `<div class="parent-card parent-card--wide">
+  return `<div class="parent-card parent-card--wide" id="dashboardCard">
     <div class="parent-header">
       <h2>🏠 家长专区</h2>
       <button class="btn btn--small btn--outline" id="lockBtn">🔒 退出专区</button>
@@ -349,17 +350,103 @@ function mountCurriculumCreator() {
 
     genBtn.disabled = true;
     genBtn.innerHTML = '<span class="ce-spinner" style="display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:middle;"></span> AI 正在设计大纲…';
-    if (msg) msg.innerHTML = '';
+    const stopTicker = startTicker(msg, SYLLABUS_GEN_STEPS);
 
     try {
       const syllabus = await generateSyllabus(goal);
+      stopTicker();
+      if (msg) msg.innerHTML = '';
       renderSyllabusPreview(syllabus, goal);
     } catch (e) {
+      stopTicker();
       genBtn.disabled = false;
       genBtn.textContent = '🤖 重试生成';
-      if (msg) msg.innerHTML = `<p style="color:var(--color-danger);font-size:var(--text-sm);">生成失败：${esc(e.message)}</p>`;
+      if (msg) msg.innerHTML = `<p style="color:var(--color-danger);font-size:var(--text-sm);">生成失败：${esc(friendlyAiError(e))}</p>`;
     }
   });
+}
+
+// 在元素里轮播一组提示文字，等待时给出"正在进行"的反馈。返回停止函数。
+function startTicker(el, messages, interval = 2200) {
+  if (!el) return () => {};
+  let i = 0;
+  const apply = () => {
+    el.innerHTML = `<p style="color:var(--color-secondary-dark);font-size:var(--text-sm);">${messages[i % messages.length]}</p>`;
+    i++;
+  };
+  apply();
+  const t = setInterval(apply, interval);
+  return () => clearInterval(t);
+}
+
+const SYLLABUS_GEN_STEPS = [
+  '🧠 正在理解学习目标…',
+  '📐 正在规划单元梯度…',
+  '✍️ 正在编写 12 单元大纲…',
+  '🔖 正在标注每单元语法点…',
+];
+
+// 批量生成 UI：在 hostEl 内渲染进度条并跑 generateAllUnits。
+// 完成后给出"进入学习地图"以及（若有失败）"重试失败单元"。
+async function renderAndRunBatch(hostEl, title) {
+  if (!hostEl) return;
+  if (!hasApiKey()) {
+    hostEl.innerHTML = `<div class="parent-card parent-card--wide" style="text-align:center;">
+      <div class="parent-icon">🔑</div>
+      <p>请先在「独立练习包」中配置 AI API key，再生成单元内容。</p>
+      <button class="btn btn--primary" id="batchToHomeBtn">进入学习地图</button>
+    </div>`;
+    document.getElementById('batchToHomeBtn')?.addEventListener('click', goHome);
+    return;
+  }
+
+  hostEl.innerHTML = `<div class="parent-card parent-card--wide">
+    <h2 style="margin-top:0;">🤖 生成单元内容</h2>
+    <p class="batch-sub">正在为《${esc(title)}》的每个单元生成故事、练习题和写作任务，每个单元约 10–30 秒，请保持页面打开…</p>
+    <div class="batch-progress"><div class="batch-progress__fill" id="batchFill"></div></div>
+    <div class="batch-status" id="batchStatus">准备中…</div>
+    <div id="batchActions"></div>
+  </div>`;
+
+  const fill = document.getElementById('batchFill');
+  const statusEl = document.getElementById('batchStatus');
+
+  let res;
+  try {
+    res = await generateAllUnits({
+      onProgress: (r, uid, kind) => {
+        if (fill) fill.style.width = Math.round((r.done / r.total) * 100) + '%';
+        const tag = kind === 'ok' ? '✅ 已生成' : kind === 'skip' ? '（已存在）' : '⚠️ 失败';
+        if (statusEl) statusEl.textContent = `进度 ${r.done}/${r.total} · 单元 ${uid} ${tag}`;
+      },
+    });
+  } catch (e) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--color-danger);">生成中断：${esc(friendlyAiError(e))}</span>`;
+    const actions = document.getElementById('batchActions');
+    if (actions) actions.innerHTML = `<button class="btn btn--primary" id="batchToHomeBtn">进入学习地图</button>`;
+    document.getElementById('batchToHomeBtn')?.addEventListener('click', goHome);
+    return;
+  }
+
+  const failCount = res.failed.length;
+  if (statusEl) {
+    statusEl.innerHTML = failCount
+      ? `完成 ${res.done}/${res.total} 个单元，其中 <strong style="color:var(--color-danger);">${failCount} 个生成失败</strong>（孩子进入该单元时可单独重试）`
+      : `🎉 全部 ${res.total} 个单元已生成完毕！`;
+  }
+  const actions = document.getElementById('batchActions');
+  if (actions) {
+    actions.innerHTML = `
+      ${failCount ? '<button class="btn btn--outline" id="batchRetryBtn">🔄 重试失败单元</button>' : ''}
+      <button class="btn btn--primary" id="batchDoneBtn">进入学习地图</button>`;
+    document.getElementById('batchDoneBtn')?.addEventListener('click', goHome);
+    document.getElementById('batchRetryBtn')?.addEventListener('click', () => renderAndRunBatch(hostEl, title));
+  }
+}
+
+function goHome() {
+  location.hash = '';
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
 }
 
 function renderSyllabusPreview(syllabus, goal) {
@@ -395,7 +482,7 @@ function renderSyllabusPreview(syllabus, goal) {
     const id = 'curr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     store.addCurriculum(id, { title, description: goal, goal, syllabus });
     store.switchCurriculum(id);
-    location.hash = '';
+    showPostCreate(title);
   });
 
   document.getElementById('currRegenBtn')?.addEventListener('click', () => {
@@ -411,6 +498,26 @@ function renderSyllabusPreview(syllabus, goal) {
   // Hide the original generate button
   const genArea = document.getElementById('currGenArea');
   if (genArea) genArea.style.display = 'none';
+}
+
+// 课程创建成功后：询问是否立即批量生成全部单元。
+function showPostCreate(title) {
+  const host = document.getElementById('currCreator');
+  if (!host) { goHome(); return; }
+  host.outerHTML = '<div id="postCreateHost"></div>';
+  const ph = document.getElementById('postCreateHost');
+  ph.innerHTML = `<div class="parent-card parent-card--wide" style="text-align:center;">
+    <div class="parent-icon">✅</div>
+    <h2>课程已创建</h2>
+    <p class="parent-desc">《${esc(title)}》已添加并设为当前课程。<br>
+    是否现在就生成全部 12 个单元的练习题？也可以稍后等孩子进入某个单元时再单独生成。</p>
+    <div style="display:flex;gap:var(--space-md);justify-content:center;flex-wrap:wrap;margin-top:var(--space-lg);">
+      <button class="btn btn--primary" id="genAllNowBtn">🤖 一键生成全部单元</button>
+      <button class="btn btn--outline" id="genLaterBtn">稍后再说</button>
+    </div>
+  </div>`;
+  document.getElementById('genLaterBtn')?.addEventListener('click', goHome);
+  document.getElementById('genAllNowBtn')?.addEventListener('click', () => renderAndRunBatch(ph, title));
 }
 
 // --- Learning Report ---
@@ -733,6 +840,16 @@ function mountDashboard() {
       store.switchCurriculum(btn.dataset.switchCurr);
       location.hash = 'parent';
       window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+  });
+
+  document.querySelectorAll('[data-genall-curr]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.genallCurr;
+      store.switchCurriculum(id); // 确保是当前课程（已是则无操作）
+      const card = document.getElementById('dashboardCard');
+      const host = card?.parentElement;
+      if (host) renderAndRunBatch(host, curriculum.getActiveTitle());
     });
   });
 

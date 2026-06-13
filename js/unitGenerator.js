@@ -69,13 +69,48 @@ Question formats:
 Return a single JSON object { "discover":{...}, "levels":{...}, "mission":{...} }.
 Return ONLY the JSON, no markdown code blocks, no other text.`;
 
+// 单次 AI 请求的超时上限。整套单元内容较大，给足时间但不至于无限挂起。
+const REQUEST_TIMEOUT_MS = 90000;
+
+// 把底层错误翻译成对家长友好的中文提示。已经友好的错误(.friendly)原样返回。
+export function friendlyAiError(err) {
+  if (err && err.friendly) return err.message;
+  const status = err && err.status;
+  const raw = String((err && err.message) || err || '').toLowerCase();
+  if (raw.includes('abort') || raw.includes('timeout') || raw.includes('timed out')) return 'AI 响应超时了，请检查网络后重试';
+  if (raw.includes('failed to fetch') || raw.includes('networkerror') || raw.includes('network request') || raw.includes('load failed')) return '网络连接不上，检查一下网络再试试';
+  if (status === 401 || status === 403 || raw.includes('api key') || raw.includes('api_key') || raw.includes('unauthorized') || raw.includes('permission denied') || raw.includes('api key not valid')) return 'API key 无效或没有权限，请检查 key 是否填对';
+  if (status === 429 || raw.includes('rate limit') || raw.includes('quota') || raw.includes('resource_exhausted') || raw.includes('too many requests')) return 'AI 调用太频繁或额度用完了，等一会儿再试';
+  if ((status && status >= 500) || raw.includes('overloaded') || raw.includes('unavailable') || raw.includes('try again later')) return 'AI 服务暂时繁忙，请稍后重试';
+  if (raw.includes('json') || raw.includes('unexpected token') || raw.includes('格式')) return 'AI 返回的内容格式有误，请重试';
+  return (err && err.message) || '生成失败，请重试';
+}
+
+// 构造一个"已友好"的错误：friendlyAiError 会原样透传其 message。
+function friendlyErr(msg) {
+  const e = new Error(msg);
+  e.friendly = true;
+  return e;
+}
+
+// 带超时的 fetch，避免请求卡住后界面一直转圈。
+async function fetchWithTimeout(url, opts) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...opts, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function callAI(systemPrompt, userText) {
   const provider = getProvider();
   const apiKey = getAiKey();
-  if (!apiKey) throw new Error('请先在家长专区 → AI 生成课程中配置 API key');
+  if (!apiKey) throw friendlyErr('请先在家长专区配置 AI API key');
 
   if (provider === 'claude') {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -92,13 +127,15 @@ async function callAI(systemPrompt, userText) {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => null);
-      throw new Error(err?.error?.message || `API 返回 ${res.status}`);
+      const e = new Error(err?.error?.message || `API 返回 ${res.status}`);
+      e.status = res.status;
+      throw e;
     }
     const data = await res.json();
     return data?.content?.find(b => b.type === 'text')?.text || '';
   }
 
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
     {
       method: 'POST',
@@ -111,34 +148,68 @@ async function callAI(systemPrompt, userText) {
   );
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.error?.message || `API 返回 ${res.status}`);
+    const e = new Error(err?.error?.message || `API 返回 ${res.status}`);
+    e.status = res.status;
+    throw e;
   }
   const data = await res.json();
   return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 }
 
+// 解析 AI 返回的 JSON。先去掉代码块围栏；若仍失败，尝试抽取首个 {…} 或 […]
+// 片段（模型偶尔会在 JSON 前后多带一两句话）。
 function parseJSON(raw) {
-  let text = raw.trim();
-  text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-  return JSON.parse(text);
+  let text = String(raw).trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '');
+  try {
+    return JSON.parse(text);
+  } catch {
+    const arr = text.match(/\[[\s\S]*\]/);
+    const obj = text.match(/\{[\s\S]*\}/);
+    let cand = null;
+    if (arr && obj) cand = arr.index <= obj.index ? arr[0] : obj[0];
+    else cand = (arr && arr[0]) || (obj && obj[0]) || null;
+    if (cand) {
+      try { return JSON.parse(cand); } catch { /* fall through */ }
+    }
+    throw friendlyErr('AI 返回的内容格式有误，请重试');
+  }
+}
+
+// 调用 + 解析 + 校验，必要时自动重试一次。
+// 仅对"格式/结构"类问题重试；鉴权/额度类问题(401/403/429)直接失败，不浪费配额。
+async function generateValidated(systemPrompt, userText, validate, attempts = 2) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const raw = await callAI(systemPrompt, userText);
+      const data = parseJSON(raw);
+      validate(data);
+      return data;
+    } catch (e) {
+      lastErr = e;
+      if (e.status === 401 || e.status === 403 || e.status === 429) break;
+    }
+  }
+  throw lastErr;
 }
 
 export async function generateSyllabus(goal) {
-  const raw = await callAI(SYLLABUS_PROMPT, `Learning goal: ${goal}`);
-  const syllabus = parseJSON(raw);
-  if (!Array.isArray(syllabus) || syllabus.length < 12) {
-    throw new Error('AI 返回的大纲不完整，请重试');
-  }
-  return syllabus.slice(0, 12);
+  return generateValidated(SYLLABUS_PROMPT, `Learning goal: ${goal}`, (syllabus) => {
+    if (!Array.isArray(syllabus) || syllabus.length < 12) {
+      throw friendlyErr('AI 返回的大纲不完整，请重试');
+    }
+  }).then(s => s.slice(0, 12));
 }
 
 export async function generateUnitContent(unitId) {
   const id = store.state.activeCurriculumId;
   const curr = store.state.curricula?.[id];
-  if (!curr) throw new Error('无活跃课程体系');
+  if (!curr) throw friendlyErr('无活跃课程体系');
 
   const sylItem = curr.syllabus[unitId - 1];
-  if (!sylItem) throw new Error('单元不在大纲中');
+  if (!sylItem) throw friendlyErr('单元不在大纲中');
 
   const userText = [
     `Unit ${unitId}: ${sylItem.title}`,
@@ -146,13 +217,45 @@ export async function generateUnitContent(unitId) {
     `Sub-skills to use: ${(sylItem.skills || []).join(', ')}`,
   ].join('\n');
 
-  const raw = await callAI(UNIT_PROMPT, userText);
-  const data = parseJSON(raw);
-
-  if (!data.discover || !data.levels) {
-    throw new Error('AI 返回的内容结构不完整，请重试');
-  }
+  const data = await generateValidated(UNIT_PROMPT, userText, (d) => {
+    if (!d || !d.discover || !d.levels) {
+      throw friendlyErr('AI 返回的内容结构不完整，请重试');
+    }
+  });
 
   curriculum.saveUnitData(unitId, data);
   return data;
+}
+
+// 批量生成当前课程体系中尚未生成的全部单元。
+// - onProgress(results, uid, kind) 在每个单元处理后回调，kind ∈ 'ok'|'skip'|'fail'
+// - 单个单元失败不会中断整体，错误收集在 results.failed 里
+// - 单元间留出小间隔，降低触发限流的概率
+export async function generateAllUnits({ onProgress } = {}) {
+  const id = store.state.activeCurriculumId;
+  const curr = store.state.curricula?.[id];
+  if (!curr) throw friendlyErr('无活跃课程体系');
+
+  const total = Math.min((curr.syllabus || []).length, 12);
+  const results = { total, done: 0, generated: 0, failed: [] };
+
+  for (let uid = 1; uid <= total; uid++) {
+    if (curriculum.isUnitGenerated(uid)) {
+      results.done++;
+      onProgress?.(results, uid, 'skip');
+      continue;
+    }
+    try {
+      await generateUnitContent(uid);
+      results.generated++;
+      results.done++;
+      onProgress?.(results, uid, 'ok');
+    } catch (e) {
+      results.failed.push({ uid, message: friendlyAiError(e) });
+      results.done++;
+      onProgress?.(results, uid, 'fail');
+    }
+    if (uid < total) await new Promise(r => setTimeout(r, 700));
+  }
+  return results;
 }

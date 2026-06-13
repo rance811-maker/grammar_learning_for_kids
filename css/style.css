@@ -3102,6 +3102,38 @@ ul, ol {
   font-weight: 600;
 }
 
+/* Batch unit-generation progress */
+.batch-sub {
+  font-size: var(--text-sm);
+  color: var(--color-text-light);
+  margin: var(--space-sm) 0 var(--space-md);
+  line-height: 1.6;
+}
+.batch-progress {
+  height: 14px;
+  background: var(--color-border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+.batch-progress__fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+  border-radius: var(--radius-pill);
+  transition: width 0.3s ease;
+}
+.batch-status {
+  margin-top: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text-light);
+}
+#batchActions {
+  margin-top: var(--space-lg);
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
 /* Unit node: needs generation indicator */
 .unit-node--needs-gen .unit-node__circle {
   border-style: dashed;
@@ -3171,4 +3203,11 @@ ul, ol {
   .sidebar__account { width: auto; padding: var(--space-xs) var(--space-sm); }
   .content { padding: var(--space-md); }
   .topbar { padding: 0 var(--space-md); }
+
+  /* 课程体系列表：窄屏时让按钮换行到信息下方，避免长标题挤压切换/删除按钮 */
+  .ce-pack-item { flex-wrap: wrap; }
+  .ce-pack-info { flex-basis: 100%; }
+  .ce-pack-btns { margin-left: 0; margin-top: var(--space-sm); }
+  .parent-header { flex-wrap: wrap; gap: var(--space-sm); }
+  #batchActions .btn { flex: 1; }
 }
