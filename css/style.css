@@ -2862,6 +2862,33 @@ ul, ol {
 
 .ce-save { margin-top: var(--space-md); }
 
+/* Provider selector tabs */
+.ce-provider-tabs {
+  display: flex;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+}
+.ce-provider-tab {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md, 12px);
+  background: var(--color-surface);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: center;
+}
+.ce-provider-tab:hover {
+  border-color: var(--color-secondary);
+}
+.ce-provider-tab--active {
+  border-color: var(--color-secondary);
+  background: var(--color-secondary-light, #e6f9e6);
+  color: var(--color-secondary-dark);
+}
+
 /* AI generation UI */
 .ce-generate {
   text-align: center;

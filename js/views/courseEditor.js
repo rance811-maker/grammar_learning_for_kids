@@ -10,9 +10,64 @@ let generating = false;
 let showKeyInput = false;
 let genError = '';
 
-const AI_KEY_STORAGE = 'gq-ai-key';
-function getAiKey() { try { return localStorage.getItem(AI_KEY_STORAGE); } catch { return null; } }
-function setAiKey(k) { try { localStorage.setItem(AI_KEY_STORAGE, k); } catch { /* */ } }
+// --- Multi-provider key storage ---
+const PROVIDER_KEY = 'gq-ai-provider';
+const PROVIDERS = {
+  gemini: {
+    id: 'gemini',
+    name: 'Google Gemini',
+    label: 'Gemini（免费）',
+    keyPlaceholder: '粘贴你的 Gemini API key',
+    keyStorageKey: 'gq-ai-key-gemini',
+    setupSteps: `<ol class="ce-key-steps">
+      <li>打开 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a></li>
+      <li>登录 Google 账号，点击「Create API Key」</li>
+      <li>复制生成的 key，粘贴到下方</li>
+    </ol>
+    <p class="ce-gen-hint">Gemini 2.0 Flash，免费额度，适合日常使用</p>`,
+  },
+  claude: {
+    id: 'claude',
+    name: 'Claude',
+    label: 'Claude（按量付费）',
+    keyPlaceholder: '粘贴你的 Claude API key（sk-ant-...）',
+    keyStorageKey: 'gq-ai-key-claude',
+    setupSteps: `<ol class="ce-key-steps">
+      <li>打开 <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic Console</a></li>
+      <li>创建 API Key（需先充值，与 Claude.ai 会员无关）</li>
+      <li>复制 key（以 sk-ant- 开头），粘贴到下方</li>
+    </ol>
+    <p class="ce-gen-hint">Claude Sonnet 4.6，每次生成约 ¥0.2，质量更高</p>`,
+  },
+};
+
+function getProvider() {
+  try { return localStorage.getItem(PROVIDER_KEY) || 'gemini'; } catch { return 'gemini'; }
+}
+function setProvider(p) {
+  try { localStorage.setItem(PROVIDER_KEY, p); } catch { /* */ }
+}
+function getAiKey(providerId) {
+  const p = providerId || getProvider();
+  const info = PROVIDERS[p];
+  if (!info) return null;
+  // Migrate old key format
+  if (p === 'gemini') {
+    try {
+      const old = localStorage.getItem('gq-ai-key');
+      if (old && !localStorage.getItem(info.keyStorageKey)) {
+        localStorage.setItem(info.keyStorageKey, old);
+        localStorage.removeItem('gq-ai-key');
+      }
+    } catch { /* */ }
+  }
+  try { return localStorage.getItem(info.keyStorageKey); } catch { return null; }
+}
+function setAiKey(providerId, key) {
+  const info = PROVIDERS[providerId];
+  if (!info) return;
+  try { localStorage.setItem(info.keyStorageKey, key); } catch { /* */ }
+}
 
 export async function init(el, packId) {
   container = el;
@@ -99,7 +154,7 @@ async function handleFiles(files) {
   rerender();
 }
 
-// --- Gemini AI ---
+// --- AI Providers ---
 
 const SYSTEM_PROMPT = `你是一个英语语法教学专家，专门为小学3-6年级的中国学生设计练习题。
 
@@ -143,14 +198,27 @@ const SYSTEM_PROMPT = `你是一个英语语法教学专家，专门为小学3-6
 
 请直接输出 JSON 数组，不要包含任何其他文字、解释或 markdown 标记。`;
 
-async function callGemini(apiKey, userParts) {
+async function callGemini(apiKey, userText, imageFiles) {
+  const parts = [];
+  for (const f of imageFiles) {
+    if (f.dataUrl) {
+      const [header, base64] = f.dataUrl.split(',');
+      const mimeMatch = header.match(/:(.*?);/);
+      if (mimeMatch && base64) {
+        parts.push({ inlineData: { mimeType: mimeMatch[1], data: base64 } });
+      }
+    }
+  }
+  parts.unshift({ text: SYSTEM_PROMPT });
+  if (userText) parts.push({ text: userText });
+
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: userParts }],
+        contents: [{ parts }],
         generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
       }),
     }
@@ -160,13 +228,11 @@ async function callGemini(apiKey, userParts) {
     const msg = err?.error?.message || `API 返回 ${res.status}`;
     if (res.status === 400 && msg.includes('API key')) throw new Error('API key 无效，请检查后重新输入');
     if (res.status === 429) {
-      // 429 既可能是"每分钟频率超限"（等一会儿就好），也可能是"今日免费额度用完"。
-      // 把 Google 返回的真实原因带出来，方便判断到底是哪种。
       const quotaExhausted = /per day|daily|quota/i.test(msg);
       const hint = quotaExhausted
-        ? '今日免费额度可能已用完，明天再试，或更换一个新的 API key。'
-        : '请求太频繁（免费版每分钟有上限），等 1 分钟再试。若一直失败，可能是 key 被盗用，建议重新生成。';
-      throw new Error(`${hint}\n（Google：${msg}）`);
+        ? '今日免费额度已用完，明天再试或更换 API key'
+        : '请求太频繁，等 1 分钟再试。若一直失败，key 可能被盗用，建议重新生成';
+      throw new Error(`${hint}\n（${msg}）`);
     }
     throw new Error(msg);
   }
@@ -176,30 +242,53 @@ async function callGemini(apiKey, userParts) {
   return text;
 }
 
-function buildUserParts() {
-  const parts = [];
-  // Add images (Gemini reads them natively)
-  for (const f of uploadedFiles) {
-    if (f.type === 'image' && f.dataUrl) {
+async function callClaude(apiKey, userText, imageFiles) {
+  const content = [];
+  for (const f of imageFiles) {
+    if (f.dataUrl) {
       const [header, base64] = f.dataUrl.split(',');
       const mimeMatch = header.match(/:(.*?);/);
       if (mimeMatch && base64) {
-        parts.push({ inlineData: { mimeType: mimeMatch[1], data: base64 } });
+        content.push({
+          type: 'image',
+          source: { type: 'base64', media_type: mimeMatch[1], data: base64 },
+        });
       }
     }
   }
-  const userText = materialText.trim();
-  if (userText) {
-    parts.push({ text: userText });
-  } else if (parts.length === 0) {
-    return null;
+  if (userText) content.push({ type: 'text', text: userText });
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4096,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content }],
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    const msg = err?.error?.message || `API 返回 ${res.status}`;
+    if (res.status === 401) throw new Error('API key 无效。注意：Claude.ai 会员密码不是 API key，需在 console.anthropic.com 创建');
+    if (res.status === 429) throw new Error('请求太频繁，请稍后再试');
+    if (res.status === 400 && /credit|balance|billing/i.test(msg)) throw new Error('账户余额不足，请在 console.anthropic.com 充值');
+    throw new Error(msg);
   }
-  return parts;
+  const data = await res.json();
+  const textBlock = data?.content?.find(b => b.type === 'text');
+  if (!textBlock?.text) throw new Error('AI 未返回内容');
+  return textBlock.text;
 }
 
 function parseQuestions(raw) {
   let text = raw.trim();
-  // Strip markdown code fences if present
   text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
   const arr = JSON.parse(text);
   if (!Array.isArray(arr)) throw new Error('AI 返回的不是数组');
@@ -207,20 +296,26 @@ function parseQuestions(raw) {
 }
 
 async function doGenerate() {
-  const key = getAiKey();
+  const provider = getProvider();
+  const key = getAiKey(provider);
   if (!key) { showKeyInput = true; rerender(); return; }
 
-  const userParts = buildUserParts();
-  if (!userParts) { genError = '请先上传素材或输入描述内容'; rerender(); return; }
+  const userText = materialText.trim();
+  const imageFiles = uploadedFiles.filter(f => f.type === 'image' && f.dataUrl);
+  if (!userText && imageFiles.length === 0) {
+    genError = '请先上传素材或输入描述内容';
+    rerender();
+    return;
+  }
 
   generating = true;
   genError = '';
   rerender();
 
   try {
-    const systemParts = [{ text: SYSTEM_PROMPT }];
-    const allParts = [...systemParts, ...userParts];
-    const raw = await callGemini(key, allParts);
+    const raw = provider === 'claude'
+      ? await callClaude(key, userText, imageFiles)
+      : await callGemini(key, userText, imageFiles);
     pack.questions = parseQuestions(raw);
     generating = false;
     rerender();
@@ -296,16 +391,19 @@ function renderUploadSection() {
 }
 
 function renderKeyInput() {
+  const provider = getProvider();
+  const info = PROVIDERS[provider];
+
+  const tabsHtml = Object.values(PROVIDERS).map(p =>
+    `<button class="ce-provider-tab${p.id === provider ? ' ce-provider-tab--active' : ''}" data-provider="${p.id}">${p.label}</button>`
+  ).join('');
+
   return `<div class="ce-form">
     <h3>🔑 配置 AI 服务</h3>
-    <p class="parent-desc">需要一个 Google Gemini API key（免费）来生成题目：</p>
-    <ol class="ce-key-steps">
-      <li>打开 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a></li>
-      <li>登录 Google 账号，点击「Create API Key」</li>
-      <li>复制生成的 key，粘贴到下方</li>
-    </ol>
+    <div class="ce-provider-tabs">${tabsHtml}</div>
+    ${info.setupSteps}
     <div class="parent-field">
-      <input type="password" id="aiKeyInput" placeholder="粘贴你的 Gemini API key">
+      <input type="password" id="aiKeyInput" placeholder="${info.keyPlaceholder}">
     </div>
     <div class="ce-form-btns">
       <button class="btn btn--primary" id="saveKeyBtn">保存并生成</button>
@@ -316,12 +414,15 @@ function renderKeyInput() {
 
 function renderGenerateButton() {
   if (showKeyInput) return '';
-  const hasKey = !!getAiKey();
+  const provider = getProvider();
+  const info = PROVIDERS[provider];
+  const hasKey = !!getAiKey(provider);
+
   if (generating) {
     return `<div class="ce-generate">
       <div class="ce-generating">
         <span class="ce-spinner"></span>
-        AI 正在生成题目，请稍候…
+        ${info.name} 正在生成题目，请稍候…
       </div>
     </div>`;
   }
@@ -329,9 +430,11 @@ function renderGenerateButton() {
     <button class="btn btn--secondary btn--block" id="generateBtn">
       🤖 AI 生成练习题
     </button>
-    ${!hasKey ? '<p class="ce-gen-hint">首次使用需配置免费的 AI 服务</p>' : '<p class="ce-gen-hint">基于上方素材/描述自动生成题目</p>'}
+    ${!hasKey
+      ? '<p class="ce-gen-hint">首次使用需配置 AI 服务</p>'
+      : `<p class="ce-gen-hint">使用 ${info.name} 生成题目</p>`}
     ${genError ? `<p class="ce-gen-error">❌ ${esc(genError)}</p>` : ''}
-    ${hasKey ? '<button class="btn btn--text" id="changeKeyBtn" style="font-size:0.8rem">更换 API key</button>' : ''}
+    ${hasKey ? `<button class="btn btn--text" id="changeKeyBtn" style="font-size:0.8rem">更换 AI 服务 / API key</button>` : ''}
   </div>`;
 }
 
@@ -405,11 +508,20 @@ function mountEditor() {
   $('generateBtn')?.addEventListener('click', doGenerate);
   $('regenBtn')?.addEventListener('click', doGenerate);
 
+  // Provider tabs
+  container.querySelectorAll('.ce-provider-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      setProvider(tab.dataset.provider);
+      rerender();
+    });
+  });
+
   // API key
   $('saveKeyBtn')?.addEventListener('click', () => {
     const key = $('aiKeyInput')?.value.trim();
     if (!key) return;
-    setAiKey(key);
+    const provider = getProvider();
+    setAiKey(provider, key);
     showKeyInput = false;
     doGenerate();
   });
