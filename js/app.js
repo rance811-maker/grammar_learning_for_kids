@@ -14,7 +14,7 @@ import * as account from './views/account.js';
 import * as parent from './views/parent.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260612f';
+const BUILD_VERSION = '20260613a';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -199,6 +199,10 @@ function mountBackButton() {
 
       if (route === 'practice' && parts[1] === 'review') {
         location.hash = 'review';
+        return;
+      }
+      if (route === 'practice' && parts[1] === 'pack') {
+        location.hash = '';
         return;
       }
       if (route === 'discover' || route === 'practice' || route === 'mission') {

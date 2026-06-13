@@ -1,6 +1,7 @@
 import { store } from '../store.js';
 import { units } from '../data/units.js';
 import { engine } from '../engine.js';
+import { cloud } from '../cloud.js';
 
 const RANK_INFO = {
   bronze: { icon: '🥉', name: '青铜' },
@@ -203,6 +204,8 @@ export function render() {
       <div class="unit-grid">
         ${nodesHtml}
       </div>
+
+      <div id="customPacksArea"></div>
     </div>`;
 }
 
@@ -248,4 +251,52 @@ export function mount() {
       }
     });
   }
+
+  loadCustomPacks();
+}
+
+async function loadCustomPacks() {
+  if (!store.isLoggedIn()) return;
+  const area = document.getElementById('customPacksArea');
+  if (!area) return;
+
+  try {
+    const packs = await cloud.listCoursePacks();
+    if (!packs || packs.length === 0) return;
+
+    const cardsHtml = packs.map(p => {
+      const qCount = Array.isArray(p.questions) ? p.questions.length : 0;
+      return `
+        <div class="custom-pack-card" data-pack-id="${p.id}">
+          <div class="custom-pack-card__icon">📝</div>
+          <div class="custom-pack-card__info">
+            <div class="custom-pack-card__title">${escapeHtml(p.title)}</div>
+            <div class="custom-pack-card__meta">${qCount} 道题</div>
+          </div>
+          <div class="custom-pack-card__play">开始 ›</div>
+        </div>`;
+    }).join('');
+
+    area.innerHTML = `
+      <div class="custom-packs-section">
+        <div class="custom-packs-section__header">
+          <span>📝 家长自定义课程</span>
+        </div>
+        ${cardsHtml}
+      </div>`;
+
+    area.querySelectorAll('.custom-pack-card').forEach(card => {
+      card.addEventListener('click', () => {
+        location.hash = `practice/pack/${card.dataset.packId}`;
+      });
+    });
+  } catch {
+    // silently fail — custom packs are optional
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
 }

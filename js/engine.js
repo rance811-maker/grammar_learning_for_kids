@@ -218,6 +218,23 @@ export const engine = {
     };
   },
 
+  createCustomSession(questions) {
+    const pool = shuffle(questions).slice(0, 15);
+    return {
+      unitId: 'custom',
+      level: null,
+      questions: pool,
+      currentIndex: 0,
+      answers: [],
+      energy: 3,
+      maxEnergy: 3,
+      score: 0,
+      combo: 0,
+      maxCombo: 0,
+      startTime: Date.now(),
+    };
+  },
+
   // Comprehensive PET mock: pull a balanced spread of questions from every
   // unlocked unit, cross-grammar, as the final milestone challenge.
   createBossSession(count = 15) {

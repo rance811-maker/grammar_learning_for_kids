@@ -2898,6 +2898,62 @@ ul, ol {
   text-decoration: underline;
 }
 
+/* Custom course packs on home */
+.custom-packs-section {
+  margin-top: var(--space-lg);
+}
+.custom-packs-section__header {
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-bottom: var(--space-sm);
+  padding: 0 var(--space-xs);
+}
+.custom-pack-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-surface);
+  border-radius: var(--radius-md, 12px);
+  margin-bottom: var(--space-sm);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.custom-pack-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+}
+.custom-pack-card:active {
+  transform: translateY(0);
+}
+.custom-pack-card__icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+.custom-pack-card__info {
+  flex: 1;
+  min-width: 0;
+}
+.custom-pack-card__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.custom-pack-card__meta {
+  font-size: 0.8rem;
+  color: var(--color-text-light);
+  margin-top: 2px;
+}
+.custom-pack-card__play {
+  font-weight: 700;
+  color: var(--color-primary);
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
 .btn--tiny {
   padding: 4px 10px;
   font-size: 0.75rem;
