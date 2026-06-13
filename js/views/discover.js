@@ -1,9 +1,9 @@
 import { store } from '../store.js';
-import { units } from '../data/units.js';
+import { curriculum } from '../curriculum.js';
 
 export function render(unitId) {
   unitId = Number(unitId);
-  const unitData = units[unitId];
+  const unitData = curriculum.getUnit(unitId);
 
   if (!unitData || !unitData.discover) {
     return `<div class="view"><p class="text-center text-muted mt-lg">内容不存在</p></div>`;
@@ -89,7 +89,7 @@ export function mount(unitId) {
       if (answeredQuestions.has(qIdx)) return;
       answeredQuestions.add(qIdx);
 
-      const unitData = units[unitId];
+      const unitData = curriculum.getUnit(unitId);
       const question = unitData.discover.questions[Number(qIdx)];
       const correctIdx = question.correctIndex ?? 0;
 

@@ -53,6 +53,8 @@ function createDefaultState() {
     mistakes: [],
     bossCleared: false,
     bossBestAccuracy: 0,
+    activeCurriculumId: null,
+    curricula: {},
   };
 }
 
@@ -105,6 +107,12 @@ export const store = {
     if (this.state.bossCleared === undefined) {
       this.state.bossCleared = false;
       this.state.bossBestAccuracy = 0;
+    }
+    if (this.state.activeCurriculumId === undefined) {
+      this.state.activeCurriculumId = null;
+    }
+    if (this.state.curricula === undefined) {
+      this.state.curricula = {};
     }
   },
 
@@ -509,6 +517,7 @@ export const store = {
   // --- Placement Test & Learning Plan ---
 
   isPlacementNeeded() {
+    if (this.state.activeCurriculumId) return false;
     return !this.state.placementCompleted && this.state.history.length === 0;
   },
 
@@ -724,6 +733,79 @@ export const store = {
     }
     this.save();
     return passed;
+  },
+
+  // --- Curriculum Management ---
+
+  switchCurriculum(newId) {
+    const BUILT_IN = '__pet__';
+    const currentId = this.state.activeCurriculumId || BUILT_IN;
+    if (currentId === newId) return;
+
+    if (!this.state.curricula) this.state.curricula = {};
+    if (!this.state.curricula[currentId]) this.state.curricula[currentId] = {};
+    this.state.curricula[currentId].progress = {
+      units: this.state.units,
+      mastery: this.state.mastery,
+      history: this.state.history,
+      mistakes: this.state.mistakes,
+      badges: this.state.badges,
+      portfolio: this.state.portfolio,
+      learningPlan: this.state.learningPlan,
+      placementCompleted: this.state.placementCompleted,
+      bossCleared: this.state.bossCleared,
+      bossBestAccuracy: this.state.bossBestAccuracy,
+    };
+
+    const saved = this.state.curricula[newId]?.progress;
+    if (saved) {
+      this.state.units = saved.units;
+      this.state.mastery = saved.mastery;
+      this.state.history = saved.history;
+      this.state.mistakes = saved.mistakes;
+      this.state.badges = saved.badges;
+      this.state.portfolio = saved.portfolio;
+      this.state.learningPlan = saved.learningPlan;
+      this.state.placementCompleted = saved.placementCompleted ?? false;
+      this.state.bossCleared = saved.bossCleared ?? false;
+      this.state.bossBestAccuracy = saved.bossBestAccuracy ?? 0;
+    } else {
+      const def = createDefaultState();
+      this.state.units = def.units;
+      this.state.mastery = def.mastery;
+      this.state.history = def.history;
+      this.state.mistakes = def.mistakes;
+      this.state.badges = def.badges;
+      this.state.portfolio = def.portfolio;
+      this.state.learningPlan = def.learningPlan;
+      this.state.placementCompleted = def.placementCompleted;
+      this.state.bossCleared = def.bossCleared;
+      this.state.bossBestAccuracy = def.bossBestAccuracy;
+    }
+
+    this.state.activeCurriculumId = newId === BUILT_IN ? null : newId;
+    this.save();
+  },
+
+  addCurriculum(id, data) {
+    if (!this.state.curricula) this.state.curricula = {};
+    this.state.curricula[id] = {
+      title: data.title,
+      description: data.description || '',
+      goal: data.goal || '',
+      syllabus: data.syllabus,
+      unitsData: data.unitsData || {},
+    };
+    this.save();
+  },
+
+  removeCurriculum(id) {
+    if (!this.state.curricula || id === '__pet__') return;
+    if (this.state.activeCurriculumId === id) {
+      this.switchCurriculum('__pet__');
+    }
+    delete this.state.curricula[id];
+    this.save();
   },
 
   // After finishing a practice/review/boss, advance the learning plan if the

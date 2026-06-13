@@ -1,5 +1,5 @@
 import { store } from '../store.js';
-import { units } from '../data/units.js';
+import { curriculum } from '../curriculum.js';
 import { SUB_SKILL_NAMES } from '../data/skill-names.js';
 
 const RANK_INFO = {
@@ -30,7 +30,7 @@ export function render() {
   const badges = store.getBadges();
   const history = store.state.history.slice(-10).reverse();
 
-  // Completed units count
+  const units = curriculum.getUnits();
   const unitIds = Object.keys(units).map(Number);
   let completedLessons = 0;
   for (const uid of unitIds) {
@@ -214,7 +214,7 @@ export function mount() {
       const skill = item.dataset.skill;
       if (!skill) return;
 
-      for (const [uid, unitData] of Object.entries(units)) {
+      for (const [uid, unitData] of Object.entries(curriculum.getUnits())) {
         const unitId = Number(uid);
         if (!store.isUnitUnlocked(unitId)) continue;
         for (const [lv, levelData] of Object.entries(unitData.levels || {})) {

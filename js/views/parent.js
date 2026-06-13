@@ -2,7 +2,8 @@ import { store } from '../store.js';
 import { cloud, friendlyError } from '../cloud.js';
 import * as courseEditor from './courseEditor.js';
 import { SUB_SKILL_NAMES } from '../data/skill-names.js';
-import { units as unitData } from '../data/units.js';
+import { curriculum, BUILT_IN_ID } from '../curriculum.js';
+import { generateSyllabus, hasApiKey } from '../unitGenerator.js';
 
 const LOCKOUT_KEY = 'gq-parent-lockout';
 const MAX_ATTEMPTS = 5;
@@ -107,41 +108,70 @@ function renderLocked() {
 }
 
 function renderDashboard(packs) {
-  const packList = packs && packs.length
-    ? packs.map(p => {
-        const count = Array.isArray(p.questions) ? p.questions.length : 0;
-        const date = (p.updated_at || '').slice(0, 10);
-        return `<div class="ce-pack-item">
-          <div class="ce-pack-info">
-            <strong>📦 ${esc(p.title)}</strong>
-            <span class="ce-pack-meta">${count} 题 · ${date}</span>
-            ${p.description ? `<span class="ce-pack-desc">${esc(p.description)}</span>` : ''}
-          </div>
-          <div class="ce-pack-btns">
-            <button class="btn btn--tiny" data-edit-pack="${p.id}">编辑</button>
-            <button class="btn btn--tiny btn--danger-text" data-del-pack="${p.id}">删除</button>
-          </div>
-        </div>`;
-      }).join('')
-    : '<p class="ce-empty">还没有课程包，点下方按钮创建第一个吧</p>';
+  // Curriculum section
+  const allCurr = curriculum.listAll();
+  const activeId = curriculum.getActiveId();
+  const currItems = allCurr.map(c => {
+    const isActive = c.id === activeId;
+    const genCount = c.builtIn ? 12 : Object.keys(store.state.curricula?.[c.id]?.unitsData || {}).length;
+    return `<div class="ce-pack-item">
+      <div class="ce-pack-info">
+        <strong>${isActive ? '✅ ' : ''}${esc(c.title)}${c.builtIn ? ' (内置)' : ''}</strong>
+        <span class="ce-pack-meta">${c.builtIn ? '12 个单元 · 完整内容' : `${genCount}/12 单元已生成`}</span>
+        ${c.description && !c.builtIn ? `<span class="ce-pack-desc">${esc(c.description)}</span>` : ''}
+      </div>
+      <div class="ce-pack-btns">
+        ${isActive
+          ? '<span class="badge badge--success" style="font-size:0.75rem;">使用中</span>'
+          : `<button class="btn btn--tiny btn--primary" data-switch-curr="${c.id}">切换</button>`}
+        ${!c.builtIn ? `<button class="btn btn--tiny btn--danger-text" data-del-curr="${c.id}">删除</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Course packs section (backward compat)
+  let packSection = '';
+  if (packs && packs.length) {
+    const packItems = packs.map(p => {
+      const count = Array.isArray(p.questions) ? p.questions.length : 0;
+      return `<div class="ce-pack-item">
+        <div class="ce-pack-info">
+          <strong>📦 ${esc(p.title)}</strong>
+          <span class="ce-pack-meta">${count} 题</span>
+        </div>
+        <div class="ce-pack-btns">
+          <button class="btn btn--tiny" data-edit-pack="${p.id}">编辑</button>
+          <button class="btn btn--tiny btn--danger-text" data-del-pack="${p.id}">删除</button>
+        </div>
+      </div>`;
+    }).join('');
+    packSection = `
+      <div class="ce-section" style="margin-top:var(--space-lg)">
+        <div class="ce-section-header"><h3>📦 独立课程包</h3></div>
+        ${packItems}
+      </div>`;
+  }
 
   return `<div class="parent-card parent-card--wide">
     <div class="parent-header">
       <h2>🏠 家长专区</h2>
       <button class="btn btn--small btn--outline" id="lockBtn">🔒 退出专区</button>
     </div>
+
     <div class="ce-section">
       <div class="ce-section-header">
-        <h3>我的课程包</h3>
+        <h3>📚 课程体系</h3>
+        <span style="font-size:0.8rem;color:var(--color-text-light);">当前：${esc(curriculum.getActiveTitle())}</span>
       </div>
-      ${packList}
+      ${currItems}
     </div>
+
     <div class="parent-grid" style="margin-top:var(--space-lg)">
-      <div class="parent-feature parent-feature--active" id="aiGenCard" style="cursor:pointer;">
+      <div class="parent-feature parent-feature--active" id="newCurrCard" style="cursor:pointer;">
         <div class="parent-feature-icon">🤖</div>
-        <h3>AI 生成课程</h3>
-        <p>上传文档或输入主题，AI 自动生成练习题</p>
-        <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">+ 创建课程包</span>
+        <h3>AI 创建课程体系</h3>
+        <p>输入学习目标，AI 自动生成完整 12 单元课程大纲</p>
+        <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">+ 创建课程体系</span>
       </div>
       <div class="parent-feature parent-feature--active" id="reportCard" style="cursor:pointer;">
         <div class="parent-feature-icon">📊</div>
@@ -150,6 +180,18 @@ function renderDashboard(packs) {
         <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">查看报告</span>
       </div>
     </div>
+
+    <div class="parent-grid" style="margin-top:var(--space-md)">
+      <div class="parent-feature parent-feature--active" id="aiGenCard" style="cursor:pointer;">
+        <div class="parent-feature-icon">📝</div>
+        <h3>独立练习包</h3>
+        <p>创建独立的 AI 练习题集（不影响课程体系）</p>
+        <span class="btn btn--outline btn--small" style="margin-top:var(--space-sm);">创建课程包</span>
+      </div>
+    </div>
+
+    ${packSection}
+
     <div class="parent-actions">
       <button class="btn btn--small btn--outline" id="changePinBtn">修改家长密码</button>
     </div>
@@ -209,6 +251,11 @@ async function loadAndRender(sub, param) {
         mountReport();
         return;
       }
+      if (sub === 'curriculum') {
+        el.outerHTML = renderCurriculumCreator();
+        mountCurriculumCreator();
+        return;
+      }
       if (sub === 'new' || sub === 'edit') {
         el.outerHTML = '<div class="parent-card parent-card--wide" id="ceRoot"><p>加载编辑器…</p></div>';
         const ceRoot = document.getElementById('ceRoot');
@@ -240,6 +287,130 @@ async function loadAndRender(sub, param) {
     console.error('Parent zone load failed:', e);
     showError(e.message);
   }
+}
+
+// --- Curriculum Creator ---
+
+function renderCurriculumCreator() {
+  return `<div class="parent-card parent-card--wide" id="currCreator">
+    <div class="parent-header">
+      <button class="btn btn--small btn--outline" id="currBackBtn">← 返回</button>
+      <h2 style="margin:0;">🤖 AI 创建课程体系</h2>
+      <div></div>
+    </div>
+
+    <div style="margin-top:var(--space-lg);">
+      <p style="font-size:var(--text-sm);color:var(--color-text-light);margin-bottom:var(--space-md);line-height:1.6;">
+        输入学习目标，AI 会自动设计一套 12 单元的课程大纲。<br>
+        每个单元的练习题会在孩子第一次进入该单元时按需生成。
+      </p>
+
+      <div class="parent-field">
+        <label>学习目标</label>
+        <input type="text" id="currGoalInput" placeholder="例如：PET 语法训练 / 雅思5分语法 / KET 口语习题 / 新概念英语第二册语法">
+      </div>
+
+      <div class="parent-field">
+        <label>课程名称（选填，默认使用目标作为名称）</label>
+        <input type="text" id="currTitleInput" placeholder="例如：雅思5分冲刺">
+      </div>
+
+      <div id="currGenArea">
+        <button class="btn btn--primary btn--block" id="currGenBtn" style="margin-top:var(--space-md);">
+          🤖 生成课程大纲
+        </button>
+      </div>
+
+      <div id="currMsg" style="margin-top:var(--space-md);"></div>
+      <div id="currSyllabusArea"></div>
+    </div>
+  </div>`;
+}
+
+function mountCurriculumCreator() {
+  document.getElementById('currBackBtn')?.addEventListener('click', () => {
+    location.hash = 'parent';
+  });
+
+  const genBtn = document.getElementById('currGenBtn');
+  if (!genBtn) return;
+
+  genBtn.addEventListener('click', async () => {
+    const goal = document.getElementById('currGoalInput')?.value.trim();
+    const msg = document.getElementById('currMsg');
+    if (!goal) {
+      if (msg) msg.innerHTML = '<p style="color:var(--color-danger);font-size:var(--text-sm);">请输入学习目标</p>';
+      return;
+    }
+    if (!hasApiKey()) {
+      if (msg) msg.innerHTML = '<p style="color:var(--color-danger);font-size:var(--text-sm);">请先在「独立练习包」中配置 AI API key</p>';
+      return;
+    }
+
+    genBtn.disabled = true;
+    genBtn.innerHTML = '<span class="ce-spinner" style="display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:middle;"></span> AI 正在设计大纲…';
+    if (msg) msg.innerHTML = '';
+
+    try {
+      const syllabus = await generateSyllabus(goal);
+      renderSyllabusPreview(syllabus, goal);
+    } catch (e) {
+      genBtn.disabled = false;
+      genBtn.textContent = '🤖 重试生成';
+      if (msg) msg.innerHTML = `<p style="color:var(--color-danger);font-size:var(--text-sm);">生成失败：${esc(e.message)}</p>`;
+    }
+  });
+}
+
+function renderSyllabusPreview(syllabus, goal) {
+  const area = document.getElementById('currSyllabusArea');
+  if (!area) return;
+
+  const items = syllabus.map((s, i) => `
+    <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #f0f0f0;">
+      <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;">
+        ${i + 1}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:0.95rem;">${esc(s.title)}</div>
+        <div style="font-size:0.8rem;color:var(--color-text-light);margin-top:2px;">${esc(s.description)}</div>
+        <div style="font-size:0.7rem;color:var(--color-muted);margin-top:4px;">
+          ${(s.skills || []).map(sk => `<span style="background:#f0f0f0;padding:1px 6px;border-radius:3px;margin-right:4px;">${esc(sk)}</span>`).join('')}
+        </div>
+      </div>
+    </div>`).join('');
+
+  area.innerHTML = `
+    <div style="margin-top:var(--space-lg);border:2px solid var(--color-primary);border-radius:var(--radius-lg);padding:var(--space-lg);">
+      <h3 style="margin:0 0 var(--space-md);font-size:1.1rem;">📋 课程大纲预览</h3>
+      ${items}
+      <div style="margin-top:var(--space-lg);display:flex;gap:var(--space-md);">
+        <button class="btn btn--primary" id="currConfirmBtn" style="flex:1;">✅ 确认并创建课程</button>
+        <button class="btn btn--outline" id="currRegenBtn">🔄 重新生成</button>
+      </div>
+    </div>`;
+
+  document.getElementById('currConfirmBtn')?.addEventListener('click', () => {
+    const title = document.getElementById('currTitleInput')?.value.trim() || goal;
+    const id = 'curr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    store.addCurriculum(id, { title, description: goal, goal, syllabus });
+    store.switchCurriculum(id);
+    location.hash = '';
+  });
+
+  document.getElementById('currRegenBtn')?.addEventListener('click', () => {
+    area.innerHTML = '';
+    const genBtn = document.getElementById('currGenBtn');
+    if (genBtn) {
+      genBtn.disabled = false;
+      genBtn.textContent = '🤖 生成课程大纲';
+      genBtn.click();
+    }
+  });
+
+  // Hide the original generate button
+  const genArea = document.getElementById('currGenArea');
+  if (genArea) genArea.style.display = 'none';
 }
 
 // --- Learning Report ---
@@ -342,7 +513,7 @@ function renderReport() {
   const recentSessions = [...history].reverse().slice(0, 10);
   const sessionRows = recentSessions.length > 0
     ? recentSessions.map(s => {
-        const unitTitle = unitData[s.unitId]?.title || `单元 ${s.unitId}`;
+        const unitTitle = curriculum.getUnit(s.unitId)?.title || `单元 ${s.unitId}`;
         const starsDisplay = '⭐'.repeat(s.stars || 0);
         const accPct = s.accuracy != null ? Math.round(s.accuracy * 100) : (s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0);
         return `<tr>
@@ -555,6 +726,24 @@ function mountDashboard() {
   document.getElementById('changePinBtn')?.addEventListener('click', () => { location.hash = 'parent/reset'; });
   document.getElementById('aiGenCard')?.addEventListener('click', () => { location.hash = 'parent/new'; });
   document.getElementById('reportCard')?.addEventListener('click', () => { location.hash = 'parent/report'; });
+  document.getElementById('newCurrCard')?.addEventListener('click', () => { location.hash = 'parent/curriculum'; });
+
+  document.querySelectorAll('[data-switch-curr]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      store.switchCurriculum(btn.dataset.switchCurr);
+      location.hash = 'parent';
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+  });
+
+  document.querySelectorAll('[data-del-curr]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!confirm('确定删除这个课程体系？相关学习进度也会清除。')) return;
+      store.removeCurriculum(btn.dataset.delCurr);
+      location.hash = 'parent';
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+  });
 
   document.querySelectorAll('[data-edit-pack]').forEach(btn => {
     btn.addEventListener('click', () => { location.hash = 'parent/edit/' + btn.dataset.editPack; });

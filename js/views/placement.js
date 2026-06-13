@@ -1,5 +1,5 @@
 import { store } from '../store.js';
-import { units } from '../data/units.js';
+import { curriculum } from '../curriculum.js';
 import { engine } from '../engine.js';
 import { sound } from '../sound.js';
 import { confetti } from '../celebrate.js';
@@ -9,7 +9,7 @@ let testState = null;
 function pickQuestions() {
   const questions = [];
   for (let id = 1; id <= 12; id++) {
-    const unit = units[id];
+    const unit = curriculum.getUnit(id);
     if (!unit) continue;
     const lvl = unit.levels[1];
     if (!lvl || !lvl.questions.length) continue;
