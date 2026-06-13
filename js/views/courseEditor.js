@@ -159,7 +159,15 @@ async function callGemini(apiKey, userParts) {
     const err = await res.json().catch(() => null);
     const msg = err?.error?.message || `API 返回 ${res.status}`;
     if (res.status === 400 && msg.includes('API key')) throw new Error('API key 无效，请检查后重新输入');
-    if (res.status === 429) throw new Error('请求太频繁，请稍后再试');
+    if (res.status === 429) {
+      // 429 既可能是"每分钟频率超限"（等一会儿就好），也可能是"今日免费额度用完"。
+      // 把 Google 返回的真实原因带出来，方便判断到底是哪种。
+      const quotaExhausted = /per day|daily|quota/i.test(msg);
+      const hint = quotaExhausted
+        ? '今日免费额度可能已用完，明天再试，或更换一个新的 API key。'
+        : '请求太频繁（免费版每分钟有上限），等 1 分钟再试。若一直失败，可能是 key 被盗用，建议重新生成。';
+      throw new Error(`${hint}\n（Google：${msg}）`);
+    }
     throw new Error(msg);
   }
   const data = await res.json();
