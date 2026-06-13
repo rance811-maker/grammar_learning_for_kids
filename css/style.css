@@ -2595,6 +2595,17 @@ ul, ol {
   text-align: center;
   position: relative;
 }
+.parent-feature--active {
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.parent-feature--active:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+}
+.parent-feature--active:active {
+  transform: translateY(0);
+}
 .parent-feature-icon {
   font-size: 36px;
   margin-bottom: var(--space-sm);

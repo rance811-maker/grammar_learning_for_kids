@@ -116,31 +116,30 @@ function renderDashboard(packs) {
             ${p.description ? `<span class="ce-pack-desc">${esc(p.description)}</span>` : ''}
           </div>
           <div class="ce-pack-btns">
-            <button class="btn btn--tiny" onclick="location.hash='parent/edit/${p.id}'">编辑</button>
+            <button class="btn btn--tiny" data-edit-pack="${p.id}">编辑</button>
             <button class="btn btn--tiny btn--danger-text" data-del-pack="${p.id}">删除</button>
           </div>
         </div>`;
       }).join('')
-    : '<p class="ce-empty">还没有课程包，点上方按钮创建第一个吧</p>';
+    : '<p class="ce-empty">还没有课程包，点下方按钮创建第一个吧</p>';
 
   return `<div class="parent-card parent-card--wide">
     <div class="parent-header">
       <h2>🏠 家长专区</h2>
-      <button class="btn btn--small btn--outline" id="lockBtn" onclick="location.hash=''">🔒 退出专区</button>
+      <button class="btn btn--small btn--outline" id="lockBtn">🔒 退出专区</button>
     </div>
     <div class="ce-section">
       <div class="ce-section-header">
         <h3>我的课程包</h3>
-        <button class="btn btn--primary btn--small" id="newPackBtn" onclick="location.hash='parent/new'">+ 创建课程包</button>
       </div>
       ${packList}
     </div>
     <div class="parent-grid" style="margin-top:var(--space-lg)">
-      <div class="parent-feature">
+      <div class="parent-feature parent-feature--active" id="aiGenCard" style="cursor:pointer;">
         <div class="parent-feature-icon">🤖</div>
         <h3>AI 生成课程</h3>
         <p>上传文档或输入主题，AI 自动生成练习题</p>
-        <span class="parent-coming">即将上线</span>
+        <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">+ 创建课程包</span>
       </div>
       <div class="parent-feature">
         <div class="parent-feature-icon">📊</div>
@@ -265,7 +264,10 @@ function mountSetup() {
       await cloud.saveParentPin(h);
       setUnlocked();
       const zone = btn.closest('.parent-zone') || btn.closest('.parent-card').parentElement;
-      zone.innerHTML = renderDashboard();
+      zone.innerHTML = '<div class="parent-card" style="text-align:center"><div class="parent-icon">⏳</div><p>加载中…</p></div>';
+      let packs = [];
+      try { packs = await cloud.listCoursePacks(); } catch { /* ignore */ }
+      zone.innerHTML = renderDashboard(packs);
       mountDashboard();
     } catch (e) {
       msg.textContent = '保存失败：' + e.message;
@@ -303,7 +305,10 @@ function mountLocked(storedHash) {
       clearLockout();
       setUnlocked();
       const zone = btn.closest('.parent-zone') || btn.closest('.parent-card').parentElement;
-      zone.innerHTML = renderDashboard();
+      zone.innerHTML = '<div class="parent-card" style="text-align:center"><div class="parent-icon">⏳</div><p>加载中…</p></div>';
+      let packs = [];
+      try { packs = await cloud.listCoursePacks(); } catch { /* ignore */ }
+      zone.innerHTML = renderDashboard(packs);
       mountDashboard();
     } else {
       const rec = recordFailedAttempt();
@@ -330,7 +335,7 @@ function mountLocked(storedHash) {
 function mountDashboard() {
   document.getElementById('lockBtn')?.addEventListener('click', () => { clearUnlock(); location.hash = ''; });
   document.getElementById('changePinBtn')?.addEventListener('click', () => { location.hash = 'parent/reset'; });
-  document.getElementById('newPackBtn')?.addEventListener('click', () => { location.hash = 'parent/new'; });
+  document.getElementById('aiGenCard')?.addEventListener('click', () => { location.hash = 'parent/new'; });
 
   document.querySelectorAll('[data-edit-pack]').forEach(btn => {
     btn.addEventListener('click', () => { location.hash = 'parent/edit/' + btn.dataset.editPack; });
@@ -342,12 +347,11 @@ function mountDashboard() {
       btn.disabled = true;
       try {
         await cloud.deleteCoursePack(btn.dataset.delPack);
-        location.hash = 'parent';
-        const el = document.querySelector('.parent-card');
-        if (el) {
-          el.innerHTML = '<div class="parent-icon">⏳</div><p>刷新中…</p>';
+        const card = document.querySelector('.parent-card');
+        if (card) {
+          card.innerHTML = '<div class="parent-icon">⏳</div><p>刷新中…</p>';
           const packs = await cloud.listCoursePacks();
-          el.outerHTML = renderDashboard(packs);
+          card.outerHTML = renderDashboard(packs);
           mountDashboard();
         }
       } catch (e) {

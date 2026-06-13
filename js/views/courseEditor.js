@@ -229,7 +229,7 @@ function renderEditor() {
   return `<div class="parent-card parent-card--wide">
     <div class="parent-header">
       <h2>${pack.id ? '编辑课程包' : '创建课程包'}</h2>
-      <button class="btn btn--small btn--outline" id="ceBack" onclick="location.hash='parent'">← 返回</button>
+      <button class="btn btn--small btn--outline" id="ceBack">← 返回</button>
     </div>
     <div class="ce-meta">
       <div class="parent-field">
@@ -353,6 +353,9 @@ function renderPreview() {
 
 function mountEditor() {
   const $ = id => document.getElementById(id);
+
+  // Back button
+  $('ceBack')?.addEventListener('click', () => { location.hash = 'parent'; });
 
   // File upload
   const fileInput = $('fileInput');
