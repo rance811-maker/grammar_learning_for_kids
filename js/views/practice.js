@@ -686,6 +686,7 @@ function submitAnswer(question, userAnswer) {
     store.addMistake(question, session.unitId, session.level);
   } else if (session.unitId === 'review') {
     store.removeMistake(question.id);
+    store.addReviewCleared(question.id, question.sentence || question.instruction || '');
   }
 
   // Visual feedback on the question elements

@@ -169,21 +169,39 @@ export const engine = {
   },
 
   // Build a session from the error notebook + weakest skills, for focused review.
+  // Excludes questions answered correctly in recent reviews (7-day window) and
+  // deduplicates by sentence text so the same sentence never appears twice.
   createReviewSession(count = 12) {
+    store.pruneReviewCleared();
+    const { ids: clearedIds, sentences: clearedSentences } = store.getReviewCleared();
     const mistakes = store.getMistakes();
-    const seen = new Set();
+    const seenIds = new Set();
+    const seenSentences = new Set(clearedSentences);
     const questions = [];
 
-    // Most recent mistakes first.
-    for (let i = mistakes.length - 1; i >= 0 && questions.length < count; i--) {
-      const q = mistakes[i].question;
-      if (q && !seen.has(q.id)) {
-        questions.push(q);
-        seen.add(q.id);
-      }
+    function sentenceKey(q) {
+      return (q.sentence || q.instruction || q.context || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 120);
     }
 
-    // Top up with questions targeting the weakest skills.
+    function canAdd(q) {
+      if (!q || seenIds.has(q.id) || clearedIds.has(q.id)) return false;
+      const sk = sentenceKey(q);
+      if (sk && seenSentences.has(sk)) return false;
+      return true;
+    }
+
+    function add(q) {
+      questions.push(q);
+      seenIds.add(q.id);
+      const sk = sentenceKey(q);
+      if (sk) seenSentences.add(sk);
+    }
+
+    for (let i = mistakes.length - 1; i >= 0 && questions.length < count; i--) {
+      const q = mistakes[i].question;
+      if (canAdd(q)) add(q);
+    }
+
     if (questions.length < count) {
       const weakSkills = store.getWeakestSkills(8);
       const pool = [];
@@ -192,7 +210,7 @@ export const engine = {
           if (!store.isUnitUnlocked(Number(uid))) continue;
           for (const level of Object.values(unit.levels || {})) {
             for (const q of level.questions || []) {
-              if (q.subSkill === skill && !seen.has(q.id)) {
+              if (q.subSkill === skill && canAdd(q)) {
                 pool.push(q);
               }
             }
@@ -201,10 +219,7 @@ export const engine = {
       }
       for (const q of shuffle(pool)) {
         if (questions.length >= count) break;
-        if (!seen.has(q.id)) {
-          questions.push(q);
-          seen.add(q.id);
-        }
+        if (canAdd(q)) add(q);
       }
     }
 

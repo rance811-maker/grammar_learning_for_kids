@@ -55,6 +55,7 @@ function createDefaultState() {
     bossBestAccuracy: 0,
     activeCurriculumId: null,
     curricula: {},
+    reviewCleared: [],
   };
 }
 
@@ -110,6 +111,9 @@ export const store = {
     }
     if (this.state.activeCurriculumId === undefined) {
       this.state.activeCurriculumId = null;
+    }
+    if (this.state.reviewCleared === undefined) {
+      this.state.reviewCleared = [];
     }
     if (this.state.curricula === undefined) {
       this.state.curricula = {};
@@ -705,6 +709,50 @@ export const store = {
     this.save();
   },
 
+  // --- Review Cleared (复习已掌握) ---
+
+  addReviewCleared(questionId, sentence) {
+    if (!this.state.reviewCleared) this.state.reviewCleared = [];
+    const today = toDateString(new Date());
+    const exists = this.state.reviewCleared.some(r => r.qid === questionId);
+    if (!exists) {
+      this.state.reviewCleared.push({
+        qid: questionId,
+        sentence: (sentence || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 120),
+        date: today,
+      });
+    }
+    if (this.state.reviewCleared.length > 200) {
+      this.state.reviewCleared = this.state.reviewCleared.slice(-200);
+    }
+    this.save();
+  },
+
+  getReviewCleared() {
+    if (!this.state.reviewCleared) return { ids: new Set(), sentences: new Set() };
+    const now = new Date();
+    const ids = new Set();
+    const sentences = new Set();
+    for (const r of this.state.reviewCleared) {
+      const age = r.date ? daysBetween(r.date, toDateString(now)) : 0;
+      if (age <= 7) {
+        ids.add(r.qid);
+        if (r.sentence) sentences.add(r.sentence);
+      }
+    }
+    return { ids, sentences };
+  },
+
+  pruneReviewCleared() {
+    if (!this.state.reviewCleared) return;
+    const today = toDateString(new Date());
+    const before = this.state.reviewCleared.length;
+    this.state.reviewCleared = this.state.reviewCleared.filter(
+      r => r.date && daysBetween(r.date, today) <= 7
+    );
+    if (this.state.reviewCleared.length !== before) this.save();
+  },
+
   // --- PET Mock Challenge (BOSS) & plan progress ---
 
   // The BOSS is unlocked once the child has cleared Lv.3 of enough units to
@@ -755,6 +803,7 @@ export const store = {
       placementCompleted: this.state.placementCompleted,
       bossCleared: this.state.bossCleared,
       bossBestAccuracy: this.state.bossBestAccuracy,
+      reviewCleared: this.state.reviewCleared,
     };
 
     const saved = this.state.curricula[newId]?.progress;
@@ -769,6 +818,7 @@ export const store = {
       this.state.placementCompleted = saved.placementCompleted ?? false;
       this.state.bossCleared = saved.bossCleared ?? false;
       this.state.bossBestAccuracy = saved.bossBestAccuracy ?? 0;
+      this.state.reviewCleared = saved.reviewCleared ?? [];
     } else {
       const def = createDefaultState();
       this.state.units = def.units;
@@ -781,6 +831,7 @@ export const store = {
       this.state.placementCompleted = def.placementCompleted;
       this.state.bossCleared = def.bossCleared;
       this.state.bossBestAccuracy = def.bossBestAccuracy;
+      this.state.reviewCleared = def.reviewCleared;
     }
 
     this.state.activeCurriculumId = newId === BUILT_IN ? null : newId;
