@@ -326,13 +326,14 @@ function renderFillQuestion(q) {
   const sentence = q.sentence || '';
   const hint = q.hint || '';
 
-  // Replace blank marker with input
   const parts = sentence.split(/_+/);
   let sentenceHtml = '';
+  let blankIdx = 0;
   for (let i = 0; i < parts.length; i++) {
     sentenceHtml += parts[i];
     if (i < parts.length - 1) {
-      sentenceHtml += `<input type="text" class="fill-input" id="fillInput" placeholder="${hint}" autocomplete="off" autocapitalize="off" spellcheck="false">`;
+      sentenceHtml += `<input type="text" class="fill-input" data-fill-idx="${blankIdx}" placeholder="${hint}" autocomplete="off" autocapitalize="off" spellcheck="false">`;
+      blankIdx++;
     }
   }
 
@@ -604,27 +605,33 @@ function attachMatchListeners(q) {
   }
 }
 
+function collectFillAnswer() {
+  const inputs = [...document.querySelectorAll('.fill-input')].sort(
+    (a, b) => Number(a.dataset.fillIdx) - Number(b.dataset.fillIdx)
+  );
+  if (inputs.length === 1) return inputs[0].value;
+  return inputs.map(el => el.value.trim()).join(', ');
+}
+
 function attachFillListeners(q) {
   const submitBtn = document.getElementById('fillSubmit');
-  const input = document.getElementById('fillInput');
+  const inputs = document.querySelectorAll('.fill-input');
 
-  if (submitBtn && input) {
+  if (submitBtn && inputs.length) {
     submitBtn.addEventListener('click', () => {
       if (feedbackVisible) return;
-      submitAnswer(q, input.value);
+      submitAnswer(q, collectFillAnswer());
     });
 
-    // Ignore Enter while an IME composition is active — when typing English
-    // through a Chinese input method, the Enter that confirms the composition
-    // would otherwise submit the answer before the user has finished.
     let composing = false;
-    input.addEventListener('compositionstart', () => { composing = true; });
-    input.addEventListener('compositionend', () => { composing = false; });
-
-    input.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter' || feedbackVisible) return;
-      if (composing || e.isComposing || e.keyCode === 229) return; // IME in progress
-      submitAnswer(q, input.value);
+    inputs.forEach(input => {
+      input.addEventListener('compositionstart', () => { composing = true; });
+      input.addEventListener('compositionend', () => { composing = false; });
+      input.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' || feedbackVisible) return;
+        if (composing || e.isComposing || e.keyCode === 229) return;
+        submitAnswer(q, collectFillAnswer());
+      });
     });
   }
 }
@@ -720,11 +727,10 @@ function showAnswerFeedback(question, userAnswer, isCorrect, result) {
       break;
     }
     case 'fill': {
-      const input = document.getElementById('fillInput');
-      if (input) {
-        input.disabled = true;
-        input.classList.add(isCorrect ? 'fill-input--correct' : 'fill-input--wrong');
-      }
+      document.querySelectorAll('.fill-input').forEach(inp => {
+        inp.disabled = true;
+        inp.classList.add(isCorrect ? 'fill-input--correct' : 'fill-input--wrong');
+      });
       break;
     }
   }
