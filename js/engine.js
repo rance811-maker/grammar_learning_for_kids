@@ -11,7 +11,7 @@ function shuffle(arr) {
 }
 
 function normalizeStr(s) {
-  return String(s).trim().toLowerCase();
+  return String(s).trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 const COMBO_MULTIPLIERS = [
@@ -347,11 +347,12 @@ export const engine = {
       }
 
       case "fill": {
-        const acceptable = question.acceptableAnswers || [
-          question.correctAnswer,
-        ];
+        const acceptable = question.acceptableAnswers?.length
+          ? question.acceptableAnswers
+          : [question.correctAnswer || question.answer].filter(Boolean);
+        const normFill = (s) => normalizeStr(s).replace(/\s*,\s*/g, ', ');
         correct = acceptable.some(
-          (ans) => normalizeStr(ans) === normalizeStr(userAnswer)
+          (ans) => normFill(ans) === normFill(userAnswer)
         );
         correctAnswer = acceptable[0] || "";
         break;

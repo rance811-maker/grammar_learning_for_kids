@@ -13,17 +13,17 @@ function normalizeGenQ(q, unitId, levelKey, idx) {
   };
   switch (q.type) {
     case 'choice':
-      return { ...base, sentence: q.sentence || '', options: q.options || [], correctIndex: q.correctIndex ?? 0 };
+      return { ...base, sentence: q.sentence || '', options: q.options || [], correctIndex: Number(q.correctIndex ?? 0) };
     case 'scenario':
-      return { ...base, context: q.context || '', dialogue: q.dialogue || [], options: q.options || [], correctIndex: q.correctIndex ?? 0 };
+      return { ...base, context: q.context || '', dialogue: q.dialogue || [], options: q.options || [], correctIndex: Number(q.correctIndex ?? 0) };
     case 'fill': {
-      const aa = q.acceptableAnswers?.length ? q.acceptableAnswers : q.answer ? [q.answer] : [];
+      const aa = q.acceptableAnswers?.length ? q.acceptableAnswers : q.answer ? [q.answer] : q.correctAnswer ? [q.correctAnswer] : [];
       return { ...base, sentence: q.sentence || '', hint: q.hint || '', acceptableAnswers: aa, correctAnswer: aa[0] || '' };
     }
     case 'reorder':
       return { ...base, words: q.words || [], correctSentence: q.correctSentence ?? '' };
     case 'error':
-      return { ...base, words: q.words ?? q.sentence ?? [], errorIndex: q.errorIndex ?? 0, correction: q.correction || '' };
+      return { ...base, words: q.words ?? q.sentence ?? [], errorIndex: Number(q.errorIndex ?? 0), correction: q.correction || '' };
     case 'match': {
       const left = q.left || [];
       const right = q.right || [];

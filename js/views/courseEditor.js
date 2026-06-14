@@ -287,12 +287,49 @@ async function callClaude(apiKey, userText, imageFiles) {
   return textBlock.text;
 }
 
+function normalizePackQ(q, idx) {
+  if (!q || !q.type) return null;
+  const base = {
+    id: q.id || `pack-${Date.now()}-${idx}`,
+    type: q.type,
+    instruction: q.instruction || '',
+    explanation: q.explanation || '',
+    subSkill: q.subSkill || '',
+  };
+  switch (q.type) {
+    case 'choice':
+    case 'scenario':
+      return { ...base, sentence: q.sentence || q.context || '', context: q.context || '',
+        dialogue: q.dialogue || [], options: q.options || [],
+        correctIndex: Number(q.correctIndex ?? q.correct ?? 0) };
+    case 'fill': {
+      const aa = q.acceptableAnswers?.length ? q.acceptableAnswers
+        : q.answer ? [q.answer] : q.correctAnswer ? [q.correctAnswer] : [];
+      return { ...base, sentence: q.sentence || '', hint: q.hint || '',
+        acceptableAnswers: aa, correctAnswer: aa[0] || '' };
+    }
+    case 'reorder':
+      return { ...base, words: q.words || [], correctSentence: q.correctSentence ?? '' };
+    case 'error':
+      return { ...base, words: q.words ?? q.sentence ?? [],
+        errorIndex: Number(q.errorIndex ?? 0), correction: q.correction || '' };
+    case 'match': {
+      const left = q.left || []; const right = q.right || [];
+      const raw = q.correctPairs || [];
+      const correctPairs = raw.map(p => typeof p[0] === 'number' ? [left[p[0]], right[p[1]]] : p);
+      return { ...base, left, right, correctPairs };
+    }
+    default:
+      return { ...base, ...q };
+  }
+}
+
 function parseQuestions(raw) {
   let text = raw.trim();
   text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
   const arr = JSON.parse(text);
   if (!Array.isArray(arr)) throw new Error('AI 返回的不是数组');
-  return arr.filter(q => q && q.type);
+  return arr.map((q, i) => normalizePackQ(q, i)).filter(Boolean);
 }
 
 async function doGenerate() {
