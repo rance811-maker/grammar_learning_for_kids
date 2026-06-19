@@ -56,6 +56,7 @@ function createDefaultState() {
     activeCurriculumId: null,
     curricula: {},
     reviewCleared: [],
+    reviewShown: [],
   };
 }
 
@@ -114,6 +115,9 @@ export const store = {
     }
     if (this.state.reviewCleared === undefined) {
       this.state.reviewCleared = [];
+    }
+    if (this.state.reviewShown === undefined) {
+      this.state.reviewShown = [];
     }
     if (this.state.curricula === undefined) {
       this.state.curricula = {};
@@ -753,6 +757,41 @@ export const store = {
     if (this.state.reviewCleared.length !== before) this.save();
   },
 
+  // --- Review Shown (复习已出现过的题) ---
+
+  addReviewShown(questionIds) {
+    if (!this.state.reviewShown) this.state.reviewShown = [];
+    const today = toDateString(new Date());
+    for (const qid of questionIds) {
+      const exists = this.state.reviewShown.find(r => r.qid === qid);
+      if (exists) {
+        exists.date = today;
+      } else {
+        this.state.reviewShown.push({ qid, date: today });
+      }
+    }
+    if (this.state.reviewShown.length > 300) {
+      this.state.reviewShown = this.state.reviewShown.slice(-300);
+    }
+    this.save();
+  },
+
+  getReviewShown() {
+    if (!this.state.reviewShown) return new Set();
+    const cutoff = toDateString(new Date(Date.now() - 30 * 86400000));
+    return new Set(
+      this.state.reviewShown.filter(r => r.date >= cutoff).map(r => r.qid)
+    );
+  },
+
+  pruneReviewShown() {
+    if (!this.state.reviewShown) return;
+    const cutoff = toDateString(new Date(Date.now() - 30 * 86400000));
+    const before = this.state.reviewShown.length;
+    this.state.reviewShown = this.state.reviewShown.filter(r => r.date >= cutoff);
+    if (this.state.reviewShown.length !== before) this.save();
+  },
+
   // --- PET Mock Challenge (BOSS) & plan progress ---
 
   // The BOSS is unlocked once the child has cleared Lv.3 of enough units to
@@ -804,6 +843,7 @@ export const store = {
       bossCleared: this.state.bossCleared,
       bossBestAccuracy: this.state.bossBestAccuracy,
       reviewCleared: this.state.reviewCleared,
+      reviewShown: this.state.reviewShown,
     };
 
     const saved = this.state.curricula[newId]?.progress;
@@ -819,6 +859,7 @@ export const store = {
       this.state.bossCleared = saved.bossCleared ?? false;
       this.state.bossBestAccuracy = saved.bossBestAccuracy ?? 0;
       this.state.reviewCleared = saved.reviewCleared ?? [];
+      this.state.reviewShown = saved.reviewShown ?? [];
     } else {
       const def = createDefaultState();
       this.state.units = def.units;
@@ -832,6 +873,7 @@ export const store = {
       this.state.bossCleared = def.bossCleared;
       this.state.bossBestAccuracy = def.bossBestAccuracy;
       this.state.reviewCleared = def.reviewCleared;
+      this.state.reviewShown = def.reviewShown;
     }
 
     this.state.activeCurriculumId = newId === BUILT_IN ? null : newId;

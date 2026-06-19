@@ -173,7 +173,9 @@ export const engine = {
   // deduplicates by sentence text so the same sentence never appears twice.
   createReviewSession(count = 12) {
     store.pruneReviewCleared();
+    store.pruneReviewShown();
     const { ids: clearedIds, sentences: clearedSentences } = store.getReviewCleared();
+    const shownIds = store.getReviewShown();
     const mistakes = store.getMistakes();
     const seenIds = new Set();
     const seenSentences = new Set(clearedSentences);
@@ -197,9 +199,29 @@ export const engine = {
       if (sk) seenSentences.add(sk);
     }
 
+    function findAlternative(subSkill) {
+      const candidates = [];
+      for (const [uid, unit] of Object.entries(getUnits())) {
+        if (!store.isUnitUnlocked(Number(uid))) continue;
+        for (const level of Object.values(unit.levels || {})) {
+          for (const q of level.questions || []) {
+            if (q.subSkill === subSkill && canAdd(q) && !shownIds.has(q.id)) {
+              candidates.push(q);
+            }
+          }
+        }
+      }
+      return candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : null;
+    }
+
     for (let i = mistakes.length - 1; i >= 0 && questions.length < count; i--) {
       const q = mistakes[i].question;
-      if (canAdd(q)) add(q);
+      if (!canAdd(q)) continue;
+      if (shownIds.has(q.id) && q.subSkill) {
+        const alt = findAlternative(q.subSkill);
+        if (alt) { add(alt); continue; }
+      }
+      add(q);
     }
 
     if (questions.length < count) {
@@ -222,6 +244,8 @@ export const engine = {
         if (canAdd(q)) add(q);
       }
     }
+
+    store.addReviewShown(questions.map(q => q.id));
 
     return {
       unitId: 'review',

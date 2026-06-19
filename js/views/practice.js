@@ -296,16 +296,27 @@ function renderErrorQuestion(q) {
     </div>`;
 }
 
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 function renderMatchQuestion(q) {
   const instruction = q.instruction || '将左右两列正确配对';
   const left = q.left || [];
-  const right = q.right || [];
+  const original = q.right || [];
+  const shuffled = shuffleArray(original);
+  q.right = shuffled;
 
   const leftHtml = left.map((item, i) =>
     `<button class="match-item" data-type="match" data-side="left" data-index="${i}">${item}</button>`
   ).join('');
 
-  const rightHtml = right.map((item, i) =>
+  const rightHtml = shuffled.map((item, i) =>
     `<button class="match-item" data-type="match" data-side="right" data-index="${i}">${item}</button>`
   ).join('');
 
@@ -737,13 +748,17 @@ function showAnswerFeedback(question, userAnswer, isCorrect, result) {
   }
 }
 
+const CORRECT_PHRASES = ['回答正确！', '答对了！', '没错！', '厉害！', '完全正确！', '漂亮！', 'Excellent!', 'Perfect!', 'Well done!'];
+const WRONG_PHRASES = ['回答错误', '不太对哦', '再想想', '差一点点'];
+
 function showFeedback(isCorrect, question, userAnswer, result) {
   const feedbackArea = document.getElementById('feedbackArea');
   if (!feedbackArea) return;
 
   const bannerClass = isCorrect ? 'feedback-banner--correct' : 'feedback-banner--wrong';
   const icon = isCorrect ? '✅' : '❌';
-  const title = isCorrect ? '回答正确！' : '回答错误';
+  const phrases = isCorrect ? CORRECT_PHRASES : WRONG_PHRASES;
+  const title = phrases[Math.floor(Math.random() * phrases.length)];
 
   const scoreInfo = isCorrect
     ? `<span style="font-size:var(--text-lg);font-weight:800;">+${Math.round(10 * (session.combo >= 10 ? 3 : session.combo >= 5 ? 2 : session.combo >= 3 ? 1.5 : 1))}分</span>`
@@ -866,6 +881,39 @@ function showResults() {
       </div>`
     : '';
 
+  // Check for new achievement badges
+  const newBadges = [];
+  if (results.comboMax >= 10) {
+    const b = { id: 'combo_king', name: '连击之王', icon: '⚡' };
+    if (!store.getBadges().some(x => x.id === b.id)) { store.earnBadge(b); newBadges.push(b); }
+  }
+  if (results.stars === 3 && !isReview && !isBoss && !isDemo && !isCustom) {
+    const b = { id: `perfect_${session.unitId}_${session.level}`, unitId: session.unitId, name: `Unit ${session.unitId} Lv.${session.level} 满星`, icon: '🌟' };
+    if (!store.getBadges().some(x => x.id === b.id)) { store.earnBadge(b); newBadges.push(b); }
+  }
+  if (results.accuracy >= 1.0 && session.answers.length >= 5) {
+    const b = { id: 'flawless', name: '完美无瑕', icon: '💎' };
+    if (!store.getBadges().some(x => x.id === b.id)) { store.earnBadge(b); newBadges.push(b); }
+  }
+  const elapsed = (Date.now() - session.startTime) / 1000;
+  if (elapsed <= 90 && session.answers.length >= 5 && results.stars >= 2) {
+    const b = { id: 'speed_star', name: '速度之星', icon: '⏱️' };
+    if (!store.getBadges().some(x => x.id === b.id)) { store.earnBadge(b); newBadges.push(b); }
+  }
+  const streak = store.state.player.currentStreak;
+  if (streak >= 7) {
+    const b = { id: 'streak_7', name: '七日坚持', icon: '🔥' };
+    if (!store.getBadges().some(x => x.id === b.id)) { store.earnBadge(b); newBadges.push(b); }
+  }
+  if (streak >= 30) {
+    const b = { id: 'streak_30', name: '月度达人', icon: '🏆' };
+    if (!store.getBadges().some(x => x.id === b.id)) { store.earnBadge(b); newBadges.push(b); }
+  }
+
+  const badgeHtml = newBadges.length > 0
+    ? `<div class="new-badges-banner">${newBadges.map(b => `<span class="new-badge-item">${b.icon} ${b.name}</span>`).join('')}</div>`
+    : '';
+
   const area = document.getElementById('questionArea');
   if (area) {
     area.innerHTML = `
@@ -888,6 +936,7 @@ function showResults() {
             <span class="result-breakdown__value">${session.answers.filter(a => a.correct).length} / ${session.answers.length}</span>
           </div>
         </div>
+        ${badgeHtml}
         ${weakHtml}
         <div class="result-actions">
           <button class="btn-primary" id="resultContinue">继续</button>
@@ -911,6 +960,9 @@ function showResults() {
     confetti({ count: 90 });
   } else if (results.stars >= 1) {
     sound.finish(results.stars);
+  }
+  if (newBadges.length > 0) {
+    confetti({ count: 60 });
   }
 
   // Attach result button listeners
@@ -977,19 +1029,32 @@ function updateEnergy(isCorrect) {
   }
 }
 
+const COMBO_TITLES = [
+  { min: 15, label: '超神！', icon: '👑', cls: 'combo-display--legendary' },
+  { min: 10, label: '无人能挡！', icon: '⚡', cls: 'combo-display--epic' },
+  { min: 7,  label: '势不可挡！', icon: '💥', cls: 'combo-display--hot' },
+  { min: 5,  label: '太强了！', icon: '🔥', cls: 'combo-display--fire' },
+  { min: 3,  label: '连击！', icon: '⭐', cls: '' },
+];
+
 function showCombo(isCorrect) {
   const comboArea = document.getElementById('comboArea');
   if (!comboArea) return;
 
   if (isCorrect && session.combo >= 3) {
+    const tier = COMBO_TITLES.find(t => session.combo >= t.min) || COMBO_TITLES[COMBO_TITLES.length - 1];
     comboArea.innerHTML = `
-      <div class="combo-display">
-        <span class="combo-display__fire">⭐</span>
-        x${session.combo} 连击!
+      <div class="combo-display ${tier.cls}">
+        <span class="combo-display__fire">${tier.icon}</span>
+        x${session.combo} ${tier.label}
       </div>`;
+    if (session.combo >= 5) {
+      document.body.classList.add('screen-shake');
+      setTimeout(() => document.body.classList.remove('screen-shake'), 300);
+    }
     setTimeout(() => {
       if (comboArea) comboArea.innerHTML = '';
-    }, 1500);
+    }, 1800);
   } else {
     comboArea.innerHTML = '';
   }

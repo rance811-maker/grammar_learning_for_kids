@@ -1145,6 +1145,72 @@ ul, ol {
   animation: comboFireIcon 0.6s ease infinite alternate;
 }
 
+.combo-display--fire {
+  background: linear-gradient(135deg, #FF6B00, #FF9600, #FFD700);
+  font-size: var(--text-2xl);
+}
+
+.combo-display--hot {
+  background: linear-gradient(135deg, #FF4500, #FF6B00, #FFD700);
+  font-size: var(--text-2xl);
+  box-shadow: 0 0 20px rgba(255, 69, 0, 0.5);
+}
+
+.combo-display--epic {
+  background: linear-gradient(135deg, #9400D3, #CE82FF, #FFD700);
+  font-size: 1.75rem;
+  box-shadow: 0 0 30px rgba(148, 0, 211, 0.5);
+}
+
+.combo-display--legendary {
+  background: linear-gradient(135deg, #FFD700, #FF4500, #9400D3, #FFD700);
+  background-size: 300% 300%;
+  animation: comboFire 0.5s ease, legendaryShimmer 1.5s ease infinite;
+  font-size: 2rem;
+  box-shadow: 0 0 40px rgba(255, 215, 0, 0.6);
+}
+
+@keyframes legendaryShimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes screenShake {
+  0%, 100% { transform: translateX(0); }
+  10%, 50%, 90% { transform: translateX(-3px); }
+  30%, 70% { transform: translateX(3px); }
+}
+
+.screen-shake {
+  animation: screenShake 0.3s ease;
+}
+
+.new-badges-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: center;
+  margin: var(--space-md) 0;
+  animation: badgePop 0.6s ease;
+}
+
+.new-badge-item {
+  background: linear-gradient(135deg, #FFD700, #FF9600);
+  color: #fff;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-full);
+  box-shadow: 0 2px 8px rgba(255, 150, 0, 0.3);
+  white-space: nowrap;
+}
+
+@keyframes badgePop {
+  0% { opacity: 0; transform: scale(0.5); }
+  60% { transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
 /* ============================================================
    MISSION VIEW
    ============================================================ */
