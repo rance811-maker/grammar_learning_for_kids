@@ -14,6 +14,46 @@ function normalizeStr(s) {
   return String(s).trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+// Robustly compare a learner's fill-in answer against the accepted answers.
+// Multi-blank questions are collected as blanks joined by ", " (e.g. "Will, visit").
+// But AI-authored answers may store the full phrase spanning the blanks, INCLUDING
+// the static words printed between them (e.g. "Will you visit" — where "you" is not
+// a blank). So we compare several representations of the learner's answer:
+//   1. the comma-joined form            → "will, visit"
+//   2. the blanks joined by a space     → "will visit"
+//   3. the blanks re-interleaved with   → "will you visit"
+//      the sentence's static text between blanks (parenthetical hints stripped)
+function matchFillAnswer(userAnswer, acceptable, sentence) {
+  const norm = (s) => normalizeStr(s);
+  const normComma = (s) => norm(s).replace(/\s*,\s*/g, ', ');
+
+  const blanks = String(userAnswer).split(/\s*,\s*/).map((b) => b.trim());
+
+  const candidates = new Set();
+  candidates.add(normComma(userAnswer));      // comma form
+  candidates.add(norm(blanks.join(' ')));     // plain space-join
+
+  // Reconstruct using the static words between blanks, taken from the sentence.
+  if (sentence) {
+    const parts = String(sentence).split(/_+/);
+    if (parts.length - 1 === blanks.length && blanks.length > 1) {
+      const stripHint = (s) => s.replace(/\([^)]*\)/g, ' ').trim();
+      let rebuilt = blanks[0];
+      for (let i = 1; i < blanks.length; i++) {
+        const mid = stripHint(parts[i] || '');
+        rebuilt += (mid ? ' ' + mid + ' ' : ' ') + blanks[i];
+      }
+      candidates.add(norm(rebuilt));
+    }
+  }
+
+  return acceptable.some((ans) => {
+    const a = norm(ans);
+    const ac = normComma(ans);
+    return candidates.has(a) || candidates.has(ac);
+  });
+}
+
 const COMBO_MULTIPLIERS = [
   { threshold: 10, multiplier: 3 },
   { threshold: 5, multiplier: 2 },
@@ -389,10 +429,7 @@ export const engine = {
         const acceptable = question.acceptableAnswers?.length
           ? question.acceptableAnswers
           : [question.correctAnswer || question.answer].filter(Boolean);
-        const normFill = (s) => normalizeStr(s).replace(/\s*,\s*/g, ', ');
-        correct = acceptable.some(
-          (ans) => normFill(ans) === normFill(userAnswer)
-        );
+        correct = matchFillAnswer(userAnswer, acceptable, question.sentence);
         correctAnswer = acceptable[0] || "";
         break;
       }
