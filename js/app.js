@@ -15,7 +15,7 @@ import * as parent from './views/parent.js';
 import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260619a';
+const BUILD_VERSION = '20260619b';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -234,7 +234,7 @@ function mountBackButton() {
 
 // Supabase 在确认/找回密码邮件的链接里，会把令牌放在 URL 的 # 片段中
 // （形如 #access_token=...&type=recovery）。这会和我们的 hash 路由冲突，
-// 所以要在路由之前把它"消费"掉。
+// 所以要在路由之前把它“消费”掉。
 async function consumeAuthCallback() {
   const h = location.hash.slice(1);
   if (!h.includes('access_token=')) return;
@@ -245,7 +245,7 @@ async function consumeAuthCallback() {
   if (!access_token) return;
 
   if (type === 'recovery') {
-    // 进入"设置新密码"界面，令牌交给 account 视图使用。
+    // 进入“设置新密码”界面，令牌交给 account 视图使用。
     window.__gqRecovery = { access_token, refresh_token };
     history.replaceState(null, '', '#account/reset');
     return;
