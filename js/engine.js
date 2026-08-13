@@ -29,6 +29,16 @@ function matchFillAnswer(userAnswer, acceptable, sentence) {
 
   const blanks = String(userAnswer).split(/\s*,\s*/).map((b) => b.trim());
 
+  // Per-blank convention: AI-authored multi-blank fills often store one answer
+  // per blank as separate array entries (e.g. blanks ["will become","was","is"]
+  // vs acceptableAnswers ["will become","was","is"]). When the entry count lines
+  // up with the blank count, match each blank against the entry in the same
+  // position — every blank must match its own answer.
+  if (blanks.length > 1 && acceptable.length === blanks.length) {
+    const allMatch = blanks.every((b, i) => normalizeStr(b) === normalizeStr(acceptable[i]));
+    if (allMatch) return true;
+  }
+
   const candidates = new Set();
   candidates.add(normComma(userAnswer));      // comma form
   candidates.add(norm(blanks.join(' ')));     // plain space-join

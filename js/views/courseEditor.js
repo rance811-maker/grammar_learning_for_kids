@@ -186,6 +186,9 @@ const SYSTEM_PROMPT = `你是一个英语语法教学专家，专门为小学3-6
     "explanation": "now 表示正在进行，用现在进行时 is + doing",
     "subSkill": "present_continuous"
   },
+  // 尽量只留一个空(___)。若确实需要多个空，acceptableAnswers 里每个空对应一个答案，
+  // 顺序与空一致，条目数必须等于空的个数，例如 "It (be) ___ 也 (be) ___" → ["was","is"]。
+  // 不要把整句或空之间的固定词写进答案。
   {
     "type": "reorder",
     "instruction": "把单词排列成正确的句子",
