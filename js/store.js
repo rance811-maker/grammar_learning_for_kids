@@ -886,6 +886,7 @@ export const store = {
       title: data.title,
       description: data.description || '',
       goal: data.goal || '',
+      material: data.material || '',
       syllabus: data.syllabus,
       unitsData: data.unitsData || {},
     };
