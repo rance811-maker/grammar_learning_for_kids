@@ -71,7 +71,7 @@ Return a single JSON object { "discover":{...}, "levels":{...}, "mission":{...} 
 Return ONLY the JSON, no markdown code blocks, no other text.`;
 
 // 单次 AI 请求的超时上限。整套单元内容较大，给足时间但不至于无限挂起。
-const REQUEST_TIMEOUT_MS = 90000;
+const REQUEST_TIMEOUT_MS = 180000;
 
 // 把底层错误翻译成对家长友好的中文提示。已经友好的错误(.friendly)原样返回。
 export function friendlyAiError(err) {
