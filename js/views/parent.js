@@ -131,9 +131,9 @@ function renderDashboard() {
       </div>
       <div class="ce-pack-btns">
         ${isActive
-          ? '<span class="badge badge--success" style="font-size:0.75rem;">使用中</span>'
-          : `<button class="btn btn--tiny btn--primary" data-switch-curr="${c.id}">切换</button>`}
-        ${!c.builtIn && genCount < 12 ? `<button class="btn btn--tiny btn--outline" data-genall-curr="${c.id}">🤖 生成单元</button>` : ''}
+          ? '<span class="badge badge--success" style="font-size:0.75rem;">✅ 孩子正在学</span>'
+          : `<button class="btn btn--tiny btn--primary" data-switch-curr="${c.id}">让孩子学这套</button>`}
+        ${!c.builtIn && genCount < 12 ? `<button class="btn btn--tiny btn--outline" data-genall-curr="${c.id}">⚡ 补齐剩余 ${12 - genCount} 单元</button>` : ''}
         ${!c.builtIn ? `<button class="btn btn--tiny btn--danger-text" data-del-curr="${c.id}">删除</button>` : ''}
       </div>
     </div>`;
@@ -148,8 +148,12 @@ function renderDashboard() {
     <div class="ce-section">
       <div class="ce-section-header">
         <h3>📚 课程体系</h3>
-        <span style="font-size:0.8rem;color:var(--color-text-light);">当前：${esc(curriculum.getActiveTitle())}</span>
+        <span style="font-size:0.8rem;color:var(--color-text-light);">孩子正在学：${esc(curriculum.getActiveTitle())}</span>
       </div>
+      <p style="font-size:0.75rem;color:var(--color-muted);margin:0 0 10px;line-height:1.5;">
+        孩子同一时间只学一套课程。点「让孩子学这套」即可切换。<br>
+        AI 课程的单元在孩子首次进入时会自动生成；也可点「补齐剩余单元」提前一次性生成好。
+      </p>
       ${currItems}
     </div>
 
@@ -696,12 +700,66 @@ function renderReport() {
       }).join('')
     : '<p style="color:#999;font-size:0.85rem;">错题本是空的，太棒了！</p>';
 
+  // --- (g) Summary header: 学员 / 时段 / 预估达成度 / 小结 ---
+  const studentName = (player.name && player.name.trim()) || (store.account && store.account.name) || '学员';
+  const activeId = store.state.activeCurriculumId;
+  const activeGoal = (store.state.curricula?.[activeId]?.goal || '').trim();
+  const dates = history.map(h => h.date).filter(Boolean).sort();
+  const firstDate = dates[0] || '';
+  const lastDate = dates[dates.length - 1] || '';
+  const activeDays = new Set(dates).size;
+  const totalSessions = history.length;
+  const weekCount = dayCounts.reduce((a, b) => a + b, 0);
+  const mVals = Object.values(mastery).map(d => d.mastery || 0);
+  const avgMastery = mVals.length ? mVals.reduce((a, b) => a + b, 0) / mVals.length : 0;
+  const completion = completedLevels / 60;
+  const achievePct = totalSessions
+    ? Math.round(100 * (0.5 * avgMastery + 0.3 * accuracyRate + 0.2 * completion))
+    : null;
+  const levelLabel = achievePct == null ? '—'
+    : achievePct >= 80 ? '优秀' : achievePct >= 60 ? '熟练' : achievePct >= 40 ? '基础' : '入门';
+  let summaryText;
+  if (!totalSessions) {
+    summaryText = '还没有练习记录。完成第一课后，这里会自动生成学习小结与建议。';
+  } else {
+    const weakName = weakest[0] ? (SUB_SKILL_NAMES[weakest[0].skill] || weakest[0].skill) : '';
+    const advice = accuracyPct >= 85 ? '掌握得很扎实，可以挑战更高难度或进入复习巩固'
+      : accuracyPct >= 65 ? '整体不错，建议多练薄弱环节后稳步推进'
+      : '建议放慢进度、重点复习错题与薄弱技能';
+    summaryText = `近 7 天练习 ${weekCount} 次、累计 ${totalSessions} 次，综合正确率 ${accuracyPct}%`
+      + (weakName ? `，目前最薄弱的是「${esc(weakName)}」` : '')
+      + `。建议：${advice}。`;
+  }
+  const periodText = firstDate
+    ? `${firstDate} 至 ${lastDate} · 活跃 ${activeDays} 天 · 共 ${totalSessions} 次练习`
+    : '暂无练习记录';
+
+  const summaryCard = `
+    <div style="margin-top:20px;background:linear-gradient(135deg,#eef6ff,#f3f0ff);border:1px solid #dfe7f5;border-radius:12px;padding:18px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-size:1.05rem;font-weight:700;color:#1a3a5c;">👦 ${esc(studentName)}</div>
+          <div style="font-size:0.8rem;color:#5a6b82;margin-top:2px;">课程：${esc(curriculum.getActiveTitle())}${activeGoal ? ` · 目标：${esc(activeGoal)}` : ''}</div>
+          <div style="font-size:0.78rem;color:#7a8aa0;margin-top:4px;">学习时段：${esc(periodText)}</div>
+        </div>
+        <div style="text-align:center;background:#fff;border-radius:10px;padding:10px 16px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+          <div style="font-size:0.72rem;color:#888;">预估达成度</div>
+          <div style="font-size:1.6rem;font-weight:800;color:#1976d2;line-height:1.1;">${achievePct == null ? '—' : achievePct + '%'}</div>
+          <div style="font-size:0.72rem;color:#666;">${levelLabel}</div>
+        </div>
+      </div>
+      <p style="margin:12px 0 0;font-size:0.85rem;line-height:1.6;color:#374a63;">📝 ${summaryText}</p>
+      <p style="margin:6px 0 0;font-size:0.68rem;color:#9aa7b8;">* 达成度为综合掌握度、正确率与完成进度的估算，仅供参考。</p>
+    </div>`;
+
   return `<div class="parent-card parent-card--wide" id="reportContent">
     <div class="parent-header">
       <button class="btn btn--small btn--outline" id="reportBackBtn">← 返回</button>
       <h2 style="margin:0;">📊 学习报告</h2>
       <div></div>
     </div>
+
+    ${summaryCard}
 
     <!-- (a) Overview -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:20px;">
