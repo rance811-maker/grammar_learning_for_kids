@@ -3,7 +3,16 @@ import { cloud, friendlyError } from '../cloud.js';
 import * as courseEditor from './courseEditor.js';
 import { SUB_SKILL_NAMES } from '../data/skill-names.js';
 import { curriculum, BUILT_IN_ID } from '../curriculum.js';
-import { generateSyllabus, generateAllUnits, hasApiKey, friendlyAiError } from '../unitGenerator.js';
+import { generateSyllabus, generateAllUnits, hasApiKey, friendlyAiError, buildMaterial } from '../unitGenerator.js';
+
+// AI 服务配置（与 unitGenerator/courseEditor 共用的存储键）
+const AI_PROVIDER_KEY = 'gq-ai-provider';
+function getAiProvider() { try { return localStorage.getItem(AI_PROVIDER_KEY) || 'gemini'; } catch { return 'gemini'; } }
+function setAiProvider(p) { try { localStorage.setItem(AI_PROVIDER_KEY, p); } catch { /* */ } }
+function setAiKeyVal(p, k) { try { localStorage.setItem(p === 'claude' ? 'gq-ai-key-claude' : 'gq-ai-key-gemini', k); } catch { /* */ } }
+
+// 上传素材（PDF/照片）暂存
+let currFiles = [];
 
 const LOCKOUT_KEY = 'gq-parent-lockout';
 const MAX_ATTEMPTS = 5;
@@ -107,7 +116,7 @@ function renderLocked() {
   </div>`;
 }
 
-function renderDashboard(packs) {
+function renderDashboard() {
   // Curriculum section
   const allCurr = curriculum.listAll();
   const activeId = curriculum.getActiveId();
@@ -130,29 +139,6 @@ function renderDashboard(packs) {
     </div>`;
   }).join('');
 
-  // Course packs section (backward compat)
-  let packSection = '';
-  if (packs && packs.length) {
-    const packItems = packs.map(p => {
-      const count = Array.isArray(p.questions) ? p.questions.length : 0;
-      return `<div class="ce-pack-item">
-        <div class="ce-pack-info">
-          <strong>📦 ${esc(p.title)}</strong>
-          <span class="ce-pack-meta">${count} 题</span>
-        </div>
-        <div class="ce-pack-btns">
-          <button class="btn btn--tiny" data-edit-pack="${p.id}">编辑</button>
-          <button class="btn btn--tiny btn--danger-text" data-del-pack="${p.id}">删除</button>
-        </div>
-      </div>`;
-    }).join('');
-    packSection = `
-      <div class="ce-section" style="margin-top:var(--space-lg)">
-        <div class="ce-section-header"><h3>📦 独立课程包</h3></div>
-        ${packItems}
-      </div>`;
-  }
-
   return `<div class="parent-card parent-card--wide" id="dashboardCard">
     <div class="parent-header">
       <h2>🏠 家长专区</h2>
@@ -170,9 +156,9 @@ function renderDashboard(packs) {
     <div class="parent-grid" style="margin-top:var(--space-lg)">
       <div class="parent-feature parent-feature--active" id="newCurrCard" style="cursor:pointer;">
         <div class="parent-feature-icon">🤖</div>
-        <h3>AI 创建课程体系</h3>
-        <p>输入学习目标，AI 自动生成完整 12 单元课程大纲</p>
-        <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">+ 创建课程体系</span>
+        <h3>AI 创建课程</h3>
+        <p>描述目标或上传教材/考纲（PDF·拍照），AI 自动生成完整 12 单元课程</p>
+        <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">+ 创建课程</span>
       </div>
       <div class="parent-feature parent-feature--active" id="reportCard" style="cursor:pointer;">
         <div class="parent-feature-icon">📊</div>
@@ -181,17 +167,6 @@ function renderDashboard(packs) {
         <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">查看报告</span>
       </div>
     </div>
-
-    <div class="parent-grid" style="margin-top:var(--space-md)">
-      <div class="parent-feature parent-feature--active" id="aiGenCard" style="cursor:pointer;">
-        <div class="parent-feature-icon">📝</div>
-        <h3>独立练习包</h3>
-        <p>创建独立的 AI 练习题集（不影响课程体系）</p>
-        <span class="btn btn--outline btn--small" style="margin-top:var(--space-sm);">创建课程包</span>
-      </div>
-    </div>
-
-    ${packSection}
 
     <div class="parent-actions">
       <button class="btn btn--small btn--outline" id="changePinBtn">修改家长密码</button>
@@ -269,9 +244,7 @@ async function loadAndRender(sub, param) {
             <button class="btn btn--primary" onclick="location.hash='parent'">返回</button>`;
         }
       } else {
-        let packs = [];
-        try { packs = await cloud.listCoursePacks(); } catch (e2) { console.warn('Load packs failed:', e2.message); }
-        el.outerHTML = renderDashboard(packs);
+        el.outerHTML = renderDashboard();
         mountDashboard();
       }
       return;
@@ -296,29 +269,43 @@ function renderCurriculumCreator() {
   return `<div class="parent-card parent-card--wide" id="currCreator">
     <div class="parent-header">
       <button class="btn btn--small btn--outline" id="currBackBtn">← 返回</button>
-      <h2 style="margin:0;">🤖 AI 创建课程体系</h2>
+      <h2 style="margin:0;">🤖 AI 创建课程</h2>
       <div></div>
     </div>
 
     <div style="margin-top:var(--space-lg);">
       <p style="font-size:var(--text-sm);color:var(--color-text-light);margin-bottom:var(--space-md);line-height:1.6;">
-        输入学习目标，AI 会自动设计一套 12 单元的课程大纲。<br>
-        每个单元的练习题会在孩子第一次进入该单元时按需生成。
+        <strong>描述目标</strong>，或<strong>上传教材/考纲</strong>（PDF、拍照均可），AI 会自动设计一套完整 12 单元课程。<br>
+        创建后即可返回首页，像内置课程一样开始全体系学习。
       </p>
 
       <div class="parent-field">
-        <label>学习目标</label>
-        <input type="text" id="currGoalInput" placeholder="例如：PET 语法训练 / 雅思5分语法 / KET 口语习题 / 新概念英语第二册语法">
+        <label>学习目标（描述你想练什么）</label>
+        <input type="text" id="currGoalInput" placeholder="例如：雅思 Band7 语法 / PET 语法训练 / 小学三年级同步">
       </div>
 
       <div class="parent-field">
-        <label>课程名称（选填，默认使用目标作为名称）</label>
-        <input type="text" id="currTitleInput" placeholder="例如：雅思5分冲刺">
+        <label>上传学习素材（可选）</label>
+        <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+          <button type="button" class="btn btn--small btn--outline" id="currPickFile">📁 选择文件</button>
+          <button type="button" class="btn btn--small btn--outline" id="currPickCam">📷 拍照上传</button>
+          <span style="font-size:0.75rem;color:var(--color-muted);">PDF / JPG / PNG / WebP</span>
+        </div>
+        <input type="file" id="currFileInput" accept=".pdf,image/*" multiple hidden>
+        <input type="file" id="currCamInput" accept="image/*" capture="environment" hidden>
+        <div id="currFileList" style="margin-top:10px;"></div>
       </div>
+
+      <div class="parent-field">
+        <label>课程名称（选填）</label>
+        <input type="text" id="currTitleInput" placeholder="例如：雅思 Band7 冲刺">
+      </div>
+
+      <div id="currKeyPanel"></div>
 
       <div id="currGenArea">
         <button class="btn btn--primary btn--block" id="currGenBtn" style="margin-top:var(--space-md);">
-          🤖 生成课程大纲
+          🤖 生成课程
         </button>
       </div>
 
@@ -328,35 +315,97 @@ function renderCurriculumCreator() {
   </div>`;
 }
 
-function mountCurriculumCreator() {
-  document.getElementById('currBackBtn')?.addEventListener('click', () => {
-    location.hash = 'parent';
+function renderCurrFileList() {
+  const host = document.getElementById('currFileList');
+  if (!host) return;
+  if (!currFiles.length) { host.innerHTML = ''; return; }
+  host.innerHTML = currFiles.map((f, i) => `
+    <div style="display:inline-flex;align-items:center;gap:6px;background:#f0f0f0;border-radius:16px;padding:4px 10px;margin:0 6px 6px 0;font-size:0.8rem;">
+      <span>${f.type.startsWith('image/') ? '🖼️' : '📄'} ${esc(f.name.length > 22 ? f.name.slice(0, 20) + '…' : f.name)}</span>
+      <button type="button" data-rm-file="${i}" style="border:none;background:none;cursor:pointer;color:#c0392b;font-weight:700;">×</button>
+    </div>`).join('');
+  host.querySelectorAll('[data-rm-file]').forEach(b => b.addEventListener('click', () => {
+    currFiles.splice(Number(b.dataset.rmFile), 1);
+    renderCurrFileList();
+  }));
+}
+
+function mountCurrKeyPanel() {
+  const host = document.getElementById('currKeyPanel');
+  if (!host) return;
+  if (hasApiKey()) { host.innerHTML = ''; return; }
+  const p = getAiProvider();
+  host.innerHTML = `
+    <div class="parent-field" style="background:#FFF8E1;border:1px solid #F0E0A8;border-radius:10px;padding:12px 14px;">
+      <label>🔑 配置 AI 服务（生成需要，配一次即可）</label>
+      <select id="currProvider" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;margin-bottom:8px;">
+        <option value="gemini" ${p === 'gemini' ? 'selected' : ''}>Gemini（免费额度）</option>
+        <option value="claude" ${p === 'claude' ? 'selected' : ''}>Claude（按量付费·质量更高，推荐正式生成）</option>
+      </select>
+      <input type="password" id="currKeyInput" placeholder="粘贴 API key" autocomplete="off" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;">
+      <div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
+        <button class="btn btn--small btn--primary" id="currKeySave">保存 key</button>
+        <span style="font-size:0.72rem;color:#999;">Gemini: aistudio.google.com/apikey · Claude: console.anthropic.com</span>
+      </div>
+    </div>`;
+  document.getElementById('currProvider')?.addEventListener('change', e => setAiProvider(e.target.value));
+  document.getElementById('currKeySave')?.addEventListener('click', () => {
+    const prov = document.getElementById('currProvider').value;
+    const key = document.getElementById('currKeyInput').value.trim();
+    if (!key) return;
+    setAiProvider(prov);
+    setAiKeyVal(prov, key);
+    mountCurrKeyPanel();
   });
+}
+
+function mountCurriculumCreator() {
+  currFiles = [];
+  document.getElementById('currBackBtn')?.addEventListener('click', () => { location.hash = 'parent'; });
+  mountCurrKeyPanel();
+
+  const fileInput = document.getElementById('currFileInput');
+  const camInput = document.getElementById('currCamInput');
+  document.getElementById('currPickFile')?.addEventListener('click', () => fileInput?.click());
+  document.getElementById('currPickCam')?.addEventListener('click', () => camInput?.click());
+  const addFiles = (list) => {
+    for (const f of list) currFiles.push(f);
+    renderCurrFileList();
+  };
+  fileInput?.addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+  camInput?.addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
 
   const genBtn = document.getElementById('currGenBtn');
   if (!genBtn) return;
 
   genBtn.addEventListener('click', async () => {
-    const goal = document.getElementById('currGoalInput')?.value.trim();
+    const goal = document.getElementById('currGoalInput')?.value.trim() || '';
     const msg = document.getElementById('currMsg');
-    if (!goal) {
-      if (msg) msg.innerHTML = '<p style="color:var(--color-danger);font-size:var(--text-sm);">请输入学习目标</p>';
+    if (!goal && currFiles.length === 0) {
+      if (msg) msg.innerHTML = '<p style="color:var(--color-danger);font-size:var(--text-sm);">请填写学习目标，或上传素材</p>';
       return;
     }
     if (!hasApiKey()) {
-      if (msg) msg.innerHTML = '<p style="color:var(--color-danger);font-size:var(--text-sm);">请先在「独立练习包」中配置 AI API key</p>';
+      if (msg) msg.innerHTML = '<p style="color:var(--color-danger);font-size:var(--text-sm);">请先在上方配置 AI API key</p>';
+      mountCurrKeyPanel();
       return;
     }
 
     genBtn.disabled = true;
-    genBtn.innerHTML = '<span class="ce-spinner" style="display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:middle;"></span> AI 正在设计大纲…';
-    const stopTicker = startTicker(msg, SYLLABUS_GEN_STEPS);
+    genBtn.innerHTML = '<span class="ce-spinner" style="display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:middle;"></span> AI 正在设计课程…';
+    const setMsg = (t) => { if (msg) msg.innerHTML = `<p style="color:var(--color-secondary-dark);font-size:var(--text-sm);">${esc(t)}</p>`; };
+    let stopTicker = () => {};
 
     try {
-      const syllabus = await generateSyllabus(goal);
+      let material = '';
+      if (currFiles.length) {
+        material = await buildMaterial({ files: currFiles, onStatus: setMsg });
+      }
+      stopTicker = startTicker(msg, SYLLABUS_GEN_STEPS);
+      const syllabus = await generateSyllabus(goal, material);
       stopTicker();
       if (msg) msg.innerHTML = '';
-      renderSyllabusPreview(syllabus, goal);
+      renderSyllabusPreview(syllabus, goal, material);
     } catch (e) {
       stopTicker();
       genBtn.disabled = false;
@@ -449,7 +498,7 @@ function goHome() {
   window.dispatchEvent(new HashChangeEvent('hashchange'));
 }
 
-function renderSyllabusPreview(syllabus, goal) {
+function renderSyllabusPreview(syllabus, goal, material = '') {
   const area = document.getElementById('currSyllabusArea');
   if (!area) return;
 
@@ -478,9 +527,9 @@ function renderSyllabusPreview(syllabus, goal) {
     </div>`;
 
   document.getElementById('currConfirmBtn')?.addEventListener('click', () => {
-    const title = document.getElementById('currTitleInput')?.value.trim() || goal;
+    const title = document.getElementById('currTitleInput')?.value.trim() || goal || '我的课程';
     const id = 'curr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    store.addCurriculum(id, { title, description: goal, goal, syllabus });
+    store.addCurriculum(id, { title, description: goal || '（据上传素材生成）', goal, material, syllabus });
     store.switchCurriculum(id);
     showPostCreate(title);
   });
@@ -760,10 +809,7 @@ function mountSetup() {
       await cloud.saveParentPin(h);
       setUnlocked();
       const zone = btn.closest('.parent-zone') || btn.closest('.parent-card').parentElement;
-      zone.innerHTML = '<div class="parent-card" style="text-align:center"><div class="parent-icon">⏳</div><p>加载中…</p></div>';
-      let packs = [];
-      try { packs = await cloud.listCoursePacks(); } catch { /* ignore */ }
-      zone.innerHTML = renderDashboard(packs);
+      zone.innerHTML = renderDashboard();
       mountDashboard();
     } catch (e) {
       msg.textContent = '保存失败：' + e.message;
@@ -801,10 +847,7 @@ function mountLocked(storedHash) {
       clearLockout();
       setUnlocked();
       const zone = btn.closest('.parent-zone') || btn.closest('.parent-card').parentElement;
-      zone.innerHTML = '<div class="parent-card" style="text-align:center"><div class="parent-icon">⏳</div><p>加载中…</p></div>';
-      let packs = [];
-      try { packs = await cloud.listCoursePacks(); } catch { /* ignore */ }
-      zone.innerHTML = renderDashboard(packs);
+      zone.innerHTML = renderDashboard();
       mountDashboard();
     } else {
       const rec = recordFailedAttempt();
@@ -831,7 +874,6 @@ function mountLocked(storedHash) {
 function mountDashboard() {
   document.getElementById('lockBtn')?.addEventListener('click', () => { clearUnlock(); location.hash = ''; });
   document.getElementById('changePinBtn')?.addEventListener('click', () => { location.hash = 'parent/reset'; });
-  document.getElementById('aiGenCard')?.addEventListener('click', () => { location.hash = 'parent/new'; });
   document.getElementById('reportCard')?.addEventListener('click', () => { location.hash = 'parent/report'; });
   document.getElementById('newCurrCard')?.addEventListener('click', () => { location.hash = 'parent/curriculum'; });
 
@@ -859,30 +901,6 @@ function mountDashboard() {
       store.removeCurriculum(btn.dataset.delCurr);
       location.hash = 'parent';
       window.dispatchEvent(new HashChangeEvent('hashchange'));
-    });
-  });
-
-  document.querySelectorAll('[data-edit-pack]').forEach(btn => {
-    btn.addEventListener('click', () => { location.hash = 'parent/edit/' + btn.dataset.editPack; });
-  });
-
-  document.querySelectorAll('[data-del-pack]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      if (!confirm('确定删除这个课程包？')) return;
-      btn.disabled = true;
-      try {
-        await cloud.deleteCoursePack(btn.dataset.delPack);
-        const card = document.querySelector('.parent-card');
-        if (card) {
-          card.innerHTML = '<div class="parent-icon">⏳</div><p>刷新中…</p>';
-          const packs = await cloud.listCoursePacks();
-          card.outerHTML = renderDashboard(packs);
-          mountDashboard();
-        }
-      } catch (e) {
-        alert('删除失败：' + e.message);
-        btn.disabled = false;
-      }
     });
   });
 }

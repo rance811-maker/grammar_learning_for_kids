@@ -28,9 +28,9 @@ function getAiKey() {
 
 export function hasApiKey() { return !!getAiKey(); }
 
-const SYLLABUS_PROMPT = `You are an English language education expert designing curricula for Chinese students (elementary school, grades 3-6).
+const SYLLABUS_PROMPT = `You are an English language education expert designing curricula for Chinese learners of English. Match the level and scope to the learning goal (e.g. elementary grammar, PET/KET, or IELTS Band 7) — do NOT force an elementary level if the goal implies otherwise.
 
-Based on the learning goal, create a 12-unit curriculum syllabus. Units progress from basic to advanced within the topic scope.
+Based on the learning goal, create a 12-unit curriculum syllabus. Units progress from basic to advanced within the topic scope. If reference material is provided below, derive the 12 units, their order, and their sub-skills FROM the grammar system in that material.
 
 Return a JSON array of exactly 12 objects:
 - "title": Grammar/skill topic in English (e.g. "Present Simple Tense")
@@ -39,7 +39,7 @@ Return a JSON array of exactly 12 objects:
 
 Return ONLY the JSON array, no markdown code blocks, no other text.`;
 
-const UNIT_PROMPT = `You are an English language education expert. Generate practice content for one unit of a curriculum for Chinese students (elementary grades 3-6).
+const UNIT_PROMPT = `You are an English language education expert. Generate practice content for one unit of a curriculum for Chinese learners of English. Match the difficulty to the unit topic and the reference material (which may be elementary, PET/KET, or IELTS Band 7 level).
 
 Generate the following for the given unit topic:
 
@@ -196,8 +196,120 @@ async function generateValidated(systemPrompt, userText, validate, attempts = 2)
   throw lastErr;
 }
 
-export async function generateSyllabus(goal) {
-  return generateValidated(SYLLABUS_PROMPT, `Learning goal: ${goal}`, (syllabus) => {
+// ---- Material extraction (PDF text + photo transcription) ----
+// Turns uploaded files (PDF / images) + a typed description into one text blob
+// that drives syllabus + unit generation. PDFs are read locally via pdf.js;
+// photos are transcribed by one vision call.
+let _pdfjs = null;
+function loadPdfJs() {
+  if (_pdfjs) return _pdfjs;
+  _pdfjs = import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs').then(lib => {
+    lib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs';
+    return lib;
+  });
+  return _pdfjs;
+}
+
+export async function extractPdfText(file) {
+  const lib = await loadPdfJs();
+  const buf = await file.arrayBuffer();
+  const pdf = await lib.getDocument({ data: buf }).promise;
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const tc = await page.getTextContent();
+    pages.push(tc.items.map(it => it.str).join(' '));
+  }
+  return pages.join('\n\n');
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+const VISION_INSTRUCTION = '这是学习素材（课本/讲义/题目截图）。请把图中所有英文文本和语法要点完整转写成纯文本，保留知识点结构，供后续生成练习题使用。只输出转写内容，不要解释。';
+
+async function callVision(dataUrl) {
+  const provider = getProvider();
+  const apiKey = getAiKey();
+  if (!apiKey) throw friendlyErr('请先配置 AI API key');
+  const [header, base64] = String(dataUrl).split(',');
+  const mime = (header.match(/:(.*?);/) || [])[1] || 'image/jpeg';
+  if (!base64) return '';
+
+  if (provider === 'claude') {
+    const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json', 'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6', max_tokens: 4096,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: mime, data: base64 } },
+          { type: 'text', text: VISION_INSTRUCTION },
+        ] }],
+      }),
+    });
+    if (!res.ok) { const e = new Error(`API 返回 ${res.status}`); e.status = res.status; throw e; }
+    const data = await res.json();
+    return data?.content?.find(b => b.type === 'text')?.text || '';
+  }
+
+  const res = await fetchWithTimeout(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [
+        { inlineData: { mimeType: mime, data: base64 } },
+        { text: VISION_INSTRUCTION },
+      ] }] }) }
+  );
+  if (!res.ok) { const e = new Error(`API 返回 ${res.status}`); e.status = res.status; throw e; }
+  const data = await res.json();
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// Build a single material text blob from a typed description + uploaded files.
+// onStatus(msg) reports progress; a single file failing does not abort the rest.
+export async function buildMaterial({ description = '', files = [], onStatus } = {}) {
+  const parts = [];
+  if (description.trim()) parts.push(description.trim());
+  for (const file of files) {
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const isImage = file.type.startsWith('image/');
+    try {
+      if (isPdf) {
+        onStatus?.(`正在读取 ${file.name}…`);
+        const t = await extractPdfText(file);
+        if (t.trim()) parts.push(t.trim());
+      } else if (isImage) {
+        onStatus?.(`正在识别 ${file.name}…`);
+        const url = await fileToDataUrl(file);
+        const t = await callVision(url);
+        if (t.trim()) parts.push(t.trim());
+      }
+    } catch (e) {
+      console.warn('material extract failed:', file.name, e.message);
+    }
+  }
+  return parts.join('\n\n');
+}
+
+const MATERIAL_CAP_SYLLABUS = 8000;
+const MATERIAL_CAP_UNIT = 3500;
+
+export async function generateSyllabus(goal, material = '') {
+  const matBlock = material
+    ? `\n\nReference material (base the 12-unit progression and sub-skills on the grammar system below):\n${String(material).slice(0, MATERIAL_CAP_SYLLABUS)}`
+    : '';
+  const userText = `Learning goal: ${goal || '(derive from the reference material below)'}${matBlock}`;
+  return generateValidated(SYLLABUS_PROMPT, userText, (syllabus) => {
     if (!Array.isArray(syllabus) || syllabus.length < 12) {
       throw friendlyErr('AI 返回的大纲不完整，请重试');
     }
@@ -212,10 +324,14 @@ export async function generateUnitContent(unitId) {
   const sylItem = curr.syllabus[unitId - 1];
   if (!sylItem) throw friendlyErr('单元不在大纲中');
 
+  const matBlock = curr.material
+    ? `\nReference material (align the questions' style and content to this):\n${String(curr.material).slice(0, MATERIAL_CAP_UNIT)}`
+    : '';
   const userText = [
     `Unit ${unitId}: ${sylItem.title}`,
     `Description: ${sylItem.description}`,
     `Sub-skills to use: ${(sylItem.skills || []).join(', ')}`,
+    matBlock,
   ].join('\n');
 
   const data = await generateValidated(UNIT_PROMPT, userText, (d) => {
