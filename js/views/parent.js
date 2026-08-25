@@ -451,7 +451,7 @@ async function renderAndRunBatch(hostEl, title) {
 
   hostEl.innerHTML = `<div class="parent-card parent-card--wide">
     <h2 style="margin-top:0;">🤖 生成单元内容</h2>
-    <p class="batch-sub">正在为《${esc(title)}》的每个单元生成故事、练习题和写作任务，每个单元约 10–30 秒，请保持页面打开…</p>
+    <p class="batch-sub">正在为《${esc(title)}》的每个单元生成故事、练习题和写作任务，每个单元约 20–90 秒，请保持页面打开…</p>
     <div class="batch-progress"><div class="batch-progress__fill" id="batchFill"></div></div>
     <div class="batch-status" id="batchStatus">准备中…</div>
     <div id="batchActions"></div>
