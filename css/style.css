@@ -3084,32 +3084,38 @@ ul, ol {
 
 .sidebar__item[data-route="parent"] {
   margin-top: auto;
-  opacity: 0.7;
-  font-size: 0.85em;
+  opacity: 0.75;
 }
 .sidebar__item[data-route="parent"].active,
 .sidebar__item[data-route="parent"]:hover {
   opacity: 1;
 }
 
-/* Sidebar curriculum indicator */
+/* Sidebar curriculum indicator — a status card (not a nav item),
+   aligned flush with the nav items below it. */
 .sidebar__curriculum {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  margin: 0 12px 8px;
-  background: rgba(88, 204, 2, 0.1);
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-sm) var(--space-md);
+  margin: 0 0 var(--space-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
   border-radius: var(--radius-md);
-  font-size: 0.8rem;
-  color: var(--color-primary-dark);
-  font-weight: 600;
   min-width: 0;
 }
-.sidebar__curriculum-icon { flex-shrink: 0; }
+.sidebar__curriculum-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-muted);
+  letter-spacing: 0.02em;
+}
 .sidebar__curriculum-name {
-  flex: 1;
   min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
