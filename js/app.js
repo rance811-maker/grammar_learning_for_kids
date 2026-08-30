@@ -15,7 +15,7 @@ import * as parent from './views/parent.js';
 import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260619g';
+const BUILD_VERSION = '20260619h';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -176,10 +176,14 @@ function renderSidebar(route) {
       ${currBadge}
       <nav class="sidebar__nav">${items}</nav>
       <div class="sidebar__footer">
-        <button class="sidebar__account" data-route="account">${accountLine}</button>
-        <div class="sidebar__rank">${rank.icon} ${rank.name}</div>
-        <div class="sidebar__score">⭐ ${p.totalScore} 积分</div>
-        <div class="sidebar__streak">🔥 连续 ${p.currentStreak} 天</div>
+        <div class="sidebar__account-panel">
+          <button class="sidebar__account" data-route="account">${accountLine}</button>
+          <div class="sidebar__stats">
+            <span class="sidebar__stat sidebar__stat--rank">${rank.icon} ${rank.name}</span>
+            <span class="sidebar__stat sidebar__stat--score">⭐ ${p.totalScore} 积分</span>
+            <span class="sidebar__stat sidebar__stat--streak">🔥 连续 ${p.currentStreak} 天</span>
+          </div>
+        </div>
       </div>
     </aside>`;
 }
