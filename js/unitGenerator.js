@@ -35,6 +35,14 @@ SCOPE — read carefully:
 - Anchor the grammar SCOPE strictly to the target CEFR level and the Cambridge English Grammar Profile (EGP) grammar points for that level. Only include grammar structures a learner AT that CEFR level is expected to master. Do NOT include structures from a higher CEFR level.
 - Every unit's topic must be a GRAMMAR structure/skill (tenses, clauses, conditionals, articles, etc.), not vocabulary, listening, or speaking.
 
+COVERAGE — the 12 units together MUST span these four systems. Do NOT drop high-frequency items (articles, quantifiers, comparatives, word formation):
+- Verb system: tenses & aspect, modals, passive & causatives, conditionals
+- Clause system: relative clauses, reported speech, participle clauses
+- Phrase system: gerunds & infinitives, articles & determiners, quantifiers, comparatives, adjectives/adverbs, prepositions & collocations
+- Applied grammar (B1 and above): open cloze, word formation, key-word transformation — put these in a final "Use of English" unit
+
+HONESTY: this is a GRAMMAR teaching blueprint aligned to the CEFR level (referencing the Cambridge English Grammar Profile), NOT an official exam syllabus — Cambridge does not publish a fixed grammar checklist. Never label a unit as an "official" exam point.
+
 Based on the learning goal and its CEFR level, create a 12-unit grammar syllabus, ordered from foundational to advanced WITHIN that level. If reference material is provided below, derive the units FROM the grammar system in that material (still within the CEFR level).
 
 Return a JSON array of exactly 12 objects:
@@ -72,6 +80,16 @@ Question formats:
    - "title": string, "description": string (Chinese), "scenario": string (Chinese)
    - "grammarType": main subSkill ID
    - "scaffolds": array of 2-3 { "prefix":"", "suffix":"", "hint":"", "grammarCheck":"skill_id", "example":"" }
+
+QUALITY RULES (critical — follow all):
+- CONSISTENCY: every target grammar structure that appears in the "story" MUST be explained in "tip" AND practiced in at least one question. Never explain a DIFFERENT structure than the story actually shows.
+- "tip" must be a real mini-lesson: contrast the unit's target structures and list 1-2 common errors — not a one-liner.
+- Each question MUST contain a clear context clue that determines the answer; there should ideally be exactly ONE best answer.
+- If both British and American English are correct, include BOTH in "acceptableAnswers".
+- Explanations must explain the MEANING/why (e.g. "by 2031 = completed before a future point → future perfect"), not just point at a surface word.
+- Keep timelines, tenses and characters logically consistent across the story and all questions.
+- For B1 and above, include a few key-word-transformation style items (rewrite a sentence keeping the meaning, testing the target structure) among the fill questions where natural.
+- Do NOT invent coverage percentages or claim official exam status anywhere in the content.
 
 Return a single JSON object { "discover":{...}, "levels":{...}, "mission":{...} }.
 Return ONLY the JSON, no markdown code blocks, no other text.`;
