@@ -2644,6 +2644,36 @@ ul, ol {
   letter-spacing: normal;
   text-align: left;
 }
+
+/* Structured course-creation wizard */
+.curr-form .parent-field input,
+.curr-form .parent-field select,
+.curr-form .parent-field textarea {
+  letter-spacing: normal;
+  text-align: left;
+  font-family: inherit;
+}
+.curr-form .parent-field select,
+.curr-form .parent-field textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 2px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 1rem;
+  box-sizing: border-box;
+  background: var(--color-card);
+  color: var(--color-text);
+  transition: border-color 0.2s;
+}
+.curr-form .parent-field select:focus,
+.curr-form .parent-field textarea:focus {
+  outline: none;
+  border-color: var(--color-secondary);
+}
+.curr-form .parent-field textarea { min-height: 60px; resize: vertical; line-height: 1.5; }
+.curr-form-row { display: flex; gap: var(--space-md); }
+.curr-form-row .parent-field { flex: 1; min-width: 0; }
+@media (max-width: 560px) { .curr-form-row { flex-direction: column; gap: 0; } }
 .parent-msg {
   min-height: 1.4em;
   font-size: 0.85rem;

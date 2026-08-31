@@ -887,6 +887,7 @@ export const store = {
       description: data.description || '',
       goal: data.goal || '',
       material: data.material || '',
+      profile: data.profile || null,
       syllabus: data.syllabus,
       unitsData: data.unitsData || {},
     };
