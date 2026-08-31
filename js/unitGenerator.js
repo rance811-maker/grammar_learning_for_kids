@@ -118,6 +118,14 @@ function friendlyErr(msg) {
   return e;
 }
 
+// 输出被 max_tokens 截断时抛出：generateValidated 会自动重试一次，
+// 若仍截断，家长看到的是这条明确的提示，而不是含糊的"格式有误"。
+function truncatedErr() {
+  const e = friendlyErr('AI 生成的内容太长被截断了，已自动重试；若多次失败，建议换用 Claude key 再试');
+  e.truncated = true;
+  return e;
+}
+
 // 带超时的 fetch，避免请求卡住后界面一直转圈。
 async function fetchWithTimeout(url, opts) {
   const controller = new AbortController();
@@ -145,7 +153,9 @@ async function callAI(systemPrompt, userText) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 8192,
+        // 一个完整单元(故事 + 3 道 discover 题 + 5 关×8 题 + 写作任务 + 中文解析)
+        // 体量很大，8192 常常不够、JSON 会被截断。给足输出预算。
+        max_tokens: 16000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userText }],
       }),
@@ -157,6 +167,7 @@ async function callAI(systemPrompt, userText) {
       throw e;
     }
     const data = await res.json();
+    if (data?.stop_reason === 'max_tokens') throw truncatedErr();
     return data?.content?.find(b => b.type === 'text')?.text || '';
   }
 
@@ -178,7 +189,9 @@ async function callAI(systemPrompt, userText) {
     throw e;
   }
   const data = await res.json();
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const cand = data?.candidates?.[0];
+  if (cand?.finishReason === 'MAX_TOKENS') throw truncatedErr();
+  return cand?.content?.parts?.[0]?.text || '';
 }
 
 // 解析 AI 返回的 JSON。先去掉代码块围栏；若仍失败，尝试抽取首个 {…} 或 […]
