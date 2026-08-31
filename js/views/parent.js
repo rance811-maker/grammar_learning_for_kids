@@ -292,14 +292,39 @@ function renderCurriculumCreator() {
 
       <div class="curr-form-row">
         ${selectField('currGrade', '1. 孩子几年级？', ['学龄前', '一年级', '二年级', '三年级', '四年级', '五年级', '六年级', '初中', '高中', '成人'])}
-        ${selectField('currLevel', '当前英语水平', ['零基础', '入门', '有一定基础', '中等', '较好'])}
+        ${selectField('currTimeframe', '期望在多长时间内达到', ['1 个月', '3 个月', '半年', '1 年', '不限'])}
       </div>
 
       <div class="parent-field">
-        <label>2. 想练什么、达到什么结果？<span style="color:var(--color-danger);">（必填）</span></label>
-        <input type="text" id="currGoalInput" placeholder="例如：雅思 Band7 语法 / 通过剑桥 PET / 校内英语提分">
+        <label>2. 目标：想达到哪个标准？<span style="color:var(--color-danger);">（必填）</span></label>
+        <select id="currGoalSelect">
+          <option value="">请选择一个明确目标…</option>
+          <optgroup label="校内同步">
+            <option value="校内英语同步提升（按所选年级的课标）">校内英语同步提升（按年级课标）</option>
+          </optgroup>
+          <optgroup label="剑桥五级考试">
+            <option value="剑桥通用五级 KET（A2）">剑桥 KET（A2）</option>
+            <option value="剑桥通用五级 PET（B1）">剑桥 PET（B1）</option>
+            <option value="剑桥通用五级 FCE（B2）">剑桥 FCE（B2）</option>
+          </optgroup>
+          <optgroup label="雅思">
+            <option value="雅思 5.0 分水平">雅思 5.0</option>
+            <option value="雅思 5.5 分水平">雅思 5.5</option>
+            <option value="雅思 6.0 分水平">雅思 6.0</option>
+            <option value="雅思 6.5 分水平">雅思 6.5</option>
+            <option value="雅思 7.0 分水平">雅思 7.0</option>
+          </optgroup>
+          <optgroup label="教材 / 专项">
+            <option value="新概念英语 第一册">新概念英语 第一册</option>
+            <option value="新概念英语 第二册">新概念英语 第二册</option>
+            <option value="英语语法专项强化">语法专项强化</option>
+            <option value="英语词汇专项强化">词汇专项强化</option>
+          </optgroup>
+          <option value="__custom__">其他（自定义）…</option>
+        </select>
+        <input type="text" id="currGoalCustom" placeholder="自定义目标，如：分级阅读 RAZ 提升 / 出国生活口语" style="display:none;margin-top:8px;">
+        <p style="font-size:0.72rem;color:var(--color-muted);margin:6px 0 0;">选具体的标准，AI 才能对着公开考纲/词表生成，也方便你核对是否覆盖到位。</p>
       </div>
-      ${selectField('currTimeframe', '期望在多长时间内达到', ['1 个月', '3 个月', '半年', '1 年', '不限'])}
 
       <div class="parent-field">
         <label>3. 希望基于哪些教材 / 试卷 / 文章？（可选）</label>
@@ -402,15 +427,24 @@ function mountCurriculumCreator() {
   fileInput?.addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
   camInput?.addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
 
+  // 目标选择器：选「其他（自定义）」时才显示自由输入框
+  const goalSelect = document.getElementById('currGoalSelect');
+  const goalCustom = document.getElementById('currGoalCustom');
+  goalSelect?.addEventListener('change', () => {
+    const custom = goalSelect.value === '__custom__';
+    if (goalCustom) { goalCustom.style.display = custom ? 'block' : 'none'; if (custom) goalCustom.focus(); }
+  });
+
   const genBtn = document.getElementById('currGenBtn');
   if (!genBtn) return;
 
   genBtn.addEventListener('click', async () => {
     const val = (id) => document.getElementById(id)?.value.trim() || '';
+    const goalSel = val('currGoalSelect');
+    const goal = goalSel === '__custom__' ? val('currGoalCustom') : goalSel;
     const profile = {
       grade: val('currGrade'),
-      level: val('currLevel'),
-      goal: val('currGoalInput'),
+      goal,
       timeframe: val('currTimeframe'),
       difficulty: val('currDifficulty'),
       dailyMinutes: val('currDaily'),
@@ -418,8 +452,8 @@ function mountCurriculumCreator() {
     };
     const msg = document.getElementById('currMsg');
     if (!profile.goal && currFiles.length === 0) {
-      if (msg) msg.innerHTML = '<p style="color:var(--color-danger);font-size:var(--text-sm);">请填写第 2 题「想练什么」，或上传素材</p>';
-      document.getElementById('currGoalInput')?.focus();
+      if (msg) msg.innerHTML = '<p style="color:var(--color-danger);font-size:var(--text-sm);">请选择第 2 题「目标」，或上传素材</p>';
+      goalSelect?.focus();
       return;
     }
     if (!hasApiKey()) {
@@ -457,8 +491,7 @@ function mountCurriculumCreator() {
 function buildGoalFromProfile(pf) {
   const parts = [];
   if (pf.goal) parts.push(`学习目标：${pf.goal}`);
-  const who = [pf.grade, pf.level].filter(Boolean).join('，');
-  if (who) parts.push(`孩子情况：${who}`);
+  if (pf.grade) parts.push(`孩子年级：${pf.grade}`);
   if (pf.timeframe) parts.push(`期望时限：${pf.timeframe}`);
   if (pf.difficulty) parts.push(`目前主要困难：${pf.difficulty}`);
   if (pf.dailyMinutes) parts.push(`每天可投入：${pf.dailyMinutes}`);
