@@ -340,8 +340,52 @@ export async function generateSyllabus(goal, material = '') {
   }).then(s => s.slice(0, 12));
 }
 
-// 生成一个单元的内容数据（不落库）。unitId 只用于提示词里的编号。
-async function genUnitData(sylItem, material, unitId = 1) {
+// 取一道题的「预期答案」，供校验用。
+function answerOf(q) {
+  if (q.type === 'choice' || q.type === 'scenario') return (q.options || [])[q.correctIndex] ?? '';
+  if (q.type === 'fill') return (q.acceptableAnswers && q.acceptableAnswers.length ? q.acceptableAnswers : [q.answer || q.correctAnswer]).filter(Boolean).join(' / ');
+  if (q.type === 'reorder') return q.correctSentence || '';
+  if (q.type === 'error') return q.correction || '';
+  return '(见题目)';
+}
+
+// 自动校验 pass：用一个独立的 AI「校验员」以全新上下文逐题审查，
+// 标出「答案错/有歧义/超纲/逻辑不一致」的题并剔除。返回校验报告；生成失败不阻断。
+const VERIFY_PROMPT = `You are a STRICT English grammar answer-checker. You are given practice questions from a grammar unit, each with its INTENDED answer, at a CEFR level.
+For EACH question INDEPENDENTLY, decide whether the intended answer is truly correct AND the item is well-formed: clear context clue, a single best answer, no timeline/logic errors, difficulty not clearly above the CEFR level.
+List ONLY the questions that are genuinely WRONG, ambiguous, or broken — do NOT list good ones.
+Return ONLY JSON (no markdown): { "drop": [ { "level":"1", "index":2, "reason":"中文原因" } ], "summary":"中文一句话，如：18题通过，2题有误已剔除" }
+Each drop item's "level" and "index" MUST exactly match the [L{level} #{index}] tag shown.`;
+
+async function verifyAndFilter(data, cefr) {
+  const levels = data.levels || {};
+  const items = [];
+  for (const lk of Object.keys(levels)) {
+    (levels[lk] || []).forEach((q, i) => {
+      const body = q.sentence || q.instruction || (Array.isArray(q.words) ? q.words.join(' ') : '') || '';
+      const opts = Array.isArray(q.options) ? ` 选项:[${q.options.join(' / ')}]` : '';
+      items.push(`[L${lk} #${i}] ${q.type} | ${body}${opts} | 答案: ${answerOf(q)}`);
+    });
+  }
+  if (!items.length) return { checked: 0, dropped: 0, summary: '本单元暂无练习题' };
+  const userText = `CEFR: ${cefr || '(unspecified)'}\nQUESTIONS:\n${items.join('\n')}`;
+  const res = await generateValidated(VERIFY_PROMPT, userText, (d) => {
+    if (!d || !Array.isArray(d.drop)) throw friendlyErr('校验返回格式有误');
+  });
+  const dropSet = new Set((res.drop || []).map((x) => `${x.level}#${x.index}`));
+  let dropped = 0;
+  for (const lk of Object.keys(levels)) {
+    levels[lk] = (levels[lk] || []).filter((q, i) => {
+      const kill = dropSet.has(`${lk}#${i}`);
+      if (kill) dropped++;
+      return !kill;
+    });
+  }
+  return { checked: items.length, dropped, summary: res.summary || `${items.length - dropped} 题通过，${dropped} 题剔除` };
+}
+
+// 生成一个单元的内容数据（不落库）。unitId 只用于提示词里的编号；cefr 供校验判难度。
+async function genUnitData(sylItem, material, unitId = 1, cefr = '') {
   const matBlock = material
     ? `\nReference material (align the questions' style and content to this):\n${String(material).slice(0, MATERIAL_CAP_UNIT)}`
     : '';
@@ -351,11 +395,18 @@ async function genUnitData(sylItem, material, unitId = 1) {
     `Sub-skills to use: ${(sylItem.skills || []).join(', ')}`,
     matBlock,
   ].join('\n');
-  return generateValidated(UNIT_PROMPT, userText, (d) => {
+  const data = await generateValidated(UNIT_PROMPT, userText, (d) => {
     if (!d || !d.discover || !d.levels) {
       throw friendlyErr('AI 返回的内容结构不完整，请重试');
     }
   });
+  // 独立校验 pass（best-effort：校验失败不影响单元本身）
+  try {
+    data._verify = await verifyAndFilter(data, cefr);
+  } catch (e) {
+    data._verify = { error: friendlyAiError(e) };
+  }
+  return data;
 }
 
 export async function generateUnitContent(unitId) {
@@ -366,14 +417,16 @@ export async function generateUnitContent(unitId) {
   const sylItem = curr.syllabus[unitId - 1];
   if (!sylItem) throw friendlyErr('单元不在大纲中');
 
-  const data = await genUnitData(sylItem, curr.material, unitId);
-  curriculum.saveUnitData(unitId, data);
+  const data = await genUnitData(sylItem, curr.material, unitId, curr.profile?.cefr || '');
+  // 校验报告只用于家长过目，不必落进关卡数据里。
+  const { _verify, ...clean } = data;
+  curriculum.saveUnitData(unitId, clean);
   return data;
 }
 
 // 试生成：在课程尚未创建时，先生成一个单元的真实内容给家长过目（不落库）。
-export async function generateUnitPreview(sylItem, material) {
-  return genUnitData(sylItem, material, 1);
+export async function generateUnitPreview(sylItem, material, cefr = '') {
+  return genUnitData(sylItem, material, 1, cefr);
 }
 
 // 语法覆盖核对：对照剑桥 EGP 中该 CEFR 等级应掌握的书面语法点，核对大纲是否覆盖、在第几单元、有无缺漏。
