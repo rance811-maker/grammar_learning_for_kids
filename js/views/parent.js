@@ -590,21 +590,21 @@ function renderSyllabusPreview(syllabus, profile, material = '') {
   const goal = (profile && profile.goal) || '';
 
   const items = syllabus.map((s, i) => `
-    <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #f0f0f0;">
-      <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;">
+    <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--color-border);">
+      <div style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:var(--color-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;">
         ${i + 1}
       </div>
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:600;font-size:0.95rem;">${esc(s.title)}</div>
-        <div style="font-size:0.8rem;color:var(--color-text-light);margin-top:2px;">${esc(s.description)}</div>
-        <div style="font-size:0.7rem;color:var(--color-muted);margin-top:4px;">
-          ${(s.skills || []).map(sk => `<span style="background:#f0f0f0;padding:1px 6px;border-radius:3px;margin-right:4px;">${esc(sk)}</span>`).join('')}
+        <div style="font-weight:600;font-size:0.95rem;overflow-wrap:anywhere;">${esc(s.title)}</div>
+        <div style="font-size:0.8rem;color:var(--color-text-light);margin-top:2px;line-height:1.5;overflow-wrap:anywhere;">${esc(s.description)}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">
+          ${(s.skills || []).map(sk => `<span style="font-size:0.68rem;color:var(--color-text-light);background:var(--color-bg);border:1px solid var(--color-border);padding:1px 6px;border-radius:4px;white-space:nowrap;">${esc(sk)}</span>`).join('')}
         </div>
       </div>
     </div>`).join('');
 
   area.innerHTML = `
-    <div style="margin-top:var(--space-lg);border:2px solid var(--color-primary);border-radius:var(--radius-lg);padding:var(--space-lg);">
+    <div style="margin-top:var(--space-lg);border:2px solid var(--color-primary);border-radius:var(--radius-lg);padding:var(--space-lg);background:var(--color-card);overflow:hidden;">
       <h3 style="margin:0 0 var(--space-md);font-size:1.1rem;">📋 课程大纲预览</h3>
       ${items}
 
