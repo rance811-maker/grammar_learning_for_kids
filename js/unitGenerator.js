@@ -92,7 +92,8 @@ QUALITY RULES (critical — follow all):
 - Do NOT invent coverage percentages or claim official exam status anywhere in the content.
 
 Return a single JSON object { "discover":{...}, "levels":{...}, "mission":{...} }.
-Return ONLY the JSON, no markdown code blocks, no other text.`;
+Return ONLY the JSON, no markdown code blocks, no other text.
+STRICT JSON: the whole output must be ONE valid JSON value. Inside every string, escape double quotes as \\" and never put a raw line break — keep each string on a single line (write the story as one continuous paragraph). Do not use smart/curly quotes ("" '') anywhere; use straight quotes only. No trailing commas.`;
 
 // 单次 AI 请求的超时上限。整套单元内容较大，给足时间但不至于无限挂起。
 const REQUEST_TIMEOUT_MS = 180000;
@@ -194,25 +195,46 @@ async function callAI(systemPrompt, userText) {
   return cand?.content?.parts?.[0]?.text || '';
 }
 
-// 解析 AI 返回的 JSON。先去掉代码块围栏；若仍失败，尝试抽取首个 {…} 或 […]
-// 片段（模型偶尔会在 JSON 前后多带一两句话）。
+// 对一个候选字符串做若干「修复」后尝试解析，任一成功即返回结果。
+// 常见问题：字符串里夹了原始换行/制表符(非法控制字符)、结尾多了逗号。
+function tryParseVariants(s) {
+  const variants = [
+    s,
+    // 把字符串内的原始控制字符(换行/制表符等)替换成空格 —— 这些在 JSON 里非法，
+    // 而模型写的小故事常带对话换行，是「格式有误」的头号元凶。
+    s.replace(/[\u0000-\u001F]/g, ' '),
+  ];
+  // 再对每个变体额外尝试「去掉对象/数组结尾多余的逗号」。
+  for (const v of variants.slice()) variants.push(v.replace(/,(\s*[}\]])/g, '$1'));
+  for (const v of variants) {
+    try { return { ok: true, data: JSON.parse(v) }; } catch { /* next */ }
+  }
+  return { ok: false };
+}
+
+// 解析 AI 返回的 JSON。依次尝试：整段 → 去围栏 → 抽取首个 {…}/[…]，
+// 每步都配合 tryParseVariants 的容错修复。全失败时把原始开头带进报错，便于排查。
 function parseJSON(raw) {
-  let text = String(raw).trim()
+  const stripped = String(raw).trim()
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/i, '');
-  try {
-    return JSON.parse(text);
-  } catch {
-    const arr = text.match(/\[[\s\S]*\]/);
-    const obj = text.match(/\{[\s\S]*\}/);
-    let cand = null;
-    if (arr && obj) cand = arr.index <= obj.index ? arr[0] : obj[0];
-    else cand = (arr && arr[0]) || (obj && obj[0]) || null;
-    if (cand) {
-      try { return JSON.parse(cand); } catch { /* fall through */ }
-    }
-    throw friendlyErr('AI 返回的内容格式有误，请重试');
+
+  const candidates = [stripped];
+  const arr = stripped.match(/\[[\s\S]*\]/);
+  const obj = stripped.match(/\{[\s\S]*\}/);
+  if (arr && obj) candidates.push(arr.index <= obj.index ? arr[0] : obj[0]);
+  else if (arr) candidates.push(arr[0]);
+  else if (obj) candidates.push(obj[0]);
+
+  for (const c of candidates) {
+    const r = tryParseVariants(c);
+    if (r.ok) return r.data;
   }
+
+  // 全部失败：把原始返回打到控制台 + 摘一小段放进报错，方便定位到底返回了什么。
+  try { console.error('[unitGenerator] 无法解析的 AI 返回：', raw); } catch { /* */ }
+  const snippet = String(raw).replace(/\s+/g, ' ').trim().slice(0, 80);
+  throw friendlyErr(`AI 返回的内容格式有误，请重试（返回开头：${snippet || '空'}）`);
 }
 
 // 调用 + 解析 + 校验，必要时自动重试一次。
