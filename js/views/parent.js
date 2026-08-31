@@ -3,7 +3,7 @@ import { cloud, friendlyError } from '../cloud.js';
 import * as courseEditor from './courseEditor.js';
 import { SUB_SKILL_NAMES } from '../data/skill-names.js';
 import { curriculum, BUILT_IN_ID } from '../curriculum.js';
-import { generateSyllabus, generateAllUnits, hasApiKey, friendlyAiError, buildMaterial, generateUnitPreview, generateCoverage } from '../unitGenerator.js';
+import { generateSyllabus, generateAllUnits, hasApiKey, friendlyAiError, buildMaterial, generateUnitPreview, generateCoverage, hasBlueprint, deterministicCoverage } from '../unitGenerator.js';
 
 // AI 服务配置（与 unitGenerator/courseEditor 共用的存储键）
 const AI_PROVIDER_KEY = 'gq-ai-provider';
@@ -680,31 +680,48 @@ function renderSyllabusPreview(syllabus, profile, material = '') {
   if (genArea) genArea.style.display = 'none';
 }
 
-// ① 考纲覆盖核对：自动调用 AI，把「这套大纲覆盖了目标考纲哪些考点、有无缺漏」明示给家长。
+// 把覆盖核对结果渲染进 host。deterministic=true 时标注为「逐条比对固定蓝图」。
+function renderCoverageBox(host, cov, cefr, deterministic) {
+  const points = cov.points || [];
+  const coveredN = points.filter(p => p.covered).length;
+  const rows = points.map(p => `
+    <div style="display:flex;gap:8px;align-items:baseline;padding:3px 0;">
+      <span>${p.covered ? '✅' : '❌'}</span>
+      <span style="flex:1;min-width:0;">${esc(p.point)}</span>
+      <span style="color:var(--color-muted);font-size:0.72rem;white-space:nowrap;">${p.covered ? ('第 ' + (p.unit || '?') + ' 单元') : '未覆盖'}</span>
+    </div>`).join('');
+  const gaps = (cov.gaps || []).length
+    ? `<div style="color:var(--color-danger);font-size:0.8rem;margin-top:8px;">⚠️ 待补齐：${cov.gaps.map(esc).join('、')}</div>`
+    : '';
+  const source = deterministic
+    ? `对照固定 ${esc(cefr || '')} 语法蓝图 · 逐条比对`
+    : `AI 对照 CEFR 语法点`;
+  host.innerHTML = `
+    <div style="border:1px solid var(--color-border);border-radius:10px;padding:14px;background:var(--color-bg);">
+      <div style="font-weight:700;margin-bottom:2px;">✅ 语法覆盖核对 · 覆盖 ${coveredN}/${points.length} 项</div>
+      <div style="font-size:0.7rem;color:var(--color-muted);margin-bottom:8px;">${source}</div>
+      <div style="font-size:0.82rem;color:var(--color-text-light);margin-bottom:8px;">${esc(cov.summary || '')}</div>
+      ${rows}
+      ${gaps}
+    </div>`;
+}
+
+// ① 语法覆盖核对：已知 CEFR 等级 → 对照内置蓝图做「确定性比对」（无需 AI）；
+// 自定义目标（无固定蓝图）→ 退回 AI 核对。
 async function runCoverageCheck(goal, cefr, syllabus) {
   const host = document.getElementById('currCoverage');
   if (!host) return;
-  host.innerHTML = `<div style="font-size:0.82rem;color:var(--color-secondary-dark);">🔎 正在对照该 CEFR 等级的语法蓝图核对覆盖…</div>`;
+
+  if (cefr && hasBlueprint(cefr)) {
+    const cov = deterministicCoverage(cefr, syllabus);
+    renderCoverageBox(host, cov, cefr, true);
+    return;
+  }
+
+  host.innerHTML = `<div style="font-size:0.82rem;color:var(--color-secondary-dark);">🔎 正在对照 CEFR 语法点核对覆盖…</div>`;
   try {
     const cov = await generateCoverage(goal, cefr, syllabus);
-    const points = cov.points || [];
-    const coveredN = points.filter(p => p.covered).length;
-    const rows = points.map(p => `
-      <div style="display:flex;gap:8px;align-items:baseline;padding:3px 0;">
-        <span>${p.covered ? '✅' : '❌'}</span>
-        <span style="flex:1;min-width:0;">${esc(p.point)}</span>
-        <span style="color:var(--color-muted);font-size:0.72rem;white-space:nowrap;">${p.covered ? ('第 ' + (p.unit || '?') + ' 单元') : '未覆盖'}</span>
-      </div>`).join('');
-    const gaps = (cov.gaps || []).length
-      ? `<div style="color:var(--color-danger);font-size:0.8rem;margin-top:8px;">⚠️ 可能缺漏：${cov.gaps.map(esc).join('、')}</div>`
-      : '';
-    host.innerHTML = `
-      <div style="border:1px solid var(--color-border);border-radius:10px;padding:14px;background:var(--color-bg);">
-        <div style="font-weight:700;margin-bottom:4px;">✅ 语法覆盖核对 · 覆盖 ${coveredN}/${points.length} 项（对照 CEFR 蓝图）</div>
-        <div style="font-size:0.82rem;color:var(--color-text-light);margin-bottom:8px;">${esc(cov.summary || '')}</div>
-        ${rows}
-        ${gaps}
-      </div>`;
+    renderCoverageBox(host, cov, cefr, false);
   } catch (e) {
     host.innerHTML = `<div style="font-size:0.8rem;color:var(--color-danger);">覆盖核对失败：${esc(friendlyAiError(e))} <button class="btn btn--tiny btn--outline" id="covRetry">重试</button></div>`;
     document.getElementById('covRetry')?.addEventListener('click', () => runCoverageCheck(goal, cefr, syllabus));

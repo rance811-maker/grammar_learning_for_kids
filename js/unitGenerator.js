@@ -397,6 +397,93 @@ export async function generateCoverage(goal, cefr, syllabus) {
   });
 }
 
+// ---- 内置 CEFR 语法蓝图（EGP 派生的教学蓝图，用于确定性覆盖比对，不再让 AI 自评）----
+// 每个语法点带一组匹配关键词（中文语法术语 / 英文短语 / snake_case），
+// 只要某单元的「标题+描述+skills」包含任一关键词即判为已覆盖。
+const EGP_BLUEPRINT = {
+  A2: [
+    { point: '一般现在时（三单 -s）', keys: ['一般现在', 'present simple', 'present_simple', '第三人称', 'third_person'] },
+    { point: '现在进行时', keys: ['现在进行', 'present continuous', 'present_continuous'] },
+    { point: '一般过去时', keys: ['一般过去', 'past simple', 'past_simple', '过去式'] },
+    { point: '过去进行时', keys: ['过去进行', 'past continuous', 'past_continuous'] },
+    { point: '将来：will / be going to', keys: ['一般将来', '将来时', 'going to', 'be_going_to', 'future simple'] },
+    { point: '基础情态（can/must/should）', keys: ['情态', 'modal', '情态动词'] },
+    { point: '可数不可数与量词', keys: ['可数', '不可数', 'countable', 'uncountable', 'quantifier', '量词'] },
+    { point: '冠词 a/an/the', keys: ['冠词', 'article'] },
+    { point: '比较级与最高级', keys: ['比较级', '最高级', 'comparative', 'superlative'] },
+    { point: '形容词与副词', keys: ['形容词', '副词', 'adjective', 'adverb'] },
+    { point: '常见介词（in/on/at）', keys: ['介词', 'preposition'] },
+    { point: '基础连词（and/but/because/so）', keys: ['连词', '连接词', 'conjunction'] },
+  ],
+  B1: [
+    { point: '现在完成时', keys: ['现在完成', 'present perfect', 'present_perfect'] },
+    { point: '过去完成时', keys: ['过去完成', 'past perfect', 'past_perfect'] },
+    { point: '将来表达对比', keys: ['将来', 'future forms', 'future_forms', '将来时'] },
+    { point: '第一条件句', keys: ['第一条件', 'first conditional', '条件句', 'conditional'] },
+    { point: '第二条件句', keys: ['第二条件', 'second conditional', 'second_conditional'] },
+    { point: '情态（可能性/义务）', keys: ['情态', 'modal', 'have to', 'might'] },
+    { point: '被动语态（现在/过去）', keys: ['被动', 'passive', 'passive_voice'] },
+    { point: '定语从句', keys: ['定语从句', 'relative clause', 'relative_clause', '关系从句'] },
+    { point: '动名词与不定式', keys: ['动名词', '不定式', 'gerund', 'infinitive'] },
+    { point: '间接引语（转述）', keys: ['间接引语', '转述', 'reported speech', 'reported_speech'] },
+    { point: '比较结构（as...as/too/enough）', keys: ['比较结构', 'as...as', '程度'] },
+    { point: '让步与对比连接', keys: ['让步', '连接词', 'although', 'however', '对比'] },
+  ],
+  B2: [
+    { point: '现在与过去时态（含 used to/would）', keys: ['时态', 'used to', 'tenses', '过去习惯', '一般现在', '一般过去', 'present simple', 'past simple', 'present_simple', 'past_simple'] },
+    { point: '完成时与叙事时态', keys: ['完成时', 'perfect', '叙事', 'narrative'] },
+    { point: '将来表达（含将来完成/进行）', keys: ['将来', 'future', '将来完成', 'future perfect'] },
+    { point: '情态动词（全范围+完成式）', keys: ['情态', 'modal', '情态完成'] },
+    { point: '被动语态与使役', keys: ['被动', 'passive', '使役', 'causative', 'have something done'] },
+    { point: '条件句与非真实表达（wish/if only）', keys: ['条件句', 'conditional', 'wish', 'if only', '虚拟'] },
+    { point: '间接引语与转述动词', keys: ['间接引语', '转述', 'reported speech', 'reporting verbs'] },
+    { point: '定语从句与分词结构', keys: ['定语从句', 'relative clause', '分词', 'participle'] },
+    { point: '动名词与不定式', keys: ['动名词', '不定式', 'gerund', 'infinitive'] },
+    { point: '名词短语（冠词/量词/一致）', keys: ['名词短语', '冠词', '量词', '主谓一致', 'noun phrase', 'agreement'] },
+    { point: '句子准确性与修饰（比较/语序/连接）', keys: ['比较', '语序', '连接', '修饰', 'word order'] },
+    { point: 'Use of English 综合（构词/关键词转换）', keys: ['use of english', '构词', '关键词转换', 'word formation', 'key word', '转换'] },
+  ],
+  C1: [
+    { point: '高级倒装', keys: ['倒装', 'inversion'] },
+    { point: '强调与信息结构（cleft/fronting）', keys: ['强调句', 'cleft', 'fronting', '强调'] },
+    { point: '复杂条件/虚拟', keys: ['虚拟', '复杂条件', 'were to', 'conditional'] },
+    { point: '复杂被动/非人称结构', keys: ['被动', 'impersonal', '非人称'] },
+    { point: '高级分词/独立主格', keys: ['分词', '独立主格', 'participle', 'absolute'] },
+    { point: '语篇衔接（指代/替代）', keys: ['衔接', 'cohesion', 'referencing', 'substitution', '指代'] },
+    { point: '名词化学术句式', keys: ['名词化', 'nominal', '学术句式'] },
+    { point: 'hedging 情态（tend to / be likely to）', keys: ['hedging', 'tend to', 'be likely to', '委婉', '推测'] },
+    { point: '嵌套关系从句', keys: ['关系从句', 'relative', '嵌套'] },
+    { point: '叙述/假设时态细微用法', keys: ['叙述时态', '假设', 'narrative tense'] },
+    { point: '抽象名词的冠词用法', keys: ['抽象名词', '冠词', 'article'] },
+    { point: '复杂句标点与准确性', keys: ['标点', 'punctuation', '复杂句', '准确性'] },
+  ],
+};
+
+export function hasBlueprint(cefr) { return !!EGP_BLUEPRINT[cefr]; }
+
+// 确定性覆盖比对：对照固定蓝图逐条检查大纲是否覆盖，无需 AI。
+export function deterministicCoverage(cefr, syllabus) {
+  const pts = EGP_BLUEPRINT[cefr] || [];
+  const units = (syllabus || []).map((s, i) => ({
+    idx: i + 1,
+    text: `${s.title || ''} ${s.description || ''} ${(s.skills || []).join(' ')}`.toLowerCase(),
+  }));
+  const points = pts.map((p) => {
+    const keys = p.keys.map((k) => k.toLowerCase());
+    let unit = null;
+    for (const u of units) {
+      if (keys.some((k) => u.text.includes(k))) { unit = u.idx; break; }
+    }
+    return { point: p.point, covered: unit != null, unit };
+  });
+  const gaps = points.filter((p) => !p.covered).map((p) => p.point);
+  const coveredN = points.length - gaps.length;
+  const summary = gaps.length === 0
+    ? `已覆盖 ${cefr} 蓝图全部 ${points.length} 项核心语法点。`
+    : `覆盖 ${coveredN}/${points.length} 项，${gaps.length} 项待补齐（见下）。`;
+  return { points, gaps, summary, cefr };
+}
+
 // 批量生成当前课程体系中尚未生成的全部单元。
 // - onProgress(results, uid, kind) 在每个单元处理后回调，kind ∈ 'ok'|'skip'|'fail'
 // - 单个单元失败不会中断整体，错误收集在 results.failed 里
