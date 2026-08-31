@@ -3,7 +3,7 @@ import { cloud, friendlyError } from '../cloud.js';
 import * as courseEditor from './courseEditor.js';
 import { SUB_SKILL_NAMES } from '../data/skill-names.js';
 import { curriculum, BUILT_IN_ID } from '../curriculum.js';
-import { generateSyllabus, generateAllUnits, hasApiKey, friendlyAiError, buildMaterial } from '../unitGenerator.js';
+import { generateSyllabus, generateAllUnits, hasApiKey, friendlyAiError, buildMaterial, generateUnitPreview, generateCoverage } from '../unitGenerator.js';
 
 // AI 服务配置（与 unitGenerator/courseEditor 共用的存储键）
 const AI_PROVIDER_KEY = 'gq-ai-provider';
@@ -607,11 +607,27 @@ function renderSyllabusPreview(syllabus, profile, material = '') {
     <div style="margin-top:var(--space-lg);border:2px solid var(--color-primary);border-radius:var(--radius-lg);padding:var(--space-lg);">
       <h3 style="margin:0 0 var(--space-md);font-size:1.1rem;">📋 课程大纲预览</h3>
       ${items}
+
+      <div style="margin-top:var(--space-lg);padding-top:var(--space-md);border-top:1px dashed var(--color-border);">
+        <div style="font-weight:700;margin-bottom:4px;">🧐 先核实一下，再决定</div>
+        <p style="font-size:0.78rem;color:var(--color-text-light);margin:0 0 12px;line-height:1.5;">
+          创建前，帮你确认这套课程靠不靠谱：① 对照目标考纲看覆盖是否到位；② 可试生成第 1 单元、亲眼看看题目质量。
+        </p>
+        <div id="currCoverage"></div>
+        <button class="btn btn--outline btn--block" id="currTrialBtn" style="margin-top:12px;">🔍 试生成第 1 单元，看看真实题目</button>
+        <div id="currTrialArea" style="margin-top:10px;"></div>
+      </div>
+
       <div style="margin-top:var(--space-lg);display:flex;gap:var(--space-md);">
         <button class="btn btn--primary" id="currConfirmBtn" style="flex:1;">✅ 确认并创建课程</button>
         <button class="btn btn--outline" id="currRegenBtn">🔄 重新生成</button>
       </div>
     </div>`;
+
+  // ① 考纲覆盖核对 —— 自动跑一次，把「是否覆盖到位」明示给家长
+  runCoverageCheck(goal, syllabus);
+  // ② 试生成第 1 单元
+  document.getElementById('currTrialBtn')?.addEventListener('click', () => runTrialUnit(syllabus[0], material));
 
   document.getElementById('currConfirmBtn')?.addEventListener('click', () => {
     const title = document.getElementById('currTitleInput')?.value.trim() || goal || '我的课程';
@@ -645,6 +661,87 @@ function renderSyllabusPreview(syllabus, profile, material = '') {
   // Hide the original generate button
   const genArea = document.getElementById('currGenArea');
   if (genArea) genArea.style.display = 'none';
+}
+
+// ① 考纲覆盖核对：自动调用 AI，把「这套大纲覆盖了目标考纲哪些考点、有无缺漏」明示给家长。
+async function runCoverageCheck(goal, syllabus) {
+  const host = document.getElementById('currCoverage');
+  if (!host) return;
+  host.innerHTML = `<div style="font-size:0.82rem;color:var(--color-secondary-dark);">🔎 正在对照目标考纲核对覆盖…</div>`;
+  try {
+    const cov = await generateCoverage(goal, syllabus);
+    const points = cov.points || [];
+    const coveredN = points.filter(p => p.covered).length;
+    const rows = points.map(p => `
+      <div style="display:flex;gap:8px;align-items:baseline;padding:3px 0;">
+        <span>${p.covered ? '✅' : '❌'}</span>
+        <span style="flex:1;min-width:0;">${esc(p.point)}</span>
+        <span style="color:var(--color-muted);font-size:0.72rem;white-space:nowrap;">${p.covered ? ('第 ' + (p.unit || '?') + ' 单元') : '未覆盖'}</span>
+      </div>`).join('');
+    const gaps = (cov.gaps || []).length
+      ? `<div style="color:var(--color-danger);font-size:0.8rem;margin-top:8px;">⚠️ 可能缺漏：${cov.gaps.map(esc).join('、')}</div>`
+      : '';
+    host.innerHTML = `
+      <div style="border:1px solid var(--color-border);border-radius:10px;padding:14px;background:var(--color-bg);">
+        <div style="font-weight:700;margin-bottom:4px;">✅ 考纲覆盖核对 · 覆盖 ${coveredN}/${points.length} 项考点</div>
+        <div style="font-size:0.82rem;color:var(--color-text-light);margin-bottom:8px;">${esc(cov.summary || '')}</div>
+        ${rows}
+        ${gaps}
+      </div>`;
+  } catch (e) {
+    host.innerHTML = `<div style="font-size:0.8rem;color:var(--color-danger);">覆盖核对失败：${esc(friendlyAiError(e))} <button class="btn btn--tiny btn--outline" id="covRetry">重试</button></div>`;
+    document.getElementById('covRetry')?.addEventListener('click', () => runCoverageCheck(goal, syllabus));
+  }
+}
+
+// 把一道题渲染成简短可读的一行（供试生成预览）。
+function briefQuestion(q) {
+  const typeName = { choice: '选择', fill: '填空', reorder: '排序', error: '纠错', match: '配对', scenario: '情景' }[q.type] || q.type;
+  let body = q.sentence || q.instruction || (Array.isArray(q.words) ? q.words.join(' ') : '') || '';
+  let ans = '';
+  if (q.type === 'choice' || q.type === 'scenario') {
+    if (Array.isArray(q.options)) body += `　【${q.options.join(' / ')}】`;
+    ans = (q.options || [])[q.correctIndex] || '';
+  } else if (q.type === 'fill') {
+    ans = (q.acceptableAnswers && q.acceptableAnswers.length ? q.acceptableAnswers : [q.answer || q.correctAnswer]).filter(Boolean).join(' / ');
+  } else if (q.type === 'reorder') {
+    ans = q.correctSentence || '';
+  } else if (q.type === 'error') {
+    ans = q.correction || '';
+  }
+  return `<div style="padding:6px 0;border-top:1px dashed var(--color-border);font-size:0.82rem;line-height:1.5;">
+    <span style="color:var(--color-secondary);font-weight:600;">[${typeName}]</span> ${esc(body)}
+    ${ans ? `<div style="color:var(--color-primary-dark);font-size:0.76rem;margin-top:2px;">答案：${esc(ans)}</div>` : ''}
+  </div>`;
+}
+
+// ② 试生成第 1 单元：真实生成一个单元的内容（不落库），把真题摆给家长看。
+async function runTrialUnit(sylItem, material) {
+  const btn = document.getElementById('currTrialBtn');
+  const host = document.getElementById('currTrialArea');
+  if (!sylItem || !host) return;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="ce-spinner" style="display:inline-block;width:14px;height:14px;margin-right:6px;vertical-align:middle;"></span> 正在试生成第 1 单元（约 20–90 秒）…'; }
+  try {
+    const data = await generateUnitPreview(sylItem, material);
+    const story = (data.discover && data.discover.story) || {};
+    const tip = (data.discover && data.discover.tip) || '';
+    const lv1 = (data.levels && (data.levels['1'] || data.levels[1])) || [];
+    const samples = lv1.slice(0, 3).map(briefQuestion).join('');
+    host.innerHTML = `
+      <div style="border:1px solid var(--color-border);border-radius:10px;padding:14px;background:var(--color-bg);">
+        <div style="font-weight:700;margin-bottom:6px;">📖 第 1 单元 · 试生成结果（仅预览，不影响课程）</div>
+        ${story.title ? `<div style="font-weight:600;font-size:0.9rem;">${esc(story.title)}</div>` : ''}
+        ${story.text ? `<div style="font-size:0.8rem;color:var(--color-text-light);margin:4px 0;line-height:1.5;">${esc(String(story.text).slice(0, 160))}…</div>` : ''}
+        ${tip ? `<div style="font-size:0.8rem;color:var(--color-secondary-dark);margin:4px 0;">💡 ${esc(tip)}</div>` : ''}
+        <div style="font-weight:600;font-size:0.82rem;margin-top:8px;">练习题样例：</div>
+        ${samples || '<div style="font-size:0.8rem;color:var(--color-muted);">（本单元第 1 关暂无题目样例）</div>'}
+        <div style="font-size:0.72rem;color:var(--color-muted);margin-top:8px;">题目质量满意就「确认并创建」；不满意可「重新生成」大纲。</div>
+      </div>`;
+    if (btn) { btn.style.display = 'none'; }
+  } catch (e) {
+    if (host) host.innerHTML = `<div style="font-size:0.8rem;color:var(--color-danger);">试生成失败：${esc(friendlyAiError(e))}</div>`;
+    if (btn) { btn.disabled = false; btn.innerHTML = '🔍 重试：试生成第 1 单元'; }
+  }
 }
 
 // 课程创建成功后：询问是否立即批量生成全部单元。

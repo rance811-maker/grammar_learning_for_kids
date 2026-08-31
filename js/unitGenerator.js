@@ -316,6 +316,24 @@ export async function generateSyllabus(goal, material = '') {
   }).then(s => s.slice(0, 12));
 }
 
+// 生成一个单元的内容数据（不落库）。unitId 只用于提示词里的编号。
+async function genUnitData(sylItem, material, unitId = 1) {
+  const matBlock = material
+    ? `\nReference material (align the questions' style and content to this):\n${String(material).slice(0, MATERIAL_CAP_UNIT)}`
+    : '';
+  const userText = [
+    `Unit ${unitId}: ${sylItem.title}`,
+    `Description: ${sylItem.description}`,
+    `Sub-skills to use: ${(sylItem.skills || []).join(', ')}`,
+    matBlock,
+  ].join('\n');
+  return generateValidated(UNIT_PROMPT, userText, (d) => {
+    if (!d || !d.discover || !d.levels) {
+      throw friendlyErr('AI 返回的内容结构不完整，请重试');
+    }
+  });
+}
+
 export async function generateUnitContent(unitId) {
   const id = store.state.activeCurriculumId;
   const curr = store.state.curricula?.[id];
@@ -324,24 +342,35 @@ export async function generateUnitContent(unitId) {
   const sylItem = curr.syllabus[unitId - 1];
   if (!sylItem) throw friendlyErr('单元不在大纲中');
 
-  const matBlock = curr.material
-    ? `\nReference material (align the questions' style and content to this):\n${String(curr.material).slice(0, MATERIAL_CAP_UNIT)}`
-    : '';
-  const userText = [
-    `Unit ${unitId}: ${sylItem.title}`,
-    `Description: ${sylItem.description}`,
-    `Sub-skills to use: ${(sylItem.skills || []).join(', ')}`,
-    matBlock,
-  ].join('\n');
-
-  const data = await generateValidated(UNIT_PROMPT, userText, (d) => {
-    if (!d || !d.discover || !d.levels) {
-      throw friendlyErr('AI 返回的内容结构不完整，请重试');
-    }
-  });
-
+  const data = await genUnitData(sylItem, curr.material, unitId);
   curriculum.saveUnitData(unitId, data);
   return data;
+}
+
+// 试生成：在课程尚未创建时，先生成一个单元的真实内容给家长过目（不落库）。
+export async function generateUnitPreview(sylItem, material) {
+  return genUnitData(sylItem, material, 1);
+}
+
+// 考纲覆盖核对：对照目标标准，列出核心考点并标注这套大纲是否覆盖、在第几单元、有无缺漏。
+const COVERAGE_PROMPT = `You are an English curriculum auditor for Chinese parents. Given a learning GOAL (an exam/standard/textbook) and a 12-unit SYLLABUS, do two things:
+1. List the 8-12 CORE knowledge/skill points that the goal's standard actually requires (grammar/skills; concise Chinese names).
+2. For each point, judge whether the syllabus covers it, and in which unit number.
+Then note any obvious GAPS (required points not covered) and give a one-sentence Chinese summary.
+
+Return ONLY this JSON (no markdown):
+{ "points": [ { "point": "中文考点名", "covered": true, "unit": 3 } ], "gaps": ["中文缺漏项"], "summary": "中文一句话总评" }`;
+
+export async function generateCoverage(goal, syllabus) {
+  const sylText = (syllabus || []).map((s, i) =>
+    `${i + 1}. ${s.title}｜${s.description}｜skills: ${(s.skills || []).join(',')}`
+  ).join('\n');
+  const userText = `GOAL: ${goal || '(未指定，请据大纲推断目标标准)'}\n\nSYLLABUS:\n${sylText}`;
+  return generateValidated(COVERAGE_PROMPT, userText, (d) => {
+    if (!d || !Array.isArray(d.points)) {
+      throw friendlyErr('AI 返回的覆盖核对结构不完整，请重试');
+    }
+  });
 }
 
 // 批量生成当前课程体系中尚未生成的全部单元。
