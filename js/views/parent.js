@@ -271,14 +271,14 @@ async function loadAndRender(sub, param) {
 
 // 目标 → CEFR 等级映射（剑桥体系）。自定义目标无固定等级。
 const GOAL_CEFR = {
-  '剑桥通用五级 KET（A2）': 'A2',
-  '剑桥通用五级 PET（B1）': 'B1',
-  '剑桥通用五级 FCE（B2）': 'B2',
-  '雅思 5.0（B1）': 'B1',
-  '雅思 5.5（B2）': 'B2',
-  '雅思 6.0（B2）': 'B2',
-  '雅思 6.5（B2）': 'B2',
-  '雅思 7.0（C1）': 'C1',
+  '剑桥 KET 语法（CEFR A2）': 'A2',
+  '剑桥 PET 语法（CEFR B1）': 'B1',
+  '剑桥 B2 First 语法与 Use of English（CEFR B2）': 'B2',
+  '雅思 5.0 语法（CEFR B1）': 'B1',
+  '雅思 5.5 语法（CEFR B2）': 'B2',
+  '雅思 6.0 语法（CEFR B2）': 'B2',
+  '雅思 6.5 语法（CEFR B2）': 'B2',
+  '雅思 7.0 语法（CEFR C1）': 'C1',
 };
 
 function selectField(id, label, options, placeholder) {
@@ -300,7 +300,8 @@ function renderCurriculumCreator() {
       <div style="background:var(--color-bg);border:1px solid var(--color-border);border-left:3px solid var(--color-secondary);border-radius:8px;padding:12px 14px;margin-bottom:var(--space-lg);">
         <div style="font-weight:700;font-size:0.9rem;margin-bottom:2px;">📝 专注书面语法准确性</div>
         <p style="font-size:0.78rem;color:var(--color-text-light);margin:0;line-height:1.55;">
-          本工具专攻<strong>书面语法</strong>（服务写作与阅读），对标<strong>剑桥语法体系（English Grammar Profile · 按 CEFR 分级）</strong>。<strong>不训练听力与口语</strong>——那需要另外的方法。
+          本工具专攻<strong>书面语法</strong>（服务写作与阅读），按 <strong>CEFR 等级</strong>对标语法能力（参考剑桥 English Grammar Profile）。<strong>不训练听力与口语</strong>。<br>
+          <span style="color:var(--color-muted);">说明：这是语法教学蓝图，非某场考试的官方考纲——剑桥并未公布固定语法清单。</span>
         </p>
       </div>
 
@@ -313,22 +314,22 @@ function renderCurriculumCreator() {
         <label>2. 目标：对标哪个剑桥等级？<span style="color:var(--color-danger);">（必填）</span></label>
         <select id="currGoalSelect">
           <option value="">请选择一个明确目标…</option>
-          <optgroup label="剑桥通用五级">
-            <option value="剑桥通用五级 KET（A2）">剑桥 KET（A2 · 初级）</option>
-            <option value="剑桥通用五级 PET（B1）">剑桥 PET（B1 · 中级）</option>
-            <option value="剑桥通用五级 FCE（B2）">剑桥 FCE（B2 · 中高级）</option>
+          <optgroup label="剑桥通用五级 · 语法专项">
+            <option value="剑桥 KET 语法（CEFR A2）">剑桥 KET · A2 语法</option>
+            <option value="剑桥 PET 语法（CEFR B1）">剑桥 PET · B1 语法</option>
+            <option value="剑桥 B2 First 语法与 Use of English（CEFR B2）">剑桥 B2 First（原 FCE）· B2 语法</option>
           </optgroup>
-          <optgroup label="雅思（语法按 CEFR 对应）">
-            <option value="雅思 5.0（B1）">雅思 5.0（≈ B1）</option>
-            <option value="雅思 5.5（B2）">雅思 5.5（≈ B2）</option>
-            <option value="雅思 6.0（B2）">雅思 6.0（≈ B2）</option>
-            <option value="雅思 6.5（B2）">雅思 6.5（≈ B2）</option>
-            <option value="雅思 7.0（C1）">雅思 7.0（≈ C1）</option>
+          <optgroup label="雅思 · 语法专项（按 CEFR 对应）">
+            <option value="雅思 5.0 语法（CEFR B1）">雅思 5.0 语法（≈ B1）</option>
+            <option value="雅思 5.5 语法（CEFR B2）">雅思 5.5 语法（≈ B2）</option>
+            <option value="雅思 6.0 语法（CEFR B2）">雅思 6.0 语法（≈ B2）</option>
+            <option value="雅思 6.5 语法（CEFR B2）">雅思 6.5 语法（≈ B2）</option>
+            <option value="雅思 7.0 语法（CEFR C1）">雅思 7.0 语法（≈ C1）</option>
           </optgroup>
           <option value="__custom__">其他（自定义语法目标）…</option>
         </select>
         <input type="text" id="currGoalCustom" placeholder="自定义语法目标，如：初中语法总复习 / 时态专项" style="display:none;margin-top:8px;">
-        <p style="font-size:0.72rem;color:var(--color-muted);margin:6px 0 0;">对标剑桥等级，AI 就按该等级的语法考点（EGP）生成，也方便你核对覆盖是否到位。</p>
+        <p style="font-size:0.72rem;color:var(--color-muted);margin:6px 0 0;">对标 CEFR 等级，AI 就按该等级应掌握的书面语法点生成，也方便你核对覆盖是否到位。</p>
       </div>
 
       <div class="parent-field">
@@ -622,7 +623,7 @@ function renderSyllabusPreview(syllabus, profile, material = '') {
       <div style="margin-top:var(--space-lg);padding-top:var(--space-md);border-top:1px dashed var(--color-border);">
         <div style="font-weight:700;margin-bottom:4px;">🧐 先核实一下，再决定</div>
         <p style="font-size:0.78rem;color:var(--color-text-light);margin:0 0 12px;line-height:1.5;">
-          创建前，帮你确认这套课程靠不靠谱：① 对照目标考纲看覆盖是否到位；② 可试生成第 1 单元、亲眼看看题目质量。
+          创建前，帮你确认这套课程靠不靠谱：① 对照该 CEFR 等级的语法蓝图看覆盖是否到位；② 可试生成第 1 单元、亲眼看看题目质量。
         </p>
         <div id="currCoverage"></div>
         <button class="btn btn--outline btn--block" id="currTrialBtn" style="margin-top:12px;">🔍 试生成第 1 单元，看看真实题目</button>
@@ -678,7 +679,7 @@ function renderSyllabusPreview(syllabus, profile, material = '') {
 async function runCoverageCheck(goal, cefr, syllabus) {
   const host = document.getElementById('currCoverage');
   if (!host) return;
-  host.innerHTML = `<div style="font-size:0.82rem;color:var(--color-secondary-dark);">🔎 正在对照剑桥语法考点（EGP）核对覆盖…</div>`;
+  host.innerHTML = `<div style="font-size:0.82rem;color:var(--color-secondary-dark);">🔎 正在对照该 CEFR 等级的语法蓝图核对覆盖…</div>`;
   try {
     const cov = await generateCoverage(goal, cefr, syllabus);
     const points = cov.points || [];
@@ -694,7 +695,7 @@ async function runCoverageCheck(goal, cefr, syllabus) {
       : '';
     host.innerHTML = `
       <div style="border:1px solid var(--color-border);border-radius:10px;padding:14px;background:var(--color-bg);">
-        <div style="font-weight:700;margin-bottom:4px;">✅ 考纲覆盖核对 · 覆盖 ${coveredN}/${points.length} 项考点</div>
+        <div style="font-weight:700;margin-bottom:4px;">✅ 语法覆盖核对 · 覆盖 ${coveredN}/${points.length} 项（对照 CEFR 蓝图）</div>
         <div style="font-size:0.82rem;color:var(--color-text-light);margin-bottom:8px;">${esc(cov.summary || '')}</div>
         ${rows}
         ${gaps}
