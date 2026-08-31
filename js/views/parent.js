@@ -269,27 +269,40 @@ async function loadAndRender(sub, param) {
 
 // --- Curriculum Creator ---
 
+function selectField(id, label, options, placeholder) {
+  const opts = [`<option value="">${placeholder || '请选择…'}</option>`]
+    .concat(options.map(o => `<option value="${esc(o)}">${esc(o)}</option>`))
+    .join('');
+  return `<div class="parent-field"><label>${label}</label><select id="${id}">${opts}</select></div>`;
+}
+
 function renderCurriculumCreator() {
   return `<div class="parent-card parent-card--wide" id="currCreator">
     <div class="parent-header">
       <button class="btn btn--small btn--outline" id="currBackBtn">← 返回</button>
-      <h2 style="margin:0;">🤖 AI 创建课程</h2>
+      <h2 style="margin:0;">🤖 创建孩子的专属课程</h2>
       <div></div>
     </div>
 
-    <div style="margin-top:var(--space-lg);">
-      <p style="font-size:var(--text-sm);color:var(--color-text-light);margin-bottom:var(--space-md);line-height:1.6;">
-        <strong>描述目标</strong>，或<strong>上传教材/考纲</strong>（PDF、拍照均可），AI 会自动设计一套完整 12 单元课程。<br>
-        创建后即可返回首页，像内置课程一样开始全体系学习。
+    <div class="curr-form" style="margin-top:var(--space-lg);">
+      <p style="font-size:var(--text-sm);color:var(--color-text-light);margin-bottom:var(--space-lg);line-height:1.6;">
+        回答几个问题，AI 会据此为孩子设计一套贴合的 12 单元课程。<br>
+        你的判断越具体，课程越对得上孩子——只有第 2 题是必填。
       </p>
 
-      <div class="parent-field">
-        <label>学习目标（描述你想练什么）</label>
-        <input type="text" id="currGoalInput" placeholder="例如：雅思 Band7 语法 / PET 语法训练 / 小学三年级同步">
+      <div class="curr-form-row">
+        ${selectField('currGrade', '1. 孩子几年级？', ['学龄前', '一年级', '二年级', '三年级', '四年级', '五年级', '六年级', '初中', '高中', '成人'])}
+        ${selectField('currLevel', '当前英语水平', ['零基础', '入门', '有一定基础', '中等', '较好'])}
       </div>
 
       <div class="parent-field">
-        <label>上传学习素材（可选）</label>
+        <label>2. 想练什么、达到什么结果？<span style="color:var(--color-danger);">（必填）</span></label>
+        <input type="text" id="currGoalInput" placeholder="例如：雅思 Band7 语法 / 通过剑桥 PET / 校内英语提分">
+      </div>
+      ${selectField('currTimeframe', '期望在多长时间内达到', ['1 个月', '3 个月', '半年', '1 年', '不限'])}
+
+      <div class="parent-field">
+        <label>3. 希望基于哪些教材 / 试卷 / 文章？（可选）</label>
         <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
           <button type="button" class="btn btn--small btn--outline" id="currPickFile">📁 选择文件</button>
           <button type="button" class="btn btn--small btn--outline" id="currPickCam">📷 拍照上传</button>
@@ -301,7 +314,17 @@ function renderCurriculumCreator() {
       </div>
 
       <div class="parent-field">
-        <label>课程名称（选填）</label>
+        <label>4. 孩子目前最明显的困难是什么？（可选，但很有用）</label>
+        <textarea id="currDifficulty" rows="2" placeholder="例如：时态总搞混 / 不会写完整句子 / 词汇量小 / 一到阅读就失分 / 会做但很慢"></textarea>
+      </div>
+
+      <div class="curr-form-row">
+        ${selectField('currDaily', '5. 每天可投入多少时间？', ['10 分钟', '20 分钟', '30 分钟', '1 小时以上'])}
+        ${selectField('currInvolvement', '6. 你希望自己参与到什么程度？', ['我陪着一起学', '每天检查+看报告', '偶尔看看报告', '全交给孩子自主'])}
+      </div>
+
+      <div class="parent-field">
+        <label>课程名称（选填，默认用学习目标）</label>
         <input type="text" id="currTitleInput" placeholder="例如：雅思 Band7 冲刺">
       </div>
 
@@ -383,10 +406,20 @@ function mountCurriculumCreator() {
   if (!genBtn) return;
 
   genBtn.addEventListener('click', async () => {
-    const goal = document.getElementById('currGoalInput')?.value.trim() || '';
+    const val = (id) => document.getElementById(id)?.value.trim() || '';
+    const profile = {
+      grade: val('currGrade'),
+      level: val('currLevel'),
+      goal: val('currGoalInput'),
+      timeframe: val('currTimeframe'),
+      difficulty: val('currDifficulty'),
+      dailyMinutes: val('currDaily'),
+      involvement: val('currInvolvement'),
+    };
     const msg = document.getElementById('currMsg');
-    if (!goal && currFiles.length === 0) {
-      if (msg) msg.innerHTML = '<p style="color:var(--color-danger);font-size:var(--text-sm);">请填写学习目标，或上传素材</p>';
+    if (!profile.goal && currFiles.length === 0) {
+      if (msg) msg.innerHTML = '<p style="color:var(--color-danger);font-size:var(--text-sm);">请填写第 2 题「想练什么」，或上传素材</p>';
+      document.getElementById('currGoalInput')?.focus();
       return;
     }
     if (!hasApiKey()) {
@@ -406,10 +439,11 @@ function mountCurriculumCreator() {
         material = await buildMaterial({ files: currFiles, onStatus: setMsg });
       }
       stopTicker = startTicker(msg, SYLLABUS_GEN_STEPS);
-      const syllabus = await generateSyllabus(goal, material);
+      const enrichedGoal = buildGoalFromProfile(profile);
+      const syllabus = await generateSyllabus(enrichedGoal, material);
       stopTicker();
       if (msg) msg.innerHTML = '';
-      renderSyllabusPreview(syllabus, goal, material);
+      renderSyllabusPreview(syllabus, profile, material);
     } catch (e) {
       stopTicker();
       genBtn.disabled = false;
@@ -417,6 +451,21 @@ function mountCurriculumCreator() {
       if (msg) msg.innerHTML = `<p style="color:var(--color-danger);font-size:var(--text-sm);">生成失败：${esc(friendlyAiError(e))}</p>`;
     }
   });
+}
+
+// 把结构化档案拼成一段给 AI 的目标描述，让它据此校准难度/深度/节奏。
+function buildGoalFromProfile(pf) {
+  const parts = [];
+  if (pf.goal) parts.push(`学习目标：${pf.goal}`);
+  const who = [pf.grade, pf.level].filter(Boolean).join('，');
+  if (who) parts.push(`孩子情况：${who}`);
+  if (pf.timeframe) parts.push(`期望时限：${pf.timeframe}`);
+  if (pf.difficulty) parts.push(`目前主要困难：${pf.difficulty}`);
+  if (pf.dailyMinutes) parts.push(`每天可投入：${pf.dailyMinutes}`);
+  const head = parts.join('；');
+  return (head ? head + '。' : '')
+    + '请据此设计难度、深度与节奏都合适的 12 单元课程大纲；'
+    + '若填写了「目前主要困难」，请在前几个单元优先覆盖这些薄弱点。';
 }
 
 // 在元素里轮播一组提示文字，等待时给出"正在进行"的反馈。返回停止函数。
@@ -502,9 +551,10 @@ function goHome() {
   window.dispatchEvent(new HashChangeEvent('hashchange'));
 }
 
-function renderSyllabusPreview(syllabus, goal, material = '') {
+function renderSyllabusPreview(syllabus, profile, material = '') {
   const area = document.getElementById('currSyllabusArea');
   if (!area) return;
+  const goal = (profile && profile.goal) || '';
 
   const items = syllabus.map((s, i) => `
     <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #f0f0f0;">
@@ -532,8 +582,19 @@ function renderSyllabusPreview(syllabus, goal, material = '') {
 
   document.getElementById('currConfirmBtn')?.addEventListener('click', () => {
     const title = document.getElementById('currTitleInput')?.value.trim() || goal || '我的课程';
+    const descParts = [goal || '（据上传素材生成）'];
+    if (profile && (profile.grade || profile.level)) {
+      descParts.push([profile.grade, profile.level].filter(Boolean).join('·'));
+    }
     const id = 'curr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    store.addCurriculum(id, { title, description: goal || '（据上传素材生成）', goal, material, syllabus });
+    store.addCurriculum(id, {
+      title,
+      description: descParts.filter(Boolean).join(' · '),
+      goal,
+      material,
+      profile: profile || null,
+      syllabus,
+    });
     store.switchCurriculum(id);
     showPostCreate(title);
   });
