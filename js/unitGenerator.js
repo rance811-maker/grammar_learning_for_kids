@@ -28,9 +28,14 @@ function getAiKey() {
 
 export function hasApiKey() { return !!getAiKey(); }
 
-const SYLLABUS_PROMPT = `You are an English language education expert designing curricula for Chinese learners of English. Match the level and scope to the learning goal (e.g. elementary grammar, PET/KET, or IELTS Band 7) — do NOT force an elementary level if the goal implies otherwise.
+const SYLLABUS_PROMPT = `You are an English GRAMMAR curriculum designer for Chinese learners.
 
-Based on the learning goal, create a 12-unit curriculum syllabus. Units progress from basic to advanced within the topic scope. If reference material is provided below, derive the 12 units, their order, and their sub-skills FROM the grammar system in that material.
+SCOPE — read carefully:
+- This product trains WRITTEN GRAMMAR ACCURACY ONLY (grammar as used in writing and reading). Do NOT design listening or speaking practice.
+- Anchor the grammar SCOPE strictly to the target CEFR level and the Cambridge English Grammar Profile (EGP) grammar points for that level. Only include grammar structures a learner AT that CEFR level is expected to master. Do NOT include structures from a higher CEFR level.
+- Every unit's topic must be a GRAMMAR structure/skill (tenses, clauses, conditionals, articles, etc.), not vocabulary, listening, or speaking.
+
+Based on the learning goal and its CEFR level, create a 12-unit grammar syllabus, ordered from foundational to advanced WITHIN that level. If reference material is provided below, derive the units FROM the grammar system in that material (still within the CEFR level).
 
 Return a JSON array of exactly 12 objects:
 - "title": Grammar/skill topic in English (e.g. "Present Simple Tense")
@@ -39,7 +44,8 @@ Return a JSON array of exactly 12 objects:
 
 Return ONLY the JSON array, no markdown code blocks, no other text.`;
 
-const UNIT_PROMPT = `You are an English language education expert. Generate practice content for one unit of a curriculum for Chinese learners of English. Match the difficulty to the unit topic and the reference material (which may be elementary, PET/KET, or IELTS Band 7 level).
+const UNIT_PROMPT = `You are an English GRAMMAR practice designer for Chinese learners. Generate content for ONE grammar unit.
+SCOPE: WRITTEN grammar accuracy only (writing/reading) — no listening/speaking tasks. Keep the grammar difficulty at the unit's stated CEFR level (per the Cambridge English Grammar Profile); do not exceed it.
 
 Generate the following for the given unit topic:
 
@@ -352,20 +358,20 @@ export async function generateUnitPreview(sylItem, material) {
   return genUnitData(sylItem, material, 1);
 }
 
-// 考纲覆盖核对：对照目标标准，列出核心考点并标注这套大纲是否覆盖、在第几单元、有无缺漏。
-const COVERAGE_PROMPT = `You are an English curriculum auditor for Chinese parents. Given a learning GOAL (an exam/standard/textbook) and a 12-unit SYLLABUS, do two things:
-1. List the 8-12 CORE knowledge/skill points that the goal's standard actually requires (grammar/skills; concise Chinese names).
+// 语法覆盖核对：对照剑桥 EGP 中该 CEFR 等级应掌握的书面语法点，核对大纲是否覆盖、在第几单元、有无缺漏。
+const COVERAGE_PROMPT = `You are a grammar-curriculum auditor. Given a GOAL, its CEFR LEVEL, and a 12-unit grammar SYLLABUS, do two things:
+1. List the 8-12 CORE WRITTEN-GRAMMAR points a learner AT that CEFR level must master according to the Cambridge English Grammar Profile (EGP). Grammar only (no vocabulary/listening/speaking). Concise Chinese names.
 2. For each point, judge whether the syllabus covers it, and in which unit number.
-Then note any obvious GAPS (required points not covered) and give a one-sentence Chinese summary.
+Then note any obvious GAPS (required grammar points not covered) and give a one-sentence Chinese summary.
 
 Return ONLY this JSON (no markdown):
-{ "points": [ { "point": "中文考点名", "covered": true, "unit": 3 } ], "gaps": ["中文缺漏项"], "summary": "中文一句话总评" }`;
+{ "points": [ { "point": "中文语法点名", "covered": true, "unit": 3 } ], "gaps": ["中文缺漏项"], "summary": "中文一句话总评" }`;
 
-export async function generateCoverage(goal, syllabus) {
+export async function generateCoverage(goal, cefr, syllabus) {
   const sylText = (syllabus || []).map((s, i) =>
     `${i + 1}. ${s.title}｜${s.description}｜skills: ${(s.skills || []).join(',')}`
   ).join('\n');
-  const userText = `GOAL: ${goal || '(未指定，请据大纲推断目标标准)'}\n\nSYLLABUS:\n${sylText}`;
+  const userText = `GOAL: ${goal || '(未指定)'}\nCEFR LEVEL: ${cefr || '(请据目标推断)'}\n\nSYLLABUS:\n${sylText}`;
   return generateValidated(COVERAGE_PROMPT, userText, (d) => {
     if (!d || !Array.isArray(d.points)) {
       throw friendlyErr('AI 返回的覆盖核对结构不完整，请重试');

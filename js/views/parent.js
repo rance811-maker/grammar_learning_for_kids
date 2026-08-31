@@ -269,6 +269,18 @@ async function loadAndRender(sub, param) {
 
 // --- Curriculum Creator ---
 
+// 目标 → CEFR 等级映射（剑桥体系）。自定义目标无固定等级。
+const GOAL_CEFR = {
+  '剑桥通用五级 KET（A2）': 'A2',
+  '剑桥通用五级 PET（B1）': 'B1',
+  '剑桥通用五级 FCE（B2）': 'B2',
+  '雅思 5.0（B1）': 'B1',
+  '雅思 5.5（B2）': 'B2',
+  '雅思 6.0（B2）': 'B2',
+  '雅思 6.5（B2）': 'B2',
+  '雅思 7.0（C1）': 'C1',
+};
+
 function selectField(id, label, options, placeholder) {
   const opts = [`<option value="">${placeholder || '请选择…'}</option>`]
     .concat(options.map(o => `<option value="${esc(o)}">${esc(o)}</option>`))
@@ -285,10 +297,12 @@ function renderCurriculumCreator() {
     </div>
 
     <div class="curr-form" style="margin-top:var(--space-lg);">
-      <p style="font-size:var(--text-sm);color:var(--color-text-light);margin-bottom:var(--space-lg);line-height:1.6;">
-        回答几个问题，AI 会据此为孩子设计一套贴合的 12 单元课程。<br>
-        你的判断越具体，课程越对得上孩子——只有第 2 题是必填。
-      </p>
+      <div style="background:var(--color-bg);border:1px solid var(--color-border);border-left:3px solid var(--color-secondary);border-radius:8px;padding:12px 14px;margin-bottom:var(--space-lg);">
+        <div style="font-weight:700;font-size:0.9rem;margin-bottom:2px;">📝 专注书面语法准确性</div>
+        <p style="font-size:0.78rem;color:var(--color-text-light);margin:0;line-height:1.55;">
+          本工具专攻<strong>书面语法</strong>（服务写作与阅读），对标<strong>剑桥语法体系（English Grammar Profile · 按 CEFR 分级）</strong>。<strong>不训练听力与口语</strong>——那需要另外的方法。
+        </p>
+      </div>
 
       <div class="curr-form-row">
         ${selectField('currGrade', '1. 孩子几年级？', ['学龄前', '一年级', '二年级', '三年级', '四年级', '五年级', '六年级', '初中', '高中', '成人'])}
@@ -296,34 +310,25 @@ function renderCurriculumCreator() {
       </div>
 
       <div class="parent-field">
-        <label>2. 目标：想达到哪个标准？<span style="color:var(--color-danger);">（必填）</span></label>
+        <label>2. 目标：对标哪个剑桥等级？<span style="color:var(--color-danger);">（必填）</span></label>
         <select id="currGoalSelect">
           <option value="">请选择一个明确目标…</option>
-          <optgroup label="校内同步">
-            <option value="校内英语同步提升（按所选年级的课标）">校内英语同步提升（按年级课标）</option>
+          <optgroup label="剑桥通用五级">
+            <option value="剑桥通用五级 KET（A2）">剑桥 KET（A2 · 初级）</option>
+            <option value="剑桥通用五级 PET（B1）">剑桥 PET（B1 · 中级）</option>
+            <option value="剑桥通用五级 FCE（B2）">剑桥 FCE（B2 · 中高级）</option>
           </optgroup>
-          <optgroup label="剑桥五级考试">
-            <option value="剑桥通用五级 KET（A2）">剑桥 KET（A2）</option>
-            <option value="剑桥通用五级 PET（B1）">剑桥 PET（B1）</option>
-            <option value="剑桥通用五级 FCE（B2）">剑桥 FCE（B2）</option>
+          <optgroup label="雅思（语法按 CEFR 对应）">
+            <option value="雅思 5.0（B1）">雅思 5.0（≈ B1）</option>
+            <option value="雅思 5.5（B2）">雅思 5.5（≈ B2）</option>
+            <option value="雅思 6.0（B2）">雅思 6.0（≈ B2）</option>
+            <option value="雅思 6.5（B2）">雅思 6.5（≈ B2）</option>
+            <option value="雅思 7.0（C1）">雅思 7.0（≈ C1）</option>
           </optgroup>
-          <optgroup label="雅思">
-            <option value="雅思 5.0 分水平">雅思 5.0</option>
-            <option value="雅思 5.5 分水平">雅思 5.5</option>
-            <option value="雅思 6.0 分水平">雅思 6.0</option>
-            <option value="雅思 6.5 分水平">雅思 6.5</option>
-            <option value="雅思 7.0 分水平">雅思 7.0</option>
-          </optgroup>
-          <optgroup label="教材 / 专项">
-            <option value="新概念英语 第一册">新概念英语 第一册</option>
-            <option value="新概念英语 第二册">新概念英语 第二册</option>
-            <option value="英语语法专项强化">语法专项强化</option>
-            <option value="英语词汇专项强化">词汇专项强化</option>
-          </optgroup>
-          <option value="__custom__">其他（自定义）…</option>
+          <option value="__custom__">其他（自定义语法目标）…</option>
         </select>
-        <input type="text" id="currGoalCustom" placeholder="自定义目标，如：分级阅读 RAZ 提升 / 出国生活口语" style="display:none;margin-top:8px;">
-        <p style="font-size:0.72rem;color:var(--color-muted);margin:6px 0 0;">选具体的标准，AI 才能对着公开考纲/词表生成，也方便你核对是否覆盖到位。</p>
+        <input type="text" id="currGoalCustom" placeholder="自定义语法目标，如：初中语法总复习 / 时态专项" style="display:none;margin-top:8px;">
+        <p style="font-size:0.72rem;color:var(--color-muted);margin:6px 0 0;">对标剑桥等级，AI 就按该等级的语法考点（EGP）生成，也方便你核对覆盖是否到位。</p>
       </div>
 
       <div class="parent-field">
@@ -445,6 +450,7 @@ function mountCurriculumCreator() {
     const profile = {
       grade: val('currGrade'),
       goal,
+      cefr: GOAL_CEFR[goalSel] || '',
       timeframe: val('currTimeframe'),
       difficulty: val('currDifficulty'),
       dailyMinutes: val('currDaily'),
@@ -491,13 +497,18 @@ function mountCurriculumCreator() {
 function buildGoalFromProfile(pf) {
   const parts = [];
   if (pf.goal) parts.push(`学习目标：${pf.goal}`);
+  if (pf.cefr) parts.push(`对应 CEFR 等级：${pf.cefr}`);
   if (pf.grade) parts.push(`孩子年级：${pf.grade}`);
   if (pf.timeframe) parts.push(`期望时限：${pf.timeframe}`);
   if (pf.difficulty) parts.push(`目前主要困难：${pf.difficulty}`);
   if (pf.dailyMinutes) parts.push(`每天可投入：${pf.dailyMinutes}`);
   const head = parts.join('；');
+  const levelRule = pf.cefr
+    ? `请严格对照剑桥 English Grammar Profile 中 ${pf.cefr} 等级应掌握的书面语法点来设计 12 单元，只覆盖该等级的语法结构，不要放入更高等级的内容。`
+    : '请据目标选择合适难度的书面语法点设计 12 单元。';
   return (head ? head + '。' : '')
-    + '请据此设计难度、深度与节奏都合适的 12 单元课程大纲；'
+    + '本课程只训练【书面语法准确性】（服务写作与阅读），不涉及听力与口语。'
+    + levelRule
     + '若填写了「目前主要困难」，请在前几个单元优先覆盖这些薄弱点。';
 }
 
@@ -625,7 +636,7 @@ function renderSyllabusPreview(syllabus, profile, material = '') {
     </div>`;
 
   // ① 考纲覆盖核对 —— 自动跑一次，把「是否覆盖到位」明示给家长
-  runCoverageCheck(goal, syllabus);
+  runCoverageCheck(goal, (profile && profile.cefr) || '', syllabus);
   // ② 试生成第 1 单元
   document.getElementById('currTrialBtn')?.addEventListener('click', () => runTrialUnit(syllabus[0], material));
 
@@ -664,12 +675,12 @@ function renderSyllabusPreview(syllabus, profile, material = '') {
 }
 
 // ① 考纲覆盖核对：自动调用 AI，把「这套大纲覆盖了目标考纲哪些考点、有无缺漏」明示给家长。
-async function runCoverageCheck(goal, syllabus) {
+async function runCoverageCheck(goal, cefr, syllabus) {
   const host = document.getElementById('currCoverage');
   if (!host) return;
-  host.innerHTML = `<div style="font-size:0.82rem;color:var(--color-secondary-dark);">🔎 正在对照目标考纲核对覆盖…</div>`;
+  host.innerHTML = `<div style="font-size:0.82rem;color:var(--color-secondary-dark);">🔎 正在对照剑桥语法考点（EGP）核对覆盖…</div>`;
   try {
-    const cov = await generateCoverage(goal, syllabus);
+    const cov = await generateCoverage(goal, cefr, syllabus);
     const points = cov.points || [];
     const coveredN = points.filter(p => p.covered).length;
     const rows = points.map(p => `
@@ -690,7 +701,7 @@ async function runCoverageCheck(goal, syllabus) {
       </div>`;
   } catch (e) {
     host.innerHTML = `<div style="font-size:0.8rem;color:var(--color-danger);">覆盖核对失败：${esc(friendlyAiError(e))} <button class="btn btn--tiny btn--outline" id="covRetry">重试</button></div>`;
-    document.getElementById('covRetry')?.addEventListener('click', () => runCoverageCheck(goal, syllabus));
+    document.getElementById('covRetry')?.addEventListener('click', () => runCoverageCheck(goal, cefr, syllabus));
   }
 }
 
