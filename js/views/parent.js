@@ -644,7 +644,7 @@ function renderSyllabusPreview(syllabus, profile, material = '') {
   // ① 考纲覆盖核对 —— 自动跑一次，把「是否覆盖到位」明示给家长
   runCoverageCheck(goal, (profile && profile.cefr) || '', syllabus);
   // ② 试生成第 1 单元
-  document.getElementById('currTrialBtn')?.addEventListener('click', () => runTrialUnit(syllabus[0], material));
+  document.getElementById('currTrialBtn')?.addEventListener('click', () => runTrialUnit(syllabus[0], material, (profile && profile.cefr) || ''));
 
   document.getElementById('currConfirmBtn')?.addEventListener('click', () => {
     const title = document.getElementById('currTitleInput')?.value.trim() || goal || '我的课程';
@@ -749,14 +749,30 @@ function briefQuestion(q) {
   </div>`;
 }
 
+// 把自动校验报告渲染成一段可读的说明（供家长看到「第二个 AI 已复核」）。
+function renderVerifyNote(v) {
+  if (!v) return '';
+  if (v.error) {
+    return `<div style="font-size:0.72rem;color:var(--color-muted);margin-top:8px;">🤖 自动复核未完成：${esc(v.error)}</div>`;
+  }
+  const dropped = v.dropped || 0;
+  const badge = dropped > 0
+    ? `<span style="color:var(--color-secondary-dark);">已自动剔除 ${dropped} 道有疑问的题</span>`
+    : `<span style="color:var(--color-primary-dark);">全部通过复核</span>`;
+  return `<div style="margin-top:10px;padding:8px 10px;border-radius:8px;background:var(--color-bg-soft, rgba(0,0,0,0.03));font-size:0.76rem;line-height:1.5;">
+    🤖 <b>第二个 AI 校验员</b>已用全新视角逐题复核：${badge}。
+    <div style="color:var(--color-muted);margin-top:2px;">${esc(v.summary || '')}</div>
+  </div>`;
+}
+
 // ② 试生成第 1 单元：真实生成一个单元的内容（不落库），把真题摆给家长看。
-async function runTrialUnit(sylItem, material) {
+async function runTrialUnit(sylItem, material, cefr = '') {
   const btn = document.getElementById('currTrialBtn');
   const host = document.getElementById('currTrialArea');
   if (!sylItem || !host) return;
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="ce-spinner" style="display:inline-block;width:14px;height:14px;margin-right:6px;vertical-align:middle;"></span> 正在试生成第 1 单元（约 20–90 秒）…'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="ce-spinner" style="display:inline-block;width:14px;height:14px;margin-right:6px;vertical-align:middle;"></span> 正在试生成第 1 单元并自动复核（约 30–120 秒）…'; }
   try {
-    const data = await generateUnitPreview(sylItem, material);
+    const data = await generateUnitPreview(sylItem, material, cefr);
     const story = (data.discover && data.discover.story) || {};
     const tip = (data.discover && data.discover.tip) || '';
     const lv1 = (data.levels && (data.levels['1'] || data.levels[1])) || [];
@@ -769,6 +785,7 @@ async function runTrialUnit(sylItem, material) {
         ${tip ? `<div style="font-size:0.8rem;color:var(--color-secondary-dark);margin:4px 0;">💡 ${esc(tip)}</div>` : ''}
         <div style="font-weight:600;font-size:0.82rem;margin-top:8px;">练习题样例：</div>
         ${samples || '<div style="font-size:0.8rem;color:var(--color-muted);">（本单元第 1 关暂无题目样例）</div>'}
+        ${renderVerifyNote(data._verify)}
         <div style="font-size:0.72rem;color:var(--color-muted);margin-top:8px;">题目质量满意就「确认并创建」；不满意可「重新生成」大纲。</div>
       </div>`;
     if (btn) { btn.style.display = 'none'; }
