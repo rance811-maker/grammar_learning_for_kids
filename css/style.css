@@ -212,7 +212,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-sm) var(--space-md) var(--space-sm) calc(var(--space-md) + 16px);
   border-top: 1px solid var(--color-border);
   font-size: var(--text-xs);
   font-weight: 600;
@@ -2038,19 +2038,14 @@ ul, ol {
 }
 .sidebar__account:hover { background: var(--color-card); }
 .sidebar__account-name {
-  font-size: var(--text-base);
+  font-size: var(--text-lg);
   font-weight: 800;
-  color: var(--color-text);
+  color: var(--color-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sidebar__account-cta {
-  font-size: var(--text-xs);
-  font-weight: 700;
-  color: var(--color-secondary);
-  white-space: nowrap;
-}
+.sidebar__account:hover .sidebar__account-name { text-decoration: underline; }
 
 .view-account { max-width: 480px; margin: 0 auto; }
 .account-card {
