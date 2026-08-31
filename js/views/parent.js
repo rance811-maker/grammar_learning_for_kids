@@ -158,18 +158,18 @@ function renderDashboard() {
     </div>
 
     <div class="parent-grid" style="margin-top:var(--space-lg)">
-      <div class="parent-feature parent-feature--active" id="newCurrCard" style="cursor:pointer;">
+      <a class="parent-feature parent-feature--active" id="newCurrCard" href="#parent/curriculum" style="cursor:pointer;text-decoration:none;color:inherit;display:block;">
         <div class="parent-feature-icon">🤖</div>
         <h3>AI 创建课程</h3>
         <p>描述目标或上传教材/考纲（PDF·拍照），AI 自动生成完整 12 单元课程</p>
         <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">+ 创建课程</span>
-      </div>
-      <div class="parent-feature parent-feature--active" id="reportCard" style="cursor:pointer;">
+      </a>
+      <a class="parent-feature parent-feature--active" id="reportCard" href="#parent/report" style="cursor:pointer;text-decoration:none;color:inherit;display:block;">
         <div class="parent-feature-icon">📊</div>
         <h3>学习报告</h3>
         <p>查看孩子的学习进度和薄弱环节分析</p>
         <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">查看报告</span>
-      </div>
+      </a>
     </div>
 
     <div class="parent-actions">
@@ -218,7 +218,12 @@ async function loadAndRender(sub, param) {
   if (!el) return;
 
   function showError(msg) {
-    const target = document.getElementById('ceRoot') || document.getElementById('parentContent') || el;
+    const target = document.getElementById('ceRoot')
+      || document.getElementById('parentContent')
+      || document.querySelector('#currCreator, #reportContent, #dashboardCard')
+      || document.querySelector('.parent-zone .parent-card')
+      || document.querySelector('.content')
+      || el;
     target.innerHTML = `<div class="parent-icon">⚠️</div>
       <p>加载失败：${msg}</p>
       <button class="btn btn--primary" onclick="location.reload()">重试</button>`;
@@ -1135,8 +1140,7 @@ function mountLocked(storedHash) {
 function mountDashboard() {
   document.getElementById('lockBtn')?.addEventListener('click', () => { clearUnlock(); location.hash = ''; });
   document.getElementById('changePinBtn')?.addEventListener('click', () => { location.hash = 'parent/reset'; });
-  document.getElementById('reportCard')?.addEventListener('click', () => { location.hash = 'parent/report'; });
-  document.getElementById('newCurrCard')?.addEventListener('click', () => { location.hash = 'parent/curriculum'; });
+  // 「创建课程」「学习报告」现为原生 <a href> 链接，靠浏览器导航，不依赖 JS 绑定（更稳）。
 
   document.querySelectorAll('[data-switch-curr]').forEach(btn => {
     btn.addEventListener('click', () => {
