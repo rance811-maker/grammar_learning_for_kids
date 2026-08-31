@@ -393,37 +393,59 @@ function renderCurrFileList() {
   }));
 }
 
+const PROVIDER_NAMES = { gemini: 'Gemini', claude: 'Claude' };
+// key 编辑器是否展开。已配置时默认收起，点「更换 / 重新录入」再展开。
+let _keyEditorOpen = false;
+
 function mountCurrKeyPanel() {
   const host = document.getElementById('currKeyPanel');
   if (!host) return;
-  if (hasApiKey()) { host.innerHTML = ''; return; }
   const p = getAiProvider();
+  const configured = hasApiKey();
+
+  // 已配置且未展开编辑器 → 显示一张紧凑的「已配置」卡片，仍可随时更换 / 重新录入。
+  if (configured && !_keyEditorOpen) {
+    host.innerHTML = `
+      <div class="parent-field" style="background:var(--color-bg-soft,#F1F8E9);border:1px solid #C5E1A5;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-size:0.9rem;">🔑 AI 服务：<b>${PROVIDER_NAMES[p] || p}</b> · 已配置 ✓</span>
+        <button class="btn btn--tiny btn--outline" id="currKeyEdit" style="margin-left:auto;">更换 / 重新录入 key</button>
+      </div>`;
+    document.getElementById('currKeyEdit')?.addEventListener('click', () => { _keyEditorOpen = true; mountCurrKeyPanel(); });
+    return;
+  }
+
+  // 未配置，或用户主动点了「更换」→ 显示完整编辑器。
   host.innerHTML = `
     <div class="parent-field" style="background:#FFF8E1;border:1px solid #F0E0A8;border-radius:10px;padding:12px 14px;">
-      <label>🔑 配置 AI 服务（生成需要，配一次即可）</label>
+      <label>🔑 ${configured ? '更换 / 重新录入 API key' : '配置 AI 服务（生成需要，配一次即可）'}</label>
       <select id="currProvider" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;margin-bottom:8px;">
-        <option value="gemini" ${p === 'gemini' ? 'selected' : ''}>Gemini（免费额度）</option>
-        <option value="claude" ${p === 'claude' ? 'selected' : ''}>Claude（按量付费·质量更高，推荐正式生成）</option>
+        <option value="gemini" ${p === 'gemini' ? 'selected' : ''}>Gemini（免费额度·输出上限较低，长单元可能被截断）</option>
+        <option value="claude" ${p === 'claude' ? 'selected' : ''}>Claude（按量付费·质量更高更稳，推荐正式生成）</option>
       </select>
-      <input type="password" id="currKeyInput" placeholder="粘贴 API key" autocomplete="off" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;">
-      <div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
+      <input type="password" id="currKeyInput" placeholder="粘贴${configured ? '新的 ' : ''}API key" autocomplete="off" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;">
+      <div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap;">
         <button class="btn btn--small btn--primary" id="currKeySave">保存 key</button>
+        ${configured ? '<button class="btn btn--small btn--outline" id="currKeyCancel">取消</button>' : ''}
         <span style="font-size:0.72rem;color:#999;">Gemini: aistudio.google.com/apikey · Claude: console.anthropic.com</span>
       </div>
+      <div style="font-size:0.72rem;color:#999;margin-top:6px;">key 只存在你这台设备的浏览器里，不会上传服务器。</div>
     </div>`;
   document.getElementById('currProvider')?.addEventListener('change', e => setAiProvider(e.target.value));
+  document.getElementById('currKeyCancel')?.addEventListener('click', () => { _keyEditorOpen = false; mountCurrKeyPanel(); });
   document.getElementById('currKeySave')?.addEventListener('click', () => {
     const prov = document.getElementById('currProvider').value;
     const key = document.getElementById('currKeyInput').value.trim();
     if (!key) return;
     setAiProvider(prov);
     setAiKeyVal(prov, key);
+    _keyEditorOpen = false;
     mountCurrKeyPanel();
   });
 }
 
 function mountCurriculumCreator() {
   currFiles = [];
+  _keyEditorOpen = false;
   document.getElementById('currBackBtn')?.addEventListener('click', () => { location.hash = 'parent'; });
   mountCurrKeyPanel();
 
