@@ -73,7 +73,7 @@ QUALITY RULES (critical — follow all):
 - For B1 and above, include a few key-word-transformation style items (rewrite a sentence keeping the meaning, testing the target structure) among the fill questions where natural.
 - Do NOT invent coverage percentages or claim official exam status anywhere in the content.
 
-STRICT JSON: the whole output must be ONE valid JSON value. Return ONLY the JSON, no markdown code blocks, no other text. Inside every string, escape double quotes as \\" and never put a raw line break — keep each string on a single line (write the story as one continuous paragraph). Do not use smart/curly quotes ("" '') anywhere; use straight quotes only. No trailing commas.`;
+STRICT JSON: the whole output must be ONE valid JSON value. Return ONLY the JSON, no markdown code blocks, no other text. Inside every string, escape double quotes as \\" and never put a raw line break — keep each string on a single line (write the story as one continuous paragraph). Do not use smart/curly quotes ("" '') anywhere; use straight quotes only. No trailing commas. Do NOT use direct speech or any double quotation marks INSIDE a string value — write the story with reported speech instead (He said that... not He said, "...").`;
 
 // A 部分：discover(故事+3题+tip) + mission(写作任务) + 关卡 1-3。
 const UNIT_PROMPT_A = `${UNIT_CORE}
@@ -202,6 +202,46 @@ async function callAI(systemPrompt, userText) {
   return cand?.content?.parts?.[0]?.text || '';
 }
 
+// 转义「字符串内部没转义的双引号」。模型写故事时常带直接引语
+// （如 He said, "This is it," and left.），双引号没转义就会把 JSON 打断。
+// 逐字符扫描：在字符串内遇到 " 时判断它是真正的结束引号还是漏转义的内层引号 ——
+// 结束引号后面(跳过空白)应当是 : } ]，或是 , 且其后紧跟新的 " { [；否则判为内层引号并转义。
+function repairInnerQuotes(s) {
+  let out = '';
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (esc) { out += ch; esc = false; continue; }
+    if (ch === '\\') { out += ch; esc = true; continue; }
+    if (!inStr) {
+      if (ch === '"') inStr = true;
+      out += ch;
+      continue;
+    }
+    if (ch === '"') {
+      let j = i + 1;
+      while (j < s.length && /\s/.test(s[j])) j++;
+      const next = s[j];
+      let closing;
+      if (next === ':' || next === '}' || next === ']' || next === undefined) {
+        closing = true;
+      } else if (next === ',') {
+        let k = j + 1;
+        while (k < s.length && /\s/.test(s[k])) k++;
+        const after = s[k];
+        closing = after === '"' || after === '{' || after === '[' || after === undefined;
+      } else {
+        closing = false;
+      }
+      if (closing) { inStr = false; out += ch; } else { out += '\\"'; }
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
 // 对一个候选字符串做若干「修复」后尝试解析，任一成功即返回结果。
 // 常见问题：字符串里夹了原始换行/制表符(非法控制字符)、结尾多了逗号。
 function tryParseVariants(s) {
@@ -211,7 +251,9 @@ function tryParseVariants(s) {
     // 而模型写的小故事常带对话换行，是「格式有误」的头号元凶。
     s.replace(/[\u0000-\u001F]/g, ' '),
   ];
-  // 再对每个变体额外尝试「去掉对象/数组结尾多余的逗号」。
+  // 再对每个变体叠加「转义内层引号」的修复（只在原样解析失败后才用到，不影响合法 JSON）。
+  for (const v of variants.slice()) variants.push(repairInnerQuotes(v));
+  // 最后对所有变体再各试一次「去掉对象/数组结尾多余的逗号」。
   for (const v of variants.slice()) variants.push(v.replace(/,(\s*[}\]])/g, '$1'));
   for (const v of variants) {
     try { return { ok: true, data: JSON.parse(v) }; } catch { /* next */ }
@@ -238,9 +280,21 @@ function parseJSON(raw) {
     if (r.ok) return r.data;
   }
 
-  // 全部失败：把原始返回打到控制台 + 摘一小段放进报错，方便定位到底返回了什么。
+  // 全部失败：把原始返回打到控制台，并把「出错位置附近」的文字带进报错 ——
+  // 只看开头定位不到问题，看断点上下文才能一眼认出是引号/换行还是被截断。
   try { console.error('[unitGenerator] 无法解析的 AI 返回：', raw); } catch { /* */ }
-  const snippet = String(raw).replace(/\s+/g, ' ').trim().slice(0, 80);
+  let where = '';
+  try {
+    JSON.parse(stripped);
+  } catch (e) {
+    const m = /position (\d+)/.exec(String(e && e.message));
+    if (m) {
+      const pos = Number(m[1]);
+      const ctx = stripped.slice(Math.max(0, pos - 45), pos + 45).replace(/\s+/g, ' ');
+      where = `断在第 ${pos} 字符附近：…${ctx}…`;
+    }
+  }
+  const snippet = where || String(raw).replace(/\s+/g, ' ').trim().slice(0, 80);
   throw friendlyErr(`AI 返回的内容格式有误，请重试（返回开头：${snippet || '空'}）`);
 }
 
