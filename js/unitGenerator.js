@@ -52,22 +52,11 @@ Return a JSON array of exactly 12 objects:
 
 Return ONLY the JSON array, no markdown code blocks, no other text.`;
 
-const UNIT_PROMPT = `You are an English GRAMMAR practice designer for Chinese learners. Generate content for ONE grammar unit.
+// 一个完整单元(故事 + 40 题 + 写作任务)一次性生成体量过大，易截断/超时。
+// 拆成两个独立请求并行生成再合并：A = discover + mission + 关卡 1-3；B = 关卡 4-5。
+// 二者共享下面这段「角色 + 题型 + 质量规则 + 严格 JSON」的核心说明。
+const UNIT_CORE = `You are an English GRAMMAR practice designer for Chinese learners. Generate content for ONE grammar unit.
 SCOPE: WRITTEN grammar accuracy only (writing/reading) — no listening/speaking tasks. Keep the grammar difficulty at the unit's stated CEFR level (per the Cambridge English Grammar Profile); do not exceed it.
-
-Generate the following for the given unit topic:
-
-1. "discover": A learning story section:
-   - "story": { "title": string, "text": string (150-250 word English story demonstrating the grammar), "highlights": [key grammar words] }
-   - "questions": array of 3 objects { "question": string, "options": [4 strings], "correctIndex": number, "explanation": string (Chinese) }
-   - "tip": string (a concise Chinese grammar tip)
-
-2. "levels": An object with keys "1" through "5", each is an array of 8 practice questions. Progressively harder:
-   - Level 1: Mostly "choice" (easy recognition)
-   - Level 2: "choice" + "fill"
-   - Level 3: "fill" + "reorder"
-   - Level 4: "choice" + "fill" + "error"
-   - Level 5: Mixed types, harder
 
 Question formats:
 - choice: { "type":"choice", "instruction":"(Chinese)", "sentence":"She ___ to school.", "options":["go","goes","going","went"], "correctIndex":1, "explanation":"(Chinese)", "subSkill":"skill_id" }
@@ -76,24 +65,41 @@ Question formats:
 - reorder: { "type":"reorder", "instruction":"(Chinese)", "words":["she","is","reading"], "correctSentence":"She is reading.", "explanation":"(Chinese)", "subSkill":"skill_id" }
 - error: { "type":"error", "instruction":"(Chinese)", "words":["She","go","to","school"], "errorIndex":1, "correction":"goes", "explanation":"(Chinese)", "subSkill":"skill_id" }
 
-3. "mission": A writing task:
-   - "title": string, "description": string (Chinese), "scenario": string (Chinese)
-   - "grammarType": main subSkill ID
-   - "scaffolds": array of 2-3 { "prefix":"", "suffix":"", "hint":"", "grammarCheck":"skill_id", "example":"" }
-
 QUALITY RULES (critical — follow all):
-- CONSISTENCY: every target grammar structure that appears in the "story" MUST be explained in "tip" AND practiced in at least one question. Never explain a DIFFERENT structure than the story actually shows.
-- "tip" must be a real mini-lesson: contrast the unit's target structures and list 1-2 common errors — not a one-liner.
 - Each question MUST contain a clear context clue that determines the answer; there should ideally be exactly ONE best answer.
 - If both British and American English are correct, include BOTH in "acceptableAnswers".
 - Explanations must explain the MEANING/why (e.g. "by 2031 = completed before a future point → future perfect"), not just point at a surface word.
-- Keep timelines, tenses and characters logically consistent across the story and all questions.
+- Keep timelines, tenses and characters logically consistent across all questions.
 - For B1 and above, include a few key-word-transformation style items (rewrite a sentence keeping the meaning, testing the target structure) among the fill questions where natural.
 - Do NOT invent coverage percentages or claim official exam status anywhere in the content.
 
-Return a single JSON object { "discover":{...}, "levels":{...}, "mission":{...} }.
-Return ONLY the JSON, no markdown code blocks, no other text.
-STRICT JSON: the whole output must be ONE valid JSON value. Inside every string, escape double quotes as \\" and never put a raw line break — keep each string on a single line (write the story as one continuous paragraph). Do not use smart/curly quotes ("" '') anywhere; use straight quotes only. No trailing commas.`;
+STRICT JSON: the whole output must be ONE valid JSON value. Return ONLY the JSON, no markdown code blocks, no other text. Inside every string, escape double quotes as \\" and never put a raw line break — keep each string on a single line (write the story as one continuous paragraph). Do not use smart/curly quotes ("" '') anywhere; use straight quotes only. No trailing commas.`;
+
+// A 部分：discover(故事+3题+tip) + mission(写作任务) + 关卡 1-3。
+const UNIT_PROMPT_A = `${UNIT_CORE}
+
+Generate ONLY these parts for the given unit topic:
+1. "discover":
+   - "story": { "title": string, "text": string (150-250 word English story demonstrating the grammar, ONE single-line paragraph), "highlights": [key grammar words] }
+   - "questions": array of 3 objects { "question": string, "options": [4 strings], "correctIndex": number, "explanation": string (Chinese) }
+   - "tip": string — a real mini-lesson (contrast the unit's target structures and list 1-2 common errors), not a one-liner.
+2. "levels": object with keys "1","2","3", each an array of 8 practice questions, progressively harder:
+   - Level 1: Mostly "choice" (easy recognition)
+   - Level 2: "choice" + "fill"
+   - Level 3: "fill" + "reorder"
+3. "mission": { "title": string, "description": string (Chinese), "scenario": string (Chinese), "grammarType": main subSkill ID, "scaffolds": array of 2-3 { "prefix":"", "suffix":"", "hint":"", "grammarCheck":"skill_id", "example":"" } }
+CONSISTENCY: every target grammar structure in the "story" MUST be explained in "tip" AND practiced in at least one question across levels 1-3. Never explain a DIFFERENT structure than the story shows.
+
+Return ONLY this JSON: { "discover":{...}, "levels":{ "1":[...], "2":[...], "3":[...] }, "mission":{...} }`;
+
+// B 部分：只生成更难的关卡 4-5。
+const UNIT_PROMPT_B = `${UNIT_CORE}
+
+Generate ONLY the two HARDEST practice levels for the given unit topic, as "levels" with keys "4","5", each an array of 8 practice questions:
+- Level 4: "choice" + "fill" + "error"
+- Level 5: Mixed types, hardest (still within the stated CEFR level)
+
+Return ONLY this JSON: { "levels":{ "4":[...], "5":[...] } }`;
 
 // 单次 AI 请求的超时上限。整套单元(40 题+故事+写作任务)在手机上直连生成较慢，
 // 给足 5 分钟，避免大单元/慢网络下被过早掐断（超时了才会提示"响应超时"）。
@@ -431,11 +437,21 @@ async function genUnitData(sylItem, material, unitId = 1, cefr = '') {
     `Sub-skills to use: ${(sylItem.skills || []).join(', ')}`,
     matBlock,
   ].join('\n');
-  const data = await generateValidated(UNIT_PROMPT, userText, (d) => {
-    if (!d || !d.discover || !d.levels) {
-      throw friendlyErr('AI 返回的内容结构不完整，请重试');
-    }
-  });
+  // 拆分为两个更小的请求并行生成：A=discover+mission+关卡1-3，B=关卡4-5。
+  // 每个请求体量减半，既不易截断也不易超时；并行发出后总耗时约等于单个请求。
+  const [partA, partB] = await Promise.all([
+    generateValidated(UNIT_PROMPT_A, userText, (d) => {
+      if (!d || !d.discover || !d.levels) throw friendlyErr('AI 返回的内容结构不完整，请重试');
+    }),
+    generateValidated(UNIT_PROMPT_B, userText, (d) => {
+      if (!d || !d.levels) throw friendlyErr('AI 返回的内容结构不完整，请重试');
+    }),
+  ]);
+  const data = {
+    discover: partA.discover,
+    mission: partA.mission,
+    levels: { ...(partA.levels || {}), ...(partB.levels || {}) },
+  };
   // 独立校验 pass（best-effort：校验失败不影响单元本身）
   try {
     data._verify = await verifyAndFilter(data, cefr);
