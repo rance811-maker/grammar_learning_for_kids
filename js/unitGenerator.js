@@ -95,8 +95,9 @@ Return a single JSON object { "discover":{...}, "levels":{...}, "mission":{...} 
 Return ONLY the JSON, no markdown code blocks, no other text.
 STRICT JSON: the whole output must be ONE valid JSON value. Inside every string, escape double quotes as \\" and never put a raw line break — keep each string on a single line (write the story as one continuous paragraph). Do not use smart/curly quotes ("" '') anywhere; use straight quotes only. No trailing commas.`;
 
-// 单次 AI 请求的超时上限。整套单元内容较大，给足时间但不至于无限挂起。
-const REQUEST_TIMEOUT_MS = 180000;
+// 单次 AI 请求的超时上限。整套单元(40 题+故事+写作任务)在手机上直连生成较慢，
+// 给足 5 分钟，避免大单元/慢网络下被过早掐断（超时了才会提示"响应超时"）。
+const REQUEST_TIMEOUT_MS = 300000;
 
 // 把底层错误翻译成对家长友好的中文提示。已经友好的错误(.friendly)原样返回。
 export function friendlyAiError(err) {
