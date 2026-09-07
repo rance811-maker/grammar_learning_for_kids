@@ -37,7 +37,10 @@ export function render(unitId) {
       </div>`;
   });
 
+  // 做过一次不等于以后不能再写。输入框既然还能打字，按钮就必须能按——
+  // 之前这里把按钮永久 disabled 掉，页面看着可以写，写完却提交不了。
   const alreadyDone = unitState?.missionCompleted;
+  const lastArticle = unitState?.missionContent || '';
 
   return `
     <div class="view view-mission">
@@ -45,6 +48,13 @@ export function render(unitId) {
         <div class="mission-task-card__title">🎯 ${mission.title || '写作任务'}</div>
         <div class="mission-task-card__desc">${mission.description || ''}</div>
       </div>
+
+      ${alreadyDone ? `
+      <div class="card mb-lg" style="border-left:4px solid var(--color-success,#4caf50);">
+        <div style="font-weight:700;margin-bottom:var(--space-sm);">✅ 这个任务你已经完成过</div>
+        ${lastArticle ? `<div style="font-size:var(--text-sm);color:var(--color-text-light);line-height:1.8;">上次写的：${esc(lastArticle)}</div>` : ''}
+        <div style="font-size:var(--text-sm);color:var(--color-text-light);margin-top:var(--space-sm);">可以再写一遍，看看这次能不能写得更好。</div>
+      </div>` : ''}
 
       ${mission.scenario ? `
       <div class="card mb-lg">
@@ -57,8 +67,8 @@ export function render(unitId) {
       </div>
 
       <div id="missionActions">
-        <button class="btn-primary" id="missionSubmitBtn" ${alreadyDone ? 'disabled' : ''}>
-          ${alreadyDone ? '已完成' : '提交作品 ✏️'}
+        <button class="btn-primary" id="missionSubmitBtn">
+          ${alreadyDone ? '重新提交 ✏️' : '提交作品 ✏️'}
         </button>
       </div>
 
