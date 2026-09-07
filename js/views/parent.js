@@ -18,23 +18,46 @@ const LOCKOUT_KEY = 'gq-parent-lockout';
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 10;
 
-// 解锁状态只存在内存里，从不持久化。
-// 刷新/关闭页面，或离开家长专区切到别的页面，都会回到"已上锁"状态。
-// 这样把设备交给孩子时，孩子点开家长专区一定会被要求重新输入 PIN，
-// 不会因为家长刚进过而处于"已登入"状态。
-let unlocked = false;
+// 解锁状态存 sessionStorage，带一个闲置超时。
+//
+// 原来是纯内存变量，且路由一离开家长专区就清空——家长每看一眼学习报告、
+// 切回地图再回来，就得重新敲一次 6 位密码，用起来太折磨。
+// 现在的取舍是：同一个标签页里，只要还在活动窗口内就不再追问；
+// 关掉标签页、闲置超过 UNLOCK_IDLE_MINUTES、或家长主动点「退出专区」，
+// 都会立刻回到上锁状态。孩子拿到设备后翻不进来，是靠这三条，不是靠反复输密码。
+const UNLOCK_KEY = 'gq-parent-unlock';
+const UNLOCK_IDLE_MINUTES = 30;
 
 async function sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function isUnlocked() { return unlocked; }
-function setUnlocked() { unlocked = true; }
-function clearUnlock() { unlocked = false; }
+// 每次确认解锁状态时顺手续期，所以"闲置 30 分钟"算的是最后一次进家长专区之后。
+function touchUnlock() {
+  try {
+    sessionStorage.setItem(UNLOCK_KEY, JSON.stringify({ until: Date.now() + UNLOCK_IDLE_MINUTES * 60000 }));
+  } catch { /* 隐私模式下 sessionStorage 可能不可用，退化成每次都要输密码 */ }
+}
 
-// 离开家长专区时自动上锁（由 app.js 的路由在切到别的页面时调用）。
-export function lock() { unlocked = false; }
+function isUnlocked() {
+  try {
+    const d = JSON.parse(sessionStorage.getItem(UNLOCK_KEY));
+    if (!d || !d.until) return false;
+    if (d.until <= Date.now()) { clearUnlock(); return false; }
+    touchUnlock();
+    return true;
+  } catch { return false; }
+}
+
+function setUnlocked() { touchUnlock(); }
+
+function clearUnlock() {
+  try { sessionStorage.removeItem(UNLOCK_KEY); } catch { /* ignore */ }
+}
+
+// 家长主动点「退出专区」时调用。路由切换不再自动上锁——那正是"反复输密码"的来源。
+export function lock() { clearUnlock(); }
 
 // 失败锁定信息存 localStorage：即使关掉标签页/刷新也照样锁着，
 // 防止用"关页面重开"的方式把连错次数清零来绕过锁定。
@@ -144,6 +167,10 @@ function renderDashboard() {
       <h2>🏠 家长专区</h2>
       <button class="btn btn--small btn--outline" id="lockBtn">🔒 退出专区</button>
     </div>
+    <p class="parent-lock-hint">
+      这次进来后不会再反复问密码。关掉标签页、闲置 ${UNLOCK_IDLE_MINUTES} 分钟，或点上面的「退出专区」，都会重新上锁。
+      <strong>要把设备交给孩子，点一下「退出专区」最稳妥。</strong>
+    </p>
 
     <div class="ce-section">
       <div class="ce-section-header">
@@ -172,10 +199,88 @@ function renderDashboard() {
       </a>
     </div>
 
+    ${renderSettingsSection()}
+
     <div class="parent-actions">
       <button class="btn btn--small btn--outline" id="changePinBtn">修改家长密码</button>
     </div>
   </div>`;
+}
+
+// 原来的「设置」页整页搬进来：每日目标、重新摸底、账号、重置进度，
+// 每一条都是家长该决定的事，本来就不该放在孩子点得到的导航里。
+// （音效留在侧边栏，孩子自己就能静音，不必为此叫家长来输密码。）
+const GOAL_OPTIONS = [1, 2, 3, 4];
+
+function renderSettingsSection() {
+  const { settings } = store.state;
+  const goalBtns = GOAL_OPTIONS.map((n) => `
+    <button class="goal-option${n === settings.dailyGoal ? ' goal-option--active' : ''}" data-goal="${n}">
+      ${n} 关
+    </button>`).join('');
+
+  return `
+    <div class="ce-section" style="margin-top:var(--space-lg);">
+      <div class="ce-section-header"><h3>⚙️ 学习设置</h3></div>
+
+      <div class="settings-group">
+        <div class="settings-group__title">🎯 每日目标</div>
+        <div class="settings-group__desc">每天完成多少关算达标</div>
+        <div class="goal-options">${goalBtns}</div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group__title">🔁 重新摸底</div>
+        <div class="settings-group__desc">重新做一次摸底测试，系统会据此调整学习计划（已完成的练习进度保留）</div>
+        <button class="btn btn--secondary" id="retakePlacementBtn" style="margin-top:var(--space-sm);">重新摸底测试</button>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group__title">👤 账号</div>
+        <div class="settings-group__desc">已登录为「${esc(store.account.name)}」，学习记录正在云端自动同步</div>
+        <button class="btn btn--secondary" id="goAccountBtn" style="margin-top:var(--space-sm);">账号管理</button>
+      </div>
+
+      <div class="settings-group settings-group--danger">
+        <div class="settings-group__title">⚠️ 重置全部进度</div>
+        <div class="settings-group__desc">清空所有积分、星星、错题本、徽章和学习计划，回到全新状态。此操作无法撤销。</div>
+        <button class="btn btn--danger" id="resetProgressBtn" style="margin-top:var(--space-sm);">重置全部进度</button>
+      </div>
+    </div>`;
+}
+
+function mountSettingsSection() {
+  document.querySelectorAll('.goal-option').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const goal = Number(btn.dataset.goal);
+      store.state.settings.dailyGoal = goal;
+      store.save();
+      document.querySelectorAll('.goal-option').forEach((b) =>
+        b.classList.toggle('goal-option--active', Number(b.dataset.goal) === goal)
+      );
+    });
+  });
+
+  document.getElementById('goAccountBtn')?.addEventListener('click', () => {
+    location.hash = 'account';
+  });
+
+  document.getElementById('retakePlacementBtn')?.addEventListener('click', () => {
+    if (confirm('确定要重新做摸底测试吗？已完成的练习进度会保留。')) {
+      store.state.placementCompleted = false;
+      store.state.learningPlan = null;
+      store.save();
+      location.hash = 'placement';
+    }
+  });
+
+  document.getElementById('resetProgressBtn')?.addEventListener('click', () => {
+    if (confirm('确定要重置全部进度吗？此操作无法撤销！')) {
+      store.reset();
+      location.hash = '';
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    }
+  });
 }
 
 function esc(s) {
@@ -1196,6 +1301,7 @@ function mountLocked(storedHash) {
 function mountDashboard() {
   document.getElementById('lockBtn')?.addEventListener('click', () => { clearUnlock(); location.hash = ''; });
   document.getElementById('changePinBtn')?.addEventListener('click', () => { location.hash = 'parent/reset'; });
+  mountSettingsSection();
   // 「创建课程」「学习报告」现为原生 <a href> 链接，靠浏览器导航，不依赖 JS 绑定（更稳）。
 
   document.querySelectorAll('[data-switch-curr]').forEach(btn => {

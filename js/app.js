@@ -9,14 +9,13 @@ import * as portfolio from './views/portfolio.js';
 import * as stats from './views/stats.js';
 import * as placement from './views/placement.js';
 import * as review from './views/review.js';
-import * as settings from './views/settings.js';
 import * as account from './views/account.js';
 import * as parent from './views/parent.js';
 import * as syllabus from './views/syllabus.js';
 import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260620b';
+const BUILD_VERSION = '20260620c';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -44,7 +43,6 @@ const routes = {
   'stats': stats,
   'placement': placement,
   'review': review,
-  'settings': settings,
   'account': account,
   'parent': parent,
   'syllabus': syllabus,
@@ -60,7 +58,6 @@ const titles = {
   'stats': '我的',
   'placement': '摸底测试',
   'review': '复习中心',
-  'settings': '设置',
   'account': '我的账号',
   'parent': '家长专区',
   'syllabus': '语法提纲',
@@ -77,15 +74,17 @@ function router() {
     return;
   }
 
+  // 「设置」已并入家长专区。旧链接/书签仍可能指到这里，直接重定向。
+  if (route === 'settings') {
+    location.hash = 'parent';
+    return;
+  }
+
   const view = routes[route];
   if (!view) {
     location.hash = '';
     return;
   }
-
-  // 离开家长专区就立即上锁：解锁状态只在专区内有效，切到别的页面后
-  // 再回来必须重新输入 PIN（避免家长进过后把设备交给孩子时仍处于解锁态）。
-  if (route !== 'parent') parent.lock();
 
   const content = view.render(...params);
   app.innerHTML = renderShell(route, content);
@@ -104,7 +103,6 @@ const NAV_ITEMS = [
   { route: 'portfolio', icon: '📁', label: '我的作品集' },
   { route: 'stats', icon: '📊', label: '我的进度' },
   { route: 'account', icon: '👤', label: '我的账号' },
-  { route: 'settings', icon: '⚙️', label: '设置' },
   { route: 'parent', icon: '🔒', label: '家长专区' },
 ];
 
@@ -122,11 +120,11 @@ function activeNavRoute(route) {
     // The review-mode practice session belongs under the 复习中心 tab.
     return location.hash.startsWith('#practice/review') ? 'review' : '';
   }
-  return ['review', 'portfolio', 'stats', 'settings', 'account', 'parent'].includes(route) ? route : '';
+  return ['review', 'portfolio', 'stats', 'account', 'parent'].includes(route) ? route : '';
 }
 
 function renderShell(route, content) {
-  const topLevelRoutes = ['', 'review', 'portfolio', 'stats', 'settings', 'account', 'parent'];
+  const topLevelRoutes = ['', 'review', 'portfolio', 'stats', 'account', 'parent'];
   const showBackBtn = !topLevelRoutes.includes(route);
   const title = titles[route] || 'Grammar Quest';
 
@@ -179,6 +177,11 @@ function renderSidebar(route) {
       <div class="sidebar__footer">
         <div class="sidebar__account-panel">
           <button class="sidebar__account" data-route="account">${accountLine}</button>
+          <button class="sidebar__sound" id="sidebarSoundBtn"
+                  title="${store.state.settings.soundEnabled ? '关闭音效' : '打开音效'}"
+                  aria-pressed="${store.state.settings.soundEnabled}">
+            ${store.state.settings.soundEnabled ? '🔊 音效已开' : '🔇 音效已关'}
+          </button>
           <div class="sidebar__stats">
             <span class="sidebar__stat sidebar__stat--rank">${rank.icon} ${rank.name}</span>
             <span class="sidebar__stat sidebar__stat--score">⭐ ${p.totalScore} 积分</span>
@@ -201,6 +204,20 @@ function mountNav() {
       location.hash = btn.dataset.route;
     });
   });
+
+  // 音效开关留在侧边栏，不跟着「设置」一起搬进家长专区——
+  // 孩子在安静场合想静音，不该还得叫家长来输一次 6 位密码。
+  const soundBtn = document.getElementById('sidebarSoundBtn');
+  if (soundBtn) {
+    soundBtn.addEventListener('click', () => {
+      const on = !store.state.settings.soundEnabled;
+      store.state.settings.soundEnabled = on;
+      store.save();
+      soundBtn.textContent = on ? '🔊 音效已开' : '🔇 音效已关';
+      soundBtn.title = on ? '关闭音效' : '打开音效';
+      soundBtn.setAttribute('aria-pressed', String(on));
+    });
+  }
 }
 
 function mountBackButton() {
