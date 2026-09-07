@@ -57,6 +57,8 @@ function createDefaultState() {
     curricula: {},
     reviewCleared: [],
     reviewShown: [],
+    practiceShown: [],
+    variants: {},
   };
 }
 
@@ -115,6 +117,12 @@ export const store = {
     }
     if (this.state.reviewCleared === undefined) {
       this.state.reviewCleared = [];
+    }
+    if (this.state.practiceShown === undefined) {
+      this.state.practiceShown = [];
+    }
+    if (this.state.variants === undefined) {
+      this.state.variants = {};
     }
     if (this.state.reviewShown === undefined) {
       this.state.reviewShown = [];
@@ -792,6 +800,72 @@ export const store = {
     if (this.state.reviewShown.length !== before) this.save();
   },
 
+  // --- Practice Shown (普通练习出现过的题) ---
+  // 普通练习原来完全没有"看过"的记忆：每次只是把该关固定的那几道题洗一次牌，
+  // 所以反复练同一关，看到的永远是同一批题。这里记录出现过的题和时间，
+  // 让选题时能优先挑没见过的、其次挑最久没见的。
+
+  addPracticeShown(questionIds) {
+    if (!this.state.practiceShown) this.state.practiceShown = [];
+    const today = toDateString(new Date());
+    for (const qid of questionIds) {
+      if (!qid) continue;
+      const exists = this.state.practiceShown.find(r => r.qid === qid);
+      if (exists) {
+        exists.date = today;
+        exists.n = (exists.n || 1) + 1;
+      } else {
+        this.state.practiceShown.push({ qid, date: today, n: 1 });
+      }
+    }
+    if (this.state.practiceShown.length > 500) {
+      this.state.practiceShown = this.state.practiceShown.slice(-500);
+    }
+    this.save();
+  },
+
+  // 返回 Map: qid -> { date, n }。date 越早表示越久没见到。
+  getPracticeShown() {
+    const m = new Map();
+    if (!this.state.practiceShown) return m;
+    const cutoff = toDateString(new Date(Date.now() - 30 * 86400000));
+    for (const r of this.state.practiceShown) {
+      if (r.date >= cutoff) m.set(r.qid, { date: r.date, n: r.n || 1 });
+    }
+    return m;
+  },
+
+  prunePracticeShown() {
+    if (!this.state.practiceShown) return;
+    const cutoff = toDateString(new Date(Date.now() - 30 * 86400000));
+    const before = this.state.practiceShown.length;
+    this.state.practiceShown = this.state.practiceShown.filter(r => r.date >= cutoff);
+    if (this.state.practiceShown.length !== before) this.save();
+  },
+
+  // --- Question Variants (同一知识点的不同问法) ---
+  // 每关只有 8 道题，练几次就见完了。光靠去重躲不掉重复，必须能"换个说法"。
+  // 变体按原题 id 存起来，累积复用，不必每次都重新生成。
+
+  getVariants(qid) {
+    if (!this.state.variants) return [];
+    return this.state.variants[qid] || [];
+  },
+
+  addVariants(qid, list) {
+    if (!qid || !Array.isArray(list) || !list.length) return;
+    if (!this.state.variants) this.state.variants = {};
+    const cur = this.state.variants[qid] || [];
+    // 同一道原题最多留 4 个变体，够用且不会把存档撑爆
+    this.state.variants[qid] = [...cur, ...list].slice(-4);
+    this.save();
+  },
+
+  countVariants() {
+    if (!this.state.variants) return 0;
+    return Object.values(this.state.variants).reduce((n, a) => n + (a?.length || 0), 0);
+  },
+
   // --- PET Mock Challenge (BOSS) & plan progress ---
 
   // The BOSS is unlocked once the child has cleared Lv.3 of enough units to
@@ -844,6 +918,8 @@ export const store = {
       bossBestAccuracy: this.state.bossBestAccuracy,
       reviewCleared: this.state.reviewCleared,
       reviewShown: this.state.reviewShown,
+      practiceShown: this.state.practiceShown,
+      variants: this.state.variants,
     };
 
     const saved = this.state.curricula[newId]?.progress;
@@ -860,6 +936,8 @@ export const store = {
       this.state.bossBestAccuracy = saved.bossBestAccuracy ?? 0;
       this.state.reviewCleared = saved.reviewCleared ?? [];
       this.state.reviewShown = saved.reviewShown ?? [];
+      this.state.practiceShown = saved.practiceShown ?? [];
+      this.state.variants = saved.variants ?? {};
     } else {
       const def = createDefaultState();
       this.state.units = def.units;
@@ -874,6 +952,8 @@ export const store = {
       this.state.bossBestAccuracy = def.bossBestAccuracy;
       this.state.reviewCleared = def.reviewCleared;
       this.state.reviewShown = def.reviewShown;
+      this.state.practiceShown = def.practiceShown;
+      this.state.variants = def.variants;
     }
 
     this.state.activeCurriculumId = newId === BUILT_IN ? null : newId;

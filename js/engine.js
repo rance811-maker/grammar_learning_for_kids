@@ -177,45 +177,89 @@ export const engine = {
   },
 
   selectQuestions(unitId, level, count) {
-    const mainPool = shuffle(getQuestionsForLevel(unitId, level));
+    store.prunePracticeShown();
+    const shown = store.getPracticeShown();   // Map: qid -> { date, n }
+
+    // 一道题最近见过的话，先看它有没有"还没见过的变体"可以顶上。
+    // 这样反复练同一关时，考的还是那个知识点，但句子换了。
+    function freshest(q) {
+      if (!q || !shown.has(q.id)) return q;
+      const vs = store.getVariants(q.id);
+      const unseenVariant = vs.find((v) => v && v.id && !shown.has(v.id));
+      return unseenVariant || q;
+    }
+
+    // 同一次练习里，同一句话不重复出现（变体没生成出来时的兜底）
+    const usedText = new Set();
+    function textKey(q) {
+      const t = (q.sentence || q.correctSentence || q.instruction ||
+        (Array.isArray(q.words) ? q.words.join(' ') : '') || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      return t.slice(0, 120);
+    }
+
+    const picked = [];
+    const pickedIds = new Set();
+    function take(q) {
+      if (!q || pickedIds.has(q.id)) return false;
+      const k = textKey(q);
+      if (k && usedText.has(k)) return false;
+      picked.push(q);
+      pickedIds.add(q.id);
+      if (k) usedText.add(k);
+      return true;
+    }
+
+    // 没见过的优先；都见过就挑"最久没见 + 见得最少"的
+    function byStaleness(a, b) {
+      const sa = shown.get(a.id) || { date: '', n: 0 };
+      const sb = shown.get(b.id) || { date: '', n: 0 };
+      if (sa.date !== sb.date) return sa.date < sb.date ? -1 : 1;
+      return (sa.n || 0) - (sb.n || 0);
+    }
+    function ordered(pool) {
+      const mapped = pool.map(freshest);
+      const unseen = shuffle(mapped.filter((q) => !shown.has(q.id)));
+      const seen = mapped.filter((q) => shown.has(q.id)).sort(byStaleness);
+      return [...unseen, ...seen];
+    }
+
     const weakSkills = store.getWeakestSkills(5);
     const reviewCount = weakSkills.length > 0 ? Math.min(4, Math.floor(count * 0.3)) : 0;
     const mainCount = count - reviewCount;
 
-    let mainQuestions = mainPool.slice(0, mainCount);
+    // 1) 本关的题（优先没见过的）
+    for (const q of ordered(getQuestionsForLevel(unitId, level))) {
+      if (picked.length >= mainCount) break;
+      take(q);
+    }
 
-    // If not enough questions from the target level, pull from the whole unit
-    if (mainQuestions.length < mainCount) {
-      const unitPool = shuffle(getAllQuestionsForUnit(unitId));
-      const seen = new Set(mainQuestions.map((q) => q.id));
-      for (const q of unitPool) {
-        if (mainQuestions.length >= mainCount) break;
-        if (!seen.has(q.id)) {
-          mainQuestions.push(q);
-          seen.add(q.id);
-        }
+    // 2) 不够就从整个单元补
+    if (picked.length < mainCount) {
+      for (const q of ordered(getAllQuestionsForUnit(unitId))) {
+        if (picked.length >= mainCount) break;
+        take(q);
       }
     }
 
-    let reviewQuestions = [];
+    // 3) 薄弱技能的复习题
     if (reviewCount > 0) {
-      reviewQuestions = findReviewQuestions(unitId, weakSkills, reviewCount);
-    }
-
-    // If we still don't have enough, fill from main pool
-    let combined = [...mainQuestions, ...reviewQuestions];
-    if (combined.length < count) {
-      const seen = new Set(combined.map((q) => q.id));
-      for (const q of mainPool) {
-        if (combined.length >= count) break;
-        if (!seen.has(q.id)) {
-          combined.push(q);
-          seen.add(q.id);
-        }
+      for (const q of ordered(findReviewQuestions(unitId, weakSkills, reviewCount * 3))) {
+        if (picked.length >= count) break;
+        take(q);
       }
     }
 
-    return shuffle(combined).slice(0, count);
+    // 4) 还不够，再从本关兜底（此时允许重复文本，总比题目不够强）
+    if (picked.length < count) {
+      for (const q of ordered(getQuestionsForLevel(unitId, level))) {
+        if (picked.length >= count) break;
+        if (!pickedIds.has(q.id)) { picked.push(q); pickedIds.add(q.id); }
+      }
+    }
+
+    const final = shuffle(picked).slice(0, count);
+    store.addPracticeShown(final.map((q) => q.id));
+    return final;
   },
 
   // Build a session from the error notebook + weakest skills, for focused review.

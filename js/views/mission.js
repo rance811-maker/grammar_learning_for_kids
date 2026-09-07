@@ -1,5 +1,6 @@
 import { store } from '../store.js';
 import { curriculum } from '../curriculum.js';
+import { hasWritingCoach, reviewWriting, friendlyAiError } from '../writingCoach.js';
 
 let submitted = false;
 
@@ -142,10 +143,14 @@ function handleSubmit(unitId, mission) {
         <div class="mission-complete-card__title">🎉 你的作品</div>
         <div class="mission-complete-card__article">${fullArticle}</div>
       </div>
+      <div id="writingReview" class="mt-md"></div>
       <div class="mt-md">
         <button class="btn-primary" id="missionSaveBtn">保存到作品集 📁</button>
         <button class="btn-secondary mt-sm" id="missionBackBtn">返回关卡</button>
       </div>`;
+
+    // 逐句 AI 批改（异步，不挡住"保存作品"）
+    runWritingReview(unitId, mission, scaffolds, userTexts);
 
     const saveBtn = document.getElementById('missionSaveBtn');
     if (saveBtn) {
@@ -317,4 +322,115 @@ function checkGrammar(text, grammarType) {
     default:
       return { ok: true, suggestion: '' };
   }
+}
+
+
+// ---------------------------------------------------------------
+// AI 写作批改
+// ---------------------------------------------------------------
+
+function esc(t) {
+  return String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+async function runWritingReview(unitId, mission, scaffolds, userTexts) {
+  const host = document.getElementById('writingReview');
+  if (!host) return;
+
+  if (!hasWritingCoach()) {
+    host.innerHTML = `
+      <div class="card" style="border-left:3px solid var(--color-warning,#C08A2E);">
+        <div style="font-weight:700;margin-bottom:4px;">✍️ 只做了基础检查</div>
+        <div style="font-size:var(--text-sm);color:var(--color-text-light);line-height:1.7;">
+          想要逐句批改、整体点评和提升建议，请到「家长专区 → 创建课程」里配置 AI API key。
+        </div>
+      </div>`;
+    return;
+  }
+
+  host.innerHTML = `
+    <div class="card">
+      <div style="font-weight:700;">✍️ 正在批改…</div>
+      <div style="font-size:var(--text-sm);color:var(--color-text-light);margin-top:4px;">
+        看看有没有语法问题、哪里可以写得更好（约 10–20 秒）
+      </div>
+    </div>`;
+
+  const lines = scaffolds.map((sc, i) => ({
+    prefix: sc.prefix || '',
+    text: userTexts[i] || '',
+    suffix: sc.suffix || '',
+  }));
+
+  const unit = curriculum.getUnit(unitId);
+  const currId = store.state.activeCurriculumId;
+  const cefr = store.state.curricula?.[currId]?.profile?.cefr || '';
+
+  try {
+    const res = await reviewWriting(lines, {
+      grammarType: mission.grammarType || '',
+      unitTitle: unit?.title || '',
+      cefr,
+    });
+    renderWritingReview(host, res, lines);
+  } catch (e) {
+    host.innerHTML = `
+      <div class="card" style="border-left:3px solid var(--color-danger,#C1553A);">
+        <div style="font-weight:700;margin-bottom:4px;">批改没跑成功</div>
+        <div style="font-size:var(--text-sm);color:var(--color-text-light);">
+          ${esc(friendlyAiError(e))}
+        </div>
+        <button class="btn-secondary mt-sm" id="reviewRetryBtn">重试批改</button>
+      </div>`;
+    document.getElementById('reviewRetryBtn')?.addEventListener('click', () => {
+      runWritingReview(unitId, mission, scaffolds, userTexts);
+    });
+  }
+}
+
+function renderWritingReview(host, res, lines) {
+  const stars = '★'.repeat(Math.max(0, Math.min(5, res.score))) +
+                '☆'.repeat(Math.max(0, 5 - Math.min(5, res.score)));
+  const wrong = res.lines.filter((l) => !l.ok).length;
+
+  const lineHtml = res.lines.map((l, i) => {
+    const written = lines[i]?.text || '';
+    if (l.ok) {
+      return `
+        <div style="padding:8px 0;border-top:1px solid var(--color-border,#eee);">
+          <div style="font-size:var(--text-sm);"><span style="color:var(--color-success,#2E6F52);">✅</span> ${esc(written)}</div>
+        </div>`;
+    }
+    return `
+      <div style="padding:8px 0;border-top:1px solid var(--color-border,#eee);">
+        <div style="font-size:var(--text-sm);"><span style="color:var(--color-danger,#C1553A);">✍️</span>
+          <span style="text-decoration:line-through;color:var(--color-text-light);">${esc(written)}</span>
+        </div>
+        ${l.fixed ? `<div style="font-size:var(--text-sm);font-weight:600;margin-top:3px;">→ ${esc(l.fixed)}</div>` : ''}
+        ${l.issue ? `<div style="font-size:var(--text-xs,0.8rem);color:var(--color-text-light);margin-top:3px;line-height:1.6;">${esc(l.issue)}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  const improveHtml = res.improve.length
+    ? `<div style="margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--color-bg-soft,#FBF3E8);">
+         <div style="font-weight:700;font-size:var(--text-sm);margin-bottom:4px;">💡 下次可以更好</div>
+         ${res.improve.map((t) => `<div style="font-size:var(--text-sm);line-height:1.7;">· ${esc(t)}</div>`).join('')}
+       </div>`
+    : '';
+
+  host.innerHTML = `
+    <div class="card">
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
+        <div style="font-weight:700;">✍️ 批改结果</div>
+        <div style="color:var(--color-warning,#C08A2E);letter-spacing:2px;">${stars}</div>
+        <div style="font-size:var(--text-xs,0.8rem);color:var(--color-text-light);margin-left:auto;">
+          ${wrong === 0 ? '全部正确' : `${wrong} 处需要改`}
+        </div>
+      </div>
+      ${res.overall ? `<div style="font-size:var(--text-sm);color:var(--color-text-light);line-height:1.7;margin-top:6px;">${esc(res.overall)}</div>` : ''}
+      <div style="margin-top:8px;">${lineHtml}</div>
+      ${improveHtml}
+    </div>`;
 }
