@@ -316,6 +316,12 @@ async function generateValidated(systemPrompt, userText, validate, attempts = 2)
   throw lastErr;
 }
 
+// 供其它模块复用：调用 AI 并解析成 JSON。
+// 复用这里已经打磨过的一整套：超时、失败重试、截断识别、容错 JSON 解析。
+export function aiJson(systemPrompt, userText, validate) {
+  return generateValidated(systemPrompt, userText, validate || (() => {}));
+}
+
 // ---- Material extraction (PDF text + photo transcription) ----
 // Turns uploaded files (PDF / images) + a typed description into one text blob
 // that drives syllabus + unit generation. PDFs are read locally via pdf.js;

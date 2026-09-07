@@ -3,6 +3,7 @@ import { engine } from '../engine.js';
 import { cloud } from '../cloud.js';
 import { sound } from '../sound.js';
 import { confetti } from '../celebrate.js';
+import { pregenerateVariants } from '../variantGenerator.js';
 
 let session = null;
 let customPackTitle = '';
@@ -816,6 +817,30 @@ function showFeedback(isCorrect, question, userAnswer, result) {
   }
 }
 
+// 结算页背后偷偷做的事：给这次做错的题、以及反复出现过的题，预先生成
+// "同知识点、不同句子"的变体，存起来供下次选题使用。
+// 放在这里是因为孩子正在看成绩，不赶时间——绝不能放在"开始练习"前面挡着。
+function schedulePregenerateVariants(sess, results) {
+  try {
+    if (!sess || sess.unitId === 'demo') return;
+    const wrongIds = new Set(
+      (sess.answers || []).filter((a) => a && a.correct === false).map((a) => a.questionId)
+    );
+    const wrong = (sess.questions || []).filter((q) => wrongIds.has(q.id));
+    // 做错的题最优先；这次没做错的也带上一两道，慢慢把题库铺开
+    const others = (sess.questions || []).filter((q) => !wrongIds.has(q.id));
+    const targets = [...wrong, ...others].slice(0, 3);
+    if (!targets.length) return;
+
+    const currId = store.state.activeCurriculumId;
+    const cefr = store.state.curricula?.[currId]?.profile?.cefr || '';
+    // 故意不 await：失败也不影响孩子看成绩
+    pregenerateVariants(targets, { cefr, max: 3 }).catch(() => {});
+  } catch (e) {
+    console.warn('[variant] 预生成未启动:', e?.message);
+  }
+}
+
 function showResults() {
   sessionEnded = true;
   const isReview = session.unitId === 'review';
@@ -823,6 +848,8 @@ function showResults() {
   const isDemo = session.unitId === 'demo';
   const isCustom = session.unitId === 'custom';
   const results = engine.calculateResults(session);
+
+  schedulePregenerateVariants(session, results);
 
   // Save results (demo/test/custom sessions never touch level progress).
   let bossPassed = false;
