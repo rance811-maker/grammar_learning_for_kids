@@ -3124,9 +3124,23 @@ ul, ol {
 .btn--danger-text { color: var(--color-danger); border-color: transparent; }
 .btn--danger-text:hover { background: #fff0f0; }
 
+/* 家长入口紧跟在菜单末尾，用一条细分隔线表示"这一项不一样"。
+   曾经用 margin-top:auto 把它顶到侧边栏底部，但侧边栏本来就比内容高，
+   那样会在菜单中间留下一段空白，看起来像少了一个菜单项。
+   现在留白落在列表末尾，是正常的"列表到此为止"。 */
 .sidebar__item[data-route="parent"] {
-  margin-top: auto;
+  margin-top: var(--space-sm);
   opacity: 0.75;
+  position: relative;
+}
+.sidebar__item[data-route="parent"]::before {
+  content: "";
+  position: absolute;
+  left: var(--space-md);
+  right: var(--space-md);
+  top: calc(var(--space-xs) * -1);
+  height: 1px;
+  background: var(--color-border);
 }
 .sidebar__item[data-route="parent"].active,
 .sidebar__item[data-route="parent"]:hover {
@@ -3304,6 +3318,8 @@ ul, ol {
   .sidebar__brand-text { display: none; }
   .sidebar__curriculum { display: none; }
   .sidebar__nav { flex-direction: row; flex: 1; }
+  .sidebar__item[data-route="parent"] { margin-top: 0; }
+  .sidebar__item[data-route="parent"]::before { display: none; }
   .sidebar__item { padding: var(--space-sm) var(--space-md); white-space: nowrap; }
   .sidebar__item-label { display: none; }
   .sidebar__footer {
