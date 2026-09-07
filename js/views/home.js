@@ -3,13 +3,71 @@ import { curriculum } from '../curriculum.js';
 import { engine } from '../engine.js';
 import { cloud } from '../cloud.js';
 
-const RANK_INFO = {
-  bronze: { icon: '🥉', name: '青铜' },
-  silver: { icon: '🥈', name: '白银' },
-  gold: { icon: '🥇', name: '黄金' },
-  diamond: { icon: '💎', name: '钻石' },
-  master: { icon: '👑', name: '大师' },
-};
+// 段位从低到高。顺序即是段位阶梯，别的地方要按序展示就靠它。
+const RANK_LADDER = [
+  { key: 'bronze', icon: '🥉', name: '青铜', min: 0 },
+  { key: 'silver', icon: '🥈', name: '白银', min: 2000 },
+  { key: 'gold', icon: '🥇', name: '黄金', min: 5000 },
+  { key: 'diamond', icon: '💎', name: '钻石', min: 10000 },
+  { key: 'master', icon: '👑', name: '大师', min: 20000 },
+];
+
+const RANK_INFO = Object.fromEntries(RANK_LADDER.map((r) => [r.key, r]));
+
+/**
+ * 光显示"黄金"两个字，孩子不知道这是第几档、上面还有什么、离下一档多远。
+ * 这里把整条阶梯摊开，并算出当前档位内的进度。
+ */
+function rankProgress(totalScore, rankKey) {
+  let idx = RANK_LADDER.findIndex((r) => r.key === rankKey);
+  if (idx < 0) idx = 0;
+  const curr = RANK_LADDER[idx];
+  const next = RANK_LADDER[idx + 1] || null;
+
+  if (!next) {
+    return { idx, curr, next: null, pct: 100, remain: 0 };
+  }
+  const span = next.min - curr.min;
+  const done = Math.max(0, totalScore - curr.min);
+  // 向下取整并封顶 99：还差 1 分就升段时，进度条不该已经显示满格。
+  const pct = Math.max(0, Math.min(99, Math.floor((done / span) * 100)));
+  return {
+    idx,
+    curr,
+    next,
+    pct,
+    remain: Math.max(0, next.min - totalScore),
+  };
+}
+
+function renderRankLadder(totalScore, rankKey) {
+  const p = rankProgress(totalScore, rankKey);
+
+  const steps = RANK_LADDER.map((r, i) => {
+    const state = i < p.idx ? 'done' : i === p.idx ? 'current' : 'todo';
+    return `
+      <div class="rank-step rank-step--${state}" title="${r.name}｜${r.min} 分">
+        <span class="rank-step__icon">${r.icon}</span>
+        <span class="rank-step__name">${r.name}</span>
+      </div>`;
+  }).join('<span class="rank-step__sep"></span>');
+
+  const tail = p.next
+    ? `距离 ${p.next.icon} ${p.next.name} 还差 <strong>${p.remain}</strong> 分`
+    : '已经是最高段位 🎉';
+
+  return `
+    <div class="card mb-md rank-ladder">
+      <div class="rank-ladder__head">
+        <span>${p.curr.icon} ${p.curr.name}<span class="rank-ladder__pos"> · 第 ${p.idx + 1} / ${RANK_LADDER.length} 段</span></span>
+        <span class="rank-ladder__tail">${tail}</span>
+      </div>
+      <div class="rank-ladder__track">${steps}</div>
+      <div class="progress-bar progress-bar--small">
+        <div class="progress-bar__fill" style="width:${p.pct}%"></div>
+      </div>
+    </div>`;
+}
 
 const UNIT_ICONS = ['📗', '📘', '📙', '📕', '📒', '📓', '📔', '📖', '🔖', '📚', '🏅', '🏆'];
 
@@ -190,7 +248,7 @@ export function render() {
       <div class="card mb-md curr-switcher">
         <div class="curr-switcher__header">
           <span class="curr-switcher__label">📚 当前课程体系</span>
-          <strong class="curr-switcher__current" title="${escapeHtml(currTitle)}">${escapeHtml(currTitle)}</strong>
+          <a class="curr-switcher__current curr-syllabus-link" href="#syllabus" title="查看这套课程的语法提纲">${escapeHtml(currTitle)} <span class="curr-syllabus-link__hint">查看语法提纲 ›</span></a>
         </div>
         <div class="curr-switcher__list">${options}</div>
       </div>`;
@@ -199,7 +257,7 @@ export function render() {
       <div class="card mb-md curr-switcher">
         <div class="curr-switcher__header">
           <span class="curr-switcher__label">📚 当前课程体系</span>
-          <strong class="curr-switcher__current" title="${escapeHtml(currTitle)}">${escapeHtml(currTitle)}</strong>
+          <a class="curr-switcher__current curr-syllabus-link" href="#syllabus" title="查看这套课程的语法提纲">${escapeHtml(currTitle)} <span class="curr-syllabus-link__hint">查看语法提纲 ›</span></a>
         </div>
       </div>`;
   }
@@ -221,6 +279,7 @@ export function render() {
         </div>
       </div>
 
+      ${renderRankLadder(player.totalScore, player.rank)}
       ${switcherHtml}
       ${planHtml}
       ${quickStartHtml}
