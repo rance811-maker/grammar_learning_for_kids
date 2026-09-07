@@ -12,10 +12,11 @@ import * as review from './views/review.js';
 import * as settings from './views/settings.js';
 import * as account from './views/account.js';
 import * as parent from './views/parent.js';
+import * as syllabus from './views/syllabus.js';
 import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260620a';
+const BUILD_VERSION = '20260620b';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -46,6 +47,7 @@ const routes = {
   'settings': settings,
   'account': account,
   'parent': parent,
+  'syllabus': syllabus,
 };
 
 const titles = {
@@ -61,6 +63,7 @@ const titles = {
   'settings': '设置',
   'account': '我的账号',
   'parent': '家长专区',
+  'syllabus': '语法提纲',
 };
 
 function router() {
