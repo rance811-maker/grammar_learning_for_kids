@@ -15,7 +15,7 @@ import * as syllabus from './views/syllabus.js';
 import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260620e';
+const BUILD_VERSION = '20260620f';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -58,7 +58,7 @@ const titles = {
   'stats': '我的',
   'placement': '摸底测试',
   'review': '复习中心',
-  'account': '我的账号',
+  'account': '账号与同步',
   'parent': '家长专区',
   'syllabus': '语法提纲',
 };
@@ -102,7 +102,7 @@ const NAV_ITEMS = [
   { route: 'review', icon: '🎯', label: '复习中心' },
   { route: 'portfolio', icon: '📁', label: '我的作品集' },
   { route: 'stats', icon: '📊', label: '我的进度' },
-  { route: 'account', icon: '👤', label: '我的账号' },
+  { route: 'account', icon: '☁️', label: '账号与同步' },
   { route: 'parent', icon: '🔒', label: '家长专区' },
 ];
 
@@ -166,8 +166,10 @@ function renderSidebar(route) {
   const p = store.state.player;
   const rank = RANKS[p.rank] || RANKS.bronze;
   const accountLine = store.isLoggedIn()
-    ? `<span class="sidebar__account-name">☁️ ${escapeHtml(store.account.name)}</span>`
-    : `<span class="sidebar__account-name">👤 登录 / 注册</span>`;
+    ? `<span class="sidebar__account-name">☁️ ${escapeHtml(store.account.name)}</span>
+       <span class="sidebar__account-role">家长账号 · 已同步</span>`
+    : `<span class="sidebar__account-name">👤 登录 / 注册</span>
+       <span class="sidebar__account-role">登录后可跨设备同步</span>`;
 
   const currTitle = curriculum.getActiveTitle();
   const currIsBuiltIn = curriculum.isBuiltIn();
@@ -189,6 +191,7 @@ function renderSidebar(route) {
         <div class="sidebar__account-panel">
           <button class="sidebar__account" data-route="account">${accountLine}</button>
           <div class="sidebar__stats">
+            <span class="sidebar__stats-label">孩子的学习进度</span>
             <span class="sidebar__stat sidebar__stat--rank">${rank.icon} ${rank.name}</span>
             <span class="sidebar__stat sidebar__stat--score">⭐ ${p.totalScore} 积分</span>
             <span class="sidebar__stat sidebar__stat--streak">🔥 连续 ${p.currentStreak} 天</span>
