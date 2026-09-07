@@ -3514,18 +3514,21 @@ ul, ol {
 }
 .parent-lock-hint strong { color: var(--color-text); }
 
-/* 侧边栏音效开关：孩子自己就能静音 */
-.sidebar__sound {
-  display: block;
-  width: 100%;
-  margin-bottom: 6px;
-  padding: 5px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-card);
-  color: var(--color-text-light);
-  font-size: var(--text-xs);
-  text-align: center;
+/* 顶栏音效开关：每一页都在，孩子随手可静音 */
+.topbar__sound {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  font-size: 1.05rem;
+  line-height: 1;
   cursor: pointer;
+  transition: background var(--transition-fast);
 }
-.sidebar__sound:hover { border-color: var(--color-primary); color: var(--color-text); }
+.topbar__sound:hover { background: var(--color-bg); }
+.topbar__sound--off { opacity: 0.45; filter: grayscale(1); }

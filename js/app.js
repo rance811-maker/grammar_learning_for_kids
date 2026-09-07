@@ -15,7 +15,7 @@ import * as syllabus from './views/syllabus.js';
 import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260620c';
+const BUILD_VERSION = '20260620d';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -138,10 +138,21 @@ function renderShell(route, content) {
             : '<span class="topbar__back-placeholder"></span>'}
           <h1 class="topbar__title">${title}</h1>
           <span class="topbar__spacer"></span>
+          ${renderSoundBtn()}
         </header>
         <main class="content">${content}</main>
       </div>
     </div>`;
+}
+
+// 音效开关放顶栏右侧：每一页都在，孩子随手就能静音，
+// 不用进家长专区输密码。图标按钮，不抢标题的位置。
+function renderSoundBtn() {
+  const on = store.state.settings.soundEnabled;
+  return `<button class="topbar__sound${on ? '' : ' topbar__sound--off'}" id="soundBtn"
+                  aria-label="${on ? '关闭音效' : '打开音效'}"
+                  title="${on ? '关闭音效' : '打开音效'}"
+                  aria-pressed="${on}">${on ? '🔊' : '🔇'}</button>`;
 }
 
 function renderSidebar(route) {
@@ -177,11 +188,6 @@ function renderSidebar(route) {
       <div class="sidebar__footer">
         <div class="sidebar__account-panel">
           <button class="sidebar__account" data-route="account">${accountLine}</button>
-          <button class="sidebar__sound" id="sidebarSoundBtn"
-                  title="${store.state.settings.soundEnabled ? '关闭音效' : '打开音效'}"
-                  aria-pressed="${store.state.settings.soundEnabled}">
-            ${store.state.settings.soundEnabled ? '🔊 音效已开' : '🔇 音效已关'}
-          </button>
           <div class="sidebar__stats">
             <span class="sidebar__stat sidebar__stat--rank">${rank.icon} ${rank.name}</span>
             <span class="sidebar__stat sidebar__stat--score">⭐ ${p.totalScore} 积分</span>
@@ -205,17 +211,19 @@ function mountNav() {
     });
   });
 
-  // 音效开关留在侧边栏，不跟着「设置」一起搬进家长专区——
-  // 孩子在安静场合想静音，不该还得叫家长来输一次 6 位密码。
-  const soundBtn = document.getElementById('sidebarSoundBtn');
+  // 音效不跟着「设置」搬进家长专区——孩子在安静场合想静音，
+  // 不该还得叫家长来输一次 6 位密码。
+  const soundBtn = document.getElementById('soundBtn');
   if (soundBtn) {
     soundBtn.addEventListener('click', () => {
       const on = !store.state.settings.soundEnabled;
       store.state.settings.soundEnabled = on;
       store.save();
-      soundBtn.textContent = on ? '🔊 音效已开' : '🔇 音效已关';
+      soundBtn.textContent = on ? '🔊' : '🔇';
       soundBtn.title = on ? '关闭音效' : '打开音效';
+      soundBtn.setAttribute('aria-label', on ? '关闭音效' : '打开音效');
       soundBtn.setAttribute('aria-pressed', String(on));
+      soundBtn.classList.toggle('topbar__sound--off', !on);
     });
   }
 }
