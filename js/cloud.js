@@ -50,6 +50,7 @@ function sessionFromToken(r) {
       id: u.id || '',
       email: u.email || '',
       display_name: (u.user_metadata && (u.user_metadata.display_name || u.user_metadata.name)) || '',
+      created_at: u.created_at || '',
     },
   };
 }
@@ -149,7 +150,7 @@ export const cloud = {
       access_token,
       refresh_token: refresh_token || '',
       expires_at: Date.now() + 3600 * 1000,
-      user: { id: '', email: '', display_name: '' },
+      user: { id: '', email: '', display_name: '', created_at: '' },
     });
   },
 
@@ -177,6 +178,7 @@ export const cloud = {
       id: u.id || '',
       email: u.email || '',
       display_name: (u.user_metadata && (u.user_metadata.display_name || u.user_metadata.name)) || '',
+      created_at: u.created_at || '',
     };
     writeSession(s);
     return s.user;

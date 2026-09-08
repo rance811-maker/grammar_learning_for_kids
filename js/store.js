@@ -99,6 +99,13 @@ export const store = {
 
   // Migration for existing saved states (run after any load).
   _migrate() {
+    // 首页欢迎语要算"第几天"。云端账号有注册时间可用；访客模式没有账号，
+    // 就以本机第一次打开的日期兜底。老用户此前没记过，用最早一条学习记录
+    // 反推，避免把用了很久的人显示成"第 1 天"。
+    if (!this.state.startedAt) {
+      const first = this.state.history?.[0]?.date;
+      this.state.startedAt = first || new Date().toISOString().slice(0, 10);
+    }
     if (this.state.placementCompleted === undefined) {
       this.state.placementCompleted = false;
     }
@@ -162,7 +169,7 @@ export const store = {
   _refreshAccount() {
     const u = cloudEnabled() ? cloud.currentUser() : null;
     this.account = u && u.id
-      ? { name: u.display_name || u.email, email: u.email, userId: u.id }
+      ? { name: u.display_name || u.email, email: u.email, userId: u.id, createdAt: u.created_at || '' }
       : null;
   },
 
