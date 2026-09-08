@@ -210,9 +210,8 @@ body {
   background: var(--color-bg);
   overflow: hidden;
 }
-/* 账号名是家长的（用家长邮箱注册），下面的段位/积分是孩子的。
-   两者挨在一起而不加说明，会读成"这些积分是这个账号的人挣的"。
-   各加一行小字标明归属。 */
+/* 账号名是家长的（用家长邮箱注册）。加一行小字点明这一点，
+   否则和下面的段位/积分挨在一起，会读成"这些积分是这个账号的人挣的"。 */
 .sidebar__account-role {
   display: block;
   font-size: var(--text-xs);
@@ -228,12 +227,6 @@ body {
   border-top: 1px solid var(--color-border);
   font-size: var(--text-xs);
   font-weight: 600;
-}
-.sidebar__stats-label {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--color-muted);
-  margin-bottom: 2px;
 }
 .sidebar__stat--rank { color: var(--color-text); }
 .sidebar__stat--score { color: var(--color-warning); }
