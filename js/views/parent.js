@@ -157,6 +157,7 @@ function renderDashboard() {
           ? '<span class="badge badge--success" style="font-size:0.75rem;">✅ 孩子正在学</span>'
           : `<button class="btn btn--tiny btn--primary" data-switch-curr="${c.id}">让孩子学这套</button>`}
         ${!c.builtIn && genCount < 12 ? `<button class="btn btn--tiny btn--outline" data-genall-curr="${c.id}">⚡ 补齐剩余 ${12 - genCount} 单元</button>` : ''}
+        ${!c.builtIn ? `<button class="btn btn--tiny btn--outline" data-export-curr="${c.id}">导出</button>` : ''}
         ${!c.builtIn ? `<button class="btn btn--tiny btn--danger-text" data-del-curr="${c.id}">删除</button>` : ''}
       </div>
     </div>`;
@@ -182,14 +183,19 @@ function renderDashboard() {
         AI 课程的单元在孩子首次进入时会自动生成；也可点「补齐剩余单元」提前一次性生成好。
       </p>
       ${currItems}
+      <div style="margin-top:var(--space-sm);">
+        <button class="btn btn--tiny btn--outline" id="currImportBtn">📥 导入课程文件</button>
+        <input type="file" id="currImportFile" accept="application/json,.json" style="display:none;">
+        <span style="font-size:0.75rem;color:var(--color-muted);margin-left:8px;">导入别人发给你的 .json 课程文件</span>
+      </div>
     </div>
 
     <div class="parent-grid" style="margin-top:var(--space-lg)">
       <a class="parent-feature parent-feature--active" id="newCurrCard" href="#parent/curriculum" style="cursor:pointer;text-decoration:none;color:inherit;display:block;">
         <div class="parent-feature-icon">🤖</div>
-        <h3>AI 创建课程</h3>
-        <p>描述目标或上传教材/考纲（PDF·拍照），AI 自动生成完整 12 单元课程</p>
-        <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">+ 创建课程</span>
+        <h3>定制专属课程</h3>
+        <p>按孩子的目标和当前水平，定制 12 个单元——只练该练的，不做无用功。可上传教材或考纲（PDF·拍照）。</p>
+        <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">+ 定制课程</span>
       </a>
       <a class="parent-feature parent-feature--active" id="reportCard" href="#parent/report" style="cursor:pointer;text-decoration:none;color:inherit;display:block;">
         <div class="parent-feature-icon">📊</div>
@@ -602,7 +608,7 @@ function mountCurriculumCreator() {
     }
 
     genBtn.disabled = true;
-    genBtn.innerHTML = '<span class="ce-spinner" style="display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:middle;"></span> AI 正在设计课程…';
+    genBtn.innerHTML = '<span class="ce-spinner" style="display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:middle;"></span> 正在为孩子定制课程…';
     const setMsg = (t) => { if (msg) msg.innerHTML = `<p style="color:var(--color-secondary-dark);font-size:var(--text-sm);">${esc(t)}</p>`; };
     let stopTicker = () => {};
 
@@ -763,7 +769,7 @@ function renderSyllabusPreview(syllabus, profile, material = '') {
       </div>
 
       <div style="margin-top:var(--space-lg);display:flex;gap:var(--space-md);">
-        <button class="btn btn--primary" id="currConfirmBtn" style="flex:1;">✅ 确认并创建课程</button>
+        <button class="btn btn--primary" id="currConfirmBtn" style="flex:1;">✅ 确认并定制课程</button>
         <button class="btn btn--outline" id="currRegenBtn">🔄 重新生成</button>
       </div>
     </div>`;
@@ -930,7 +936,7 @@ function showPostCreate(title) {
   const ph = document.getElementById('postCreateHost');
   ph.innerHTML = `<div class="parent-card parent-card--wide" style="text-align:center;">
     <div class="parent-icon">✅</div>
-    <h2>课程已创建</h2>
+    <h2>专属课程已就绪</h2>
     <p class="parent-desc">《${esc(title)}》已添加并设为当前课程。<br>
     是否现在就生成全部 12 个单元的练习题？也可以稍后等孩子进入某个单元时再单独生成。</p>
     <div style="display:flex;gap:var(--space-md);justify-content:center;flex-wrap:wrap;margin-top:var(--space-lg);">
@@ -1298,11 +1304,98 @@ function mountLocked(storedHash) {
   if (resetLink) resetLink.addEventListener('click', () => { location.hash = 'parent/reset'; });
 }
 
+// 课程的导入/导出。
+//
+// 为什么需要：课程原来只存在创建者自己的账号里，既没法把自己做好的课程
+// 变成内置内容，也没法把生成好的课程交给别人。
+//
+// 导出时刻意剥掉 progress —— 那里面是自家孩子的答题记录、错题本和徽章，
+// 属于隐私，不该跟着课程文件送到别人手上。
+const CURRICULUM_FILE_TAG = 'grammar-quest-curriculum';
+
+function exportCurriculum(id) {
+  const c = store.state.curricula?.[id];
+  if (!c) return;
+  const payload = {
+    _type: CURRICULUM_FILE_TAG,
+    _version: 1,
+    title: c.title || '自定义课程',
+    description: c.description || '',
+    goal: c.goal || '',
+    material: '',                 // 原始教材可能很大且含版权内容，不随课程外发
+    profile: c.profile || null,
+    syllabus: c.syllabus || [],
+    unitsData: c.unitsData || {},
+    // 注意：不含 progress（自家孩子的学习记录）
+  };
+  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${(payload.title || 'course').replace(/[\\/:*?"<>|]/g, '_')}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function importCurriculumFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try {
+      data = JSON.parse(String(reader.result));
+    } catch {
+      alert('这个文件不是有效的课程文件（JSON 解析失败）。');
+      return;
+    }
+    if (!data || data._type !== CURRICULUM_FILE_TAG || !Array.isArray(data.syllabus) || !data.syllabus.length) {
+      alert('这个文件不是 Grammar Quest 的课程文件。');
+      return;
+    }
+    const id = `imp-${Date.now().toString(36)}`;
+    store.addCurriculum(id, {
+      title: data.title || '导入的课程',
+      description: data.description || '',
+      goal: data.goal || '',
+      material: '',
+      profile: data.profile || null,
+      syllabus: data.syllabus,
+      unitsData: data.unitsData || {},
+    });
+    const done = Object.keys(data.unitsData || {}).length;
+    alert(`已导入「${data.title || '课程'}」（${done}/12 单元已生成）。\n在上面的课程列表里点「让孩子学这套」即可开始。`);
+    location.hash = 'parent';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  };
+  reader.onerror = () => alert('读取文件失败，请重试。');
+  reader.readAsText(file);
+}
+
+function mountCurriculumTransfer() {
+  document.querySelectorAll('[data-export-curr]').forEach((btn) => {
+    btn.addEventListener('click', () => exportCurriculum(btn.dataset.exportCurr));
+  });
+
+  const importBtn = document.getElementById('currImportBtn');
+  const importFile = document.getElementById('currImportFile');
+  if (importBtn && importFile) {
+    importBtn.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', () => {
+      const f = importFile.files && importFile.files[0];
+      if (f) importCurriculumFile(f);
+      importFile.value = '';
+    });
+  }
+}
+
 function mountDashboard() {
   document.getElementById('lockBtn')?.addEventListener('click', () => { clearUnlock(); location.hash = ''; });
   document.getElementById('changePinBtn')?.addEventListener('click', () => { location.hash = 'parent/reset'; });
   mountSettingsSection();
   // 「创建课程」「学习报告」现为原生 <a href> 链接，靠浏览器导航，不依赖 JS 绑定（更稳）。
+
+  mountCurriculumTransfer();
 
   document.querySelectorAll('[data-switch-curr]').forEach(btn => {
     btn.addEventListener('click', () => {
