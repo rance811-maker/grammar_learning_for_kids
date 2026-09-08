@@ -15,58 +15,19 @@ const RANK_LADDER = [
 const RANK_INFO = Object.fromEntries(RANK_LADDER.map((r) => [r.key, r]));
 
 /**
- * 光显示"黄金"两个字，孩子不知道这是第几档、上面还有什么、离下一档多远。
- * 这里把整条阶梯摊开，并算出当前档位内的进度。
+ * 首页的段位/积分/连续天数是次要信息——主角是"今天练什么"。
+ * 参照多邻国：首页顶部只有一排紧凑的图标+数字，段位阶梯放在独立的页面里。
+ * 这里同理，做成一条可点的细状态条，点开进「我的进度」看完整阶梯。
  */
-function rankProgress(totalScore, rankKey) {
-  let idx = RANK_LADDER.findIndex((r) => r.key === rankKey);
-  if (idx < 0) idx = 0;
-  const curr = RANK_LADDER[idx];
-  const next = RANK_LADDER[idx + 1] || null;
-
-  if (!next) {
-    return { idx, curr, next: null, pct: 100, remain: 0 };
-  }
-  const span = next.min - curr.min;
-  const done = Math.max(0, totalScore - curr.min);
-  // 向下取整并封顶 99：还差 1 分就升段时，进度条不该已经显示满格。
-  const pct = Math.max(0, Math.min(99, Math.floor((done / span) * 100)));
-  return {
-    idx,
-    curr,
-    next,
-    pct,
-    remain: Math.max(0, next.min - totalScore),
-  };
-}
-
-function renderRankLadder(totalScore, rankKey) {
-  const p = rankProgress(totalScore, rankKey);
-
-  const steps = RANK_LADDER.map((r, i) => {
-    const state = i < p.idx ? 'done' : i === p.idx ? 'current' : 'todo';
-    return `
-      <div class="rank-step rank-step--${state}" title="${r.name}｜${r.min} 分">
-        <span class="rank-step__icon">${r.icon}</span>
-        <span class="rank-step__name">${r.name}</span>
-      </div>`;
-  }).join('<span class="rank-step__sep"></span>');
-
-  const tail = p.next
-    ? `距离 ${p.next.icon} ${p.next.name} 还差 <strong>${p.remain}</strong> 分`
-    : '已经是最高段位 🎉';
-
+function renderStatusStrip(player) {
+  const rank = RANK_INFO[player.rank] || RANK_INFO.bronze;
   return `
-    <div class="card mb-md rank-ladder">
-      <div class="rank-ladder__head">
-        <span>${p.curr.icon} ${p.curr.name}<span class="rank-ladder__pos"> · 第 ${p.idx + 1} / ${RANK_LADDER.length} 段</span></span>
-        <span class="rank-ladder__tail">${tail}</span>
-      </div>
-      <div class="rank-ladder__track">${steps}</div>
-      <div class="progress-bar progress-bar--small">
-        <div class="progress-bar__fill" style="width:${p.pct}%"></div>
-      </div>
-    </div>`;
+    <a class="status-strip" href="#stats" title="查看完整进度">
+      <span class="status-strip__item">${rank.icon} ${rank.name}</span>
+      <span class="status-strip__item">⭐ ${player.totalScore}</span>
+      <span class="status-strip__item">🔥 ${player.currentStreak}</span>
+      <span class="status-strip__more">详情 ›</span>
+    </a>`;
 }
 
 const UNIT_ICONS = ['📗', '📘', '📙', '📕', '📒', '📓', '📔', '📖', '🔖', '📚', '🏅', '🏆'];
@@ -108,7 +69,6 @@ function renderStars(earned, max) {
 
 export function render() {
   const { player } = store.state;
-  const rank = RANK_INFO[player.rank] || RANK_INFO.bronze;
   const todayLessons = store.getTodayLessons();
   const dailyGoal = store.state.settings.dailyGoal;
   const units = curriculum.getUnits();
@@ -264,22 +224,7 @@ export function render() {
 
   return `
     <div class="view view-map">
-      <div class="player-stats">
-        <div class="player-stats__item">
-          <span class="player-stats__value">${rank.icon}</span>
-          <span class="player-stats__label">${rank.name}</span>
-        </div>
-        <div class="player-stats__item">
-          <span class="player-stats__value">${player.totalScore}</span>
-          <span class="player-stats__label">积分</span>
-        </div>
-        <div class="player-stats__item">
-          <span class="player-stats__value">🔥 ${player.currentStreak}</span>
-          <span class="player-stats__label">连续天数</span>
-        </div>
-      </div>
-
-      ${renderRankLadder(player.totalScore, player.rank)}
+      ${renderStatusStrip(player)}
       ${switcherHtml}
       ${planHtml}
       ${quickStartHtml}
