@@ -3550,13 +3550,38 @@ ul, ol {
 .topbar__sound:hover { background: var(--color-bg); }
 .topbar__sound--off { opacity: 0.45; filter: grayscale(1); }
 
-/* 首页状态条：段位/积分/连续天数是次要信息，压成一行，点开看详情。 */
+/* 首页顶部：左边欢迎语，右边状态条。 */
+.home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-md);
+  padding: var(--space-xs) var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+.home-header__hello { min-width: 0; }
+.home-header__greet {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+.home-header__sub {
+  font-size: var(--text-sm);
+  color: var(--color-text-light);
+  line-height: 1.6;
+  margin-top: 2px;
+}
+.home-header__sub strong { color: var(--color-primary); }
+
+/* 状态条：段位/积分/连续天数是次要信息，压成一行，点开看详情。 */
 .status-strip {
   display: flex;
   align-items: center;
   gap: var(--space-md);
   padding: var(--space-xs) var(--space-sm);
-  margin-bottom: var(--space-md);
+  flex-shrink: 0;
   color: var(--color-text-light);
   font-size: var(--text-sm);
   font-weight: 600;
@@ -3571,4 +3596,10 @@ ul, ol {
   font-weight: 400;
   font-size: var(--text-xs);
   color: var(--color-muted);
+}
+
+@media (max-width: 720px) {
+  .home-header { align-items: flex-start; }
+  .status-strip { padding-left: 0; }
+  .status-strip__more { display: none; }
 }

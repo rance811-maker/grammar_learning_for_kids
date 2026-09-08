@@ -14,20 +14,58 @@ const RANK_LADDER = [
 
 const RANK_INFO = Object.fromEntries(RANK_LADDER.map((r) => [r.key, r]));
 
+// 鼓励语按当天轮换，同一天进来看到的是同一句，不会每次刷新都换一句。
+const CHEERS = [
+  '今天也来一小步，积累就是这么攒出来的。',
+  '慢一点没关系，别停下就行。',
+  '错的题才是真正在教你东西。',
+  '每天二十分钟，一年就是一百多个小时。',
+  '昨天不会的，今天可能就会了。',
+  '坚持这件事，本身就很厉害。',
+  '一次练不完也没关系，先开个头。',
+];
+
+/** 从起始日期算到今天是第几天（含起始当天，所以最小是 1）。 */
+function daysSince(dateStr) {
+  if (!dateStr) return 1;
+  const start = new Date(dateStr);
+  if (Number.isNaN(start.getTime())) return 1;
+  const d0 = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+  const now = new Date();
+  const d1 = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.max(1, Math.floor((d1 - d0) / 86400000) + 1);
+}
+
 /**
- * 首页的段位/积分/连续天数是次要信息——主角是"今天练什么"。
- * 参照多邻国：首页顶部只有一排紧凑的图标+数字，段位阶梯放在独立的页面里。
- * 这里同理，做成一条可点的细状态条，点开进「我的进度」看完整阶梯。
+ * 首页顶部：左边是给孩子的欢迎语，右边是段位/积分/连续天数。
+ * 段位那几个数是次要信息（参照多邻国把排位放在独立页面），
+ * 所以压成一行、靠右、点开进「我的进度」看完整阶梯。
  */
-function renderStatusStrip(player) {
+function renderHeader(player) {
   const rank = RANK_INFO[player.rank] || RANK_INFO.bronze;
+  // 注册时填的「名字（昵称）」是小朋友的名字，没登录就不称呼具体的人。
+  const name = store.account?.name || '';
+  const day = daysSince(store.account?.createdAt || store.state.startedAt);
+  const cheer = CHEERS[day % CHEERS.length];
+
+  const greet = name ? `亲爱的 ${escapeHtml(name)}，` : '亲爱的同学，';
+  const sinceLine = name
+    ? `这是你注册 Grammar Quest 并学习的第 <strong>${day}</strong> 天。`
+    : `这是你使用 Grammar Quest 的第 <strong>${day}</strong> 天。`;
+
   return `
-    <a class="status-strip" href="#stats" title="查看完整进度">
-      <span class="status-strip__item">${rank.icon} ${rank.name}</span>
-      <span class="status-strip__item">⭐ ${player.totalScore}</span>
-      <span class="status-strip__item">🔥 ${player.currentStreak}</span>
-      <span class="status-strip__more">详情 ›</span>
-    </a>`;
+    <div class="home-header">
+      <div class="home-header__hello">
+        <div class="home-header__greet">${greet}</div>
+        <div class="home-header__sub">${sinceLine}${cheer}</div>
+      </div>
+      <a class="status-strip" href="#stats" title="查看完整进度">
+        <span class="status-strip__item">${rank.icon} ${rank.name}</span>
+        <span class="status-strip__item">⭐ ${player.totalScore}</span>
+        <span class="status-strip__item">🔥 ${player.currentStreak}</span>
+        <span class="status-strip__more">详情 ›</span>
+      </a>
+    </div>`;
 }
 
 const UNIT_ICONS = ['📗', '📘', '📙', '📕', '📒', '📓', '📔', '📖', '🔖', '📚', '🏅', '🏆'];
@@ -224,7 +262,7 @@ export function render() {
 
   return `
     <div class="view view-map">
-      ${renderStatusStrip(player)}
+      ${renderHeader(player)}
       ${switcherHtml}
       ${planHtml}
       ${quickStartHtml}
