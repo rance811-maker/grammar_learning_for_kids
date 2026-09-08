@@ -18,6 +18,30 @@ const RANK_THRESHOLDS = {
   master: 20000,
 };
 
+const RANK_ORDER = ['bronze', 'silver', 'gold', 'diamond', 'master'];
+
+// 完整的段位阶梯。放在「我的进度」而不是首页：首页的主角是"今天练什么"，
+// 段位是次要信息，摊开五档会喧宾夺主。
+function renderRankLadder(currentRank) {
+  let idx = RANK_ORDER.indexOf(currentRank);
+  if (idx < 0) idx = 0;
+  const steps = RANK_ORDER.map((key, i) => {
+    const r = RANK_INFO[key];
+    const state = i < idx ? 'done' : i === idx ? 'current' : 'todo';
+    return `
+      <div class="rank-step rank-step--${state}" title="${r.name}｜${RANK_THRESHOLDS[key]} 积分">
+        <span class="rank-step__icon">${r.icon}</span>
+        <span class="rank-step__name">${r.name}</span>
+      </div>`;
+  }).join('<span class="rank-step__sep"></span>');
+
+  return `
+    <div class="rank-ladder__head">
+      <span class="rank-ladder__pos">第 ${idx + 1} / ${RANK_ORDER.length} 段</span>
+    </div>
+    <div class="rank-ladder__track">${steps}</div>`;
+}
+
 const BADGE_ICONS = ['🌟', '💪', '🎯', '🏅', '🔥', '📚', '✨', '🎓', '💡', '🏆', '🎖️', '👑'];
 
 export function render() {
@@ -175,7 +199,10 @@ export function render() {
         <div class="rank-badge-display__sub">当前段位</div>
       </div>
 
-      <div class="card mb-lg">${rankProgressHtml}</div>
+      <div class="card mb-lg rank-ladder">
+        ${renderRankLadder(player.rank)}
+        ${rankProgressHtml}
+      </div>
 
       <div class="stats-cards">
         <div class="stat-card">

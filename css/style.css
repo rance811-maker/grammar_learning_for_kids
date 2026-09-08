@@ -3354,26 +3354,16 @@ ul, ol {
 }
 
 /* ---------------------------------------------------------------
-   段位阶梯：只显示"黄金"两个字看不出这是第几档、上面还有什么。
+   段位阶梯（「我的进度」页）。首页只放一条状态条——
+   参照多邻国：排位/联赛在独立页面，首页留给"今天练什么"。
    --------------------------------------------------------------- */
-.rank-ladder {
-  padding: var(--space-md) !important;
-}
 .rank-ladder__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px var(--space-sm);
   font-size: var(--text-sm);
   font-weight: 700;
+  text-align: center;
   margin-bottom: var(--space-sm);
 }
 .rank-ladder__pos {
-  font-weight: 400;
-  color: var(--color-text-light);
-}
-.rank-ladder__tail {
   font-weight: 400;
   color: var(--color-text-light);
 }
@@ -3559,3 +3549,26 @@ ul, ol {
 }
 .topbar__sound:hover { background: var(--color-bg); }
 .topbar__sound--off { opacity: 0.45; filter: grayscale(1); }
+
+/* 首页状态条：段位/积分/连续天数是次要信息，压成一行，点开看详情。 */
+.status-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-xs) var(--space-sm);
+  margin-bottom: var(--space-md);
+  color: var(--color-text-light);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+.status-strip:hover { background: var(--color-card); }
+.status-strip__item { white-space: nowrap; }
+.status-strip__more {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
