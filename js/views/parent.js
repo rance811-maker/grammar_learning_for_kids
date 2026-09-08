@@ -671,6 +671,11 @@ const SYLLABUS_GEN_STEPS = [
   '🔖 正在标注每单元语法点…',
 ];
 
+function countGeneratedUnits() {
+  const id = store.state.activeCurriculumId;
+  return Object.keys(store.state.curricula?.[id]?.unitsData || {}).length;
+}
+
 // 批量生成 UI：在 hostEl 内渲染进度条并跑 generateAllUnits。
 // 完成后给出"进入学习地图"以及（若有失败）"重试失败单元"。
 async function renderAndRunBatch(hostEl, title) {
@@ -685,9 +690,17 @@ async function renderAndRunBatch(hostEl, title) {
     return;
   }
 
+  const already = countGeneratedUnits();
+  const willGenerate = Math.max(0, 12 - already);
+
   hostEl.innerHTML = `<div class="parent-card parent-card--wide">
     <h2 style="margin-top:0;">🤖 生成单元内容</h2>
-    <p class="batch-sub">正在为《${esc(title)}》的每个单元生成故事、练习题和写作任务，每个单元约 20–90 秒，请保持页面打开…</p>
+    <p class="batch-sub">
+      ${already
+        ? `《${esc(title)}》已有 <strong>${already}</strong> 个单元，本次只生成剩下的 <strong>${willGenerate}</strong> 个——已生成的不会重跑，也不消耗额度。`
+        : `正在为《${esc(title)}》的 12 个单元生成故事、练习题和写作任务。`}
+      每个单元约 20–90 秒，请保持页面打开…
+    </p>
     <div class="batch-progress"><div class="batch-progress__fill" id="batchFill"></div></div>
     <div class="batch-status" id="batchStatus">准备中…</div>
     <div id="batchActions"></div>
@@ -700,9 +713,10 @@ async function renderAndRunBatch(hostEl, title) {
   try {
     res = await generateAllUnits({
       onProgress: (r, uid, kind) => {
-        if (fill) fill.style.width = Math.round((r.done / r.total) * 100) + '%';
-        const tag = kind === 'ok' ? '✅ 已生成' : kind === 'skip' ? '（已存在）' : '⚠️ 失败';
-        if (statusEl) statusEl.textContent = `进度 ${r.done}/${r.total} · 单元 ${uid} ${tag}`;
+        const denom = r.pending || r.total;
+        if (fill) fill.style.width = Math.round((r.done / denom) * 100) + '%';
+        const tag = kind === 'ok' ? '✅ 已生成' : '⚠️ 失败';
+        if (statusEl) statusEl.textContent = `进度 ${r.done}/${denom} · 单元 ${uid} ${tag}`;
       },
     });
   } catch (e) {
@@ -715,9 +729,16 @@ async function renderAndRunBatch(hostEl, title) {
 
   const failCount = res.failed.length;
   if (statusEl) {
-    statusEl.innerHTML = failCount
-      ? `完成 ${res.done}/${res.total} 个单元，其中 <strong style="color:var(--color-danger);">${failCount} 个生成失败</strong>（孩子进入该单元时可单独重试）`
-      : `🎉 全部 ${res.total} 个单元已生成完毕！`;
+    if (!res.pending) {
+      statusEl.innerHTML = `🎉 全部 ${res.total} 个单元都已就绪，本次无需生成。`;
+    } else if (failCount) {
+      const failIds = res.failed.map((f) => f.uid).join('、');
+      statusEl.innerHTML = `本次生成 ${res.done - failCount}/${res.pending} 个，
+        <strong style="color:var(--color-danger);">单元 ${failIds} 失败</strong>。
+        点下面的「重试失败单元」只会重跑这 ${failCount} 个。`;
+    } else {
+      statusEl.innerHTML = `🎉 全部 ${res.total} 个单元已生成完毕！`;
+    }
   }
   const actions = document.getElementById('batchActions');
   if (actions) {
