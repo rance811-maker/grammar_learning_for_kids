@@ -3604,30 +3604,104 @@ ul, ol {
   .status-strip__more { display: none; }
 }
 
-/* 站点定位：第一次来的人要在三秒内知道这是什么。
-   放在首页最上方，窄屏下字号和内边距收紧，但不隐藏——
-   手机才是家长第一次点开链接的地方。 */
-.site-intro {
-  padding: var(--space-md) var(--space-md) var(--space-sm);
-  margin-bottom: var(--space-xs);
+
+/* ---------------------------------------------------------------
+   站点带：全站唯一的品牌 + 定位出现位置。
+   刻意不 sticky —— 家长进站第一屏必见，孩子往下一滚就让位。
+   --------------------------------------------------------------- */
+.siteband {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px var(--space-sm);
+  padding: 10px var(--space-xl);
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
 }
-.site-intro__title {
-  font-size: 1.25rem;
-  font-weight: 800;
-  line-height: 1.35;
+/* 站点带是通栏的，排在 .layout 之上。宽屏下把它的高度从视口高度里扣掉，
+   否则 sticky 的侧边栏会比屏幕高出一截，底部账号面板被挤出可视区。
+   限定 min-width：窄屏下侧边栏是横条，高度必须保持 auto。 */
+@media (min-width: 721px) {
+  .layout { min-height: calc(100dvh - 45px); }
+  .sidebar { height: calc(100dvh - 45px); }
+}
+.siteband__brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  text-decoration: none;
   color: var(--color-text);
+  flex-shrink: 0;
 }
-.site-intro__desc {
-  margin: 6px 0 0;
+.siteband__logo { font-size: 1.05rem; line-height: 1; }
+.siteband__name { font-weight: 800; font-size: 0.98rem; letter-spacing: 0.01em; }
+.siteband__sub { font-weight: 600; font-size: var(--text-xs); color: var(--color-muted); }
+.siteband__tagline {
   font-size: var(--text-sm);
-  line-height: 1.75;
   color: var(--color-text-light);
-  max-width: 46em;
+  min-width: 0;
 }
-.site-intro__desc strong { color: var(--color-text); font-weight: 700; }
+.siteband__tagline::before { content: "·"; margin-right: var(--space-sm); color: var(--color-border); }
+.siteband__more {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.siteband__more:hover { text-decoration: underline; }
 
 @media (max-width: 720px) {
-  .site-intro { padding: var(--space-sm) var(--space-sm) 0; }
-  .site-intro__title { font-size: 1.08rem; }
-  .site-intro__desc { font-size: var(--text-xs); line-height: 1.7; }
+  .siteband { padding: 8px var(--space-md); row-gap: 0; }
+  .siteband__sub { display: none; }          /* 390px 上省掉「语法冒险」，定位本身已说清 */
+  .siteband__tagline { flex-basis: 100%; font-size: var(--text-xs); }
+  .siteband__tagline::before { content: none; }
+}
+
+/* ---------------------------------------------------------------
+   「这是什么」：定位长文案的正式住址，可以单独发给人
+   --------------------------------------------------------------- */
+.view-about { max-width: 44em; margin: 0 auto; }
+.about-hero { padding: var(--space-md) 0 var(--space-lg); }
+.about-hero__title {
+  margin: 0 0 var(--space-sm);
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.about-hero__lead {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.85;
+  color: var(--color-text-light);
+}
+.about-hero__lead strong { color: var(--color-text); }
+.about-section {
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+  background: var(--color-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.about-section--plain { background: var(--color-bg); box-shadow: none; border: 1px solid var(--color-border); }
+.about-section h2 { margin: 0 0 var(--space-sm); font-size: 1.05rem; font-weight: 800; }
+.about-section p { margin: 0 0 var(--space-sm); font-size: var(--text-sm); line-height: 1.85; color: var(--color-text-light); }
+.about-section p:last-child { margin-bottom: 0; }
+.about-section p strong { color: var(--color-text); }
+.about-note { font-size: var(--text-xs) !important; color: var(--color-muted) !important; }
+.about-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin: var(--space-lg) 0 var(--space-xl);
+}
+.about-actions .btn { text-decoration: none; }
+
+@media (max-width: 720px) {
+  .about-hero__title { font-size: 1.22rem; }
+  .about-hero__lead { font-size: var(--text-sm); }
+  .about-section { padding: var(--space-md); }
+  .about-actions .btn { width: 100%; text-align: center; }
 }

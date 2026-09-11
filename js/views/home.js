@@ -37,24 +37,6 @@ function daysSince(dateStr) {
 }
 
 /**
- * 站点定位。第一次来的人需要在三秒内知道这是什么、给谁用、解决什么。
- *
- * 刻意没写"自适应迭代课程"——那个功能还没做。教育类产品上来就承诺
- * 做不到的事，是在拿最难赚回来的东西（信任）去换一句好听的话。
- * 等真做出来再写。
- */
-function renderSiteIntro() {
-  return `
-    <div class="site-intro">
-      <div class="site-intro__title">给中国孩子的英语语法精准练习</div>
-      <p class="site-intro__desc">
-        不做通用题库——按孩子的<strong>考试目标</strong>和<strong>当前水平</strong>定制课程，只练该练的。
-        家长可自定义整套课程；写作由 AI 逐句批改，指出错在哪、为什么错。
-      </p>
-    </div>`;
-}
-
-/**
  * 首页顶部：左边是给孩子的欢迎语，右边是段位/积分/连续天数。
  * 段位那几个数是次要信息（参照多邻国把排位放在独立页面），
  * 所以压成一行、靠右、点开进「我的进度」看完整阶梯。
@@ -280,7 +262,6 @@ export function render() {
 
   return `
     <div class="view view-map">
-      ${renderSiteIntro()}
       ${renderHeader(player)}
       ${switcherHtml}
       ${planHtml}

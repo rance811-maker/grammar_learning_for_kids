@@ -105,12 +105,16 @@ export function render() {
     <div id="placementRoot">
       <div class="view text-center" style="max-width:560px;margin:0 auto;padding:var(--space-lg) var(--space-md);">
         <div style="font-size:3rem;margin-bottom:var(--space-md);">📝</div>
-        <h2 class="mb-md">摸底测试</h2>
-        <p style="color:var(--color-text-light);margin-bottom:var(--space-lg);line-height:1.6;">
-          让我们看看你已经掌握了哪些语法！<br>
-          <span style="font-size:var(--text-sm);color:var(--color-muted);">共 ${questions.length} 题，每单元 1 题，轻松作答即可</span>
+        <h2 class="mb-md">先花 3 分钟，看看孩子已经会了什么</h2>
+        <p style="color:var(--color-text-light);margin-bottom:var(--space-lg);line-height:1.8;">
+          Grammar Quest 不给所有孩子发同一套题。<br>
+          这 ${questions.length} 道题每个单元一题，做完就知道哪些语法点已经掌握、哪些还要练——<br>
+          后面的学习计划按这个结果来排。
         </p>
-        <button class="btn btn--primary btn--large" id="placementBeginBtn">开始测试</button>
+        <button class="btn btn--primary btn--large" id="placementBeginBtn">开始摸底</button>
+        <div style="margin-top:var(--space-md);">
+          <a href="#about" style="font-size:var(--text-sm);color:var(--color-secondary);">先看看这是什么 ›</a>
+        </div>
       </div>
     </div>`;
 }
