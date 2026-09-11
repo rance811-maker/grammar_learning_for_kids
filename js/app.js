@@ -16,7 +16,7 @@ import * as about from './views/about.js';
 import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260620n';
+const BUILD_VERSION = '20260620p';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -98,6 +98,7 @@ function router() {
 
   mountNav();
   mountBackButton();
+  mountCloudSaveBanner();
 }
 
 const NAV_ITEMS = [
@@ -135,13 +136,12 @@ function renderShell(route, content) {
     <div class="layout">
       ${renderSidebar(route)}
       <div class="main-col">
-        <header class="topbar">
+        <header class="topbar${showBackBtn ? '' : ' topbar--title-only'}">
           ${showBackBtn
             ? `<button class="topbar__back" id="navBackBtn">← 返回</button>`
             : '<span class="topbar__back-placeholder"></span>'}
           <h1 class="topbar__title">${title}</h1>
           <span class="topbar__spacer"></span>
-          ${renderSoundBtn()}
         </header>
         <main class="content">${content}</main>
       </div>
@@ -165,11 +165,13 @@ function renderSiteBand() {
       </a>
       <span class="siteband__tagline">给中国孩子的英语语法精准练习</span>
       <a class="siteband__more" href="#about">这是什么 ›</a>
+      ${renderSoundBtn()}
     </div>`;
 }
 
-// 音效开关放顶栏右侧：每一页都在，孩子随手就能静音，
-// 不用进家长专区输密码。图标按钮，不抢标题的位置。
+// 音效开关放站点带右端：每一页都在，孩子随手就能静音，不用进家长专区输密码。
+// 原来放在页面带里，但页面带在顶层页面只剩一个标题，为了一个图标撑起一整条
+// 白带不划算——现在页面带在宽屏的顶层页面直接不显示了。
 function renderSoundBtn() {
   const on = store.state.settings.soundEnabled;
   return `<button class="topbar__sound${on ? '' : ' topbar__sound--off'}" id="soundBtn"
@@ -223,6 +225,40 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
+}
+
+// 云端保存失败的提示条。
+//
+// 这是开放给外部用户前必须补的一环：保存失败原来只在 console 里留一行，
+// 用户以为存上了，换台设备才发现进度少了一截。现在自动重试仍失败就明确告知，
+// 并说清数据还在本机、没有丢——避免家长以为已经彻底没了。
+function mountCloudSaveBanner() {
+  if (window.__gqCloudBannerMounted) return;
+  window.__gqCloudBannerMounted = true;
+
+  window.addEventListener('gq-cloud-save', (e) => {
+    const ok = e.detail && e.detail.ok;
+    let el = document.getElementById('cloudSaveBanner');
+
+    if (ok) {
+      if (el) el.remove();
+      return;
+    }
+    if (el) return;                       // 同一轮失败不重复弹
+
+    el = document.createElement('div');
+    el.id = 'cloudSaveBanner';
+    el.className = 'cloud-banner';
+    el.innerHTML = `
+      <span class="cloud-banner__text">
+        ⚠️ 学习记录没能存到云端（已自动重试 3 次）。
+        <strong>数据还在这台设备上，没有丢</strong>，但现在换设备登录会看不到最新进度。
+        网络恢复后继续练习会自动重试。
+      </span>
+      <button class="cloud-banner__close" aria-label="关闭">✕</button>`;
+    el.querySelector('.cloud-banner__close').addEventListener('click', () => el.remove());
+    document.body.appendChild(el);
+  });
 }
 
 function mountNav() {
