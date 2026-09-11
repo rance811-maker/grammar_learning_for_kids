@@ -1,7 +1,7 @@
-import { units as petUnits } from './data/units.js';
 import { store } from './store.js';
+import { BUILT_IN_ID, BUILTIN_COURSES, getBuiltinCourse, isBuiltinId } from './data/builtinCourses.js';
 
-export const BUILT_IN_ID = '__pet__';
+export { BUILT_IN_ID };
 
 function normalizeGenQ(q, unitId, levelKey, idx) {
   const id = `gen-${unitId}-${levelKey}-${idx}`;
@@ -82,10 +82,15 @@ function buildUnitsFromCurriculum(curr) {
 
 export const curriculum = {
   getUnits() {
-    if (this.isBuiltIn()) return petUnits;
-    const id = store.state.activeCurriculumId;
+    return this.getUnitsOf(this.getActiveId());
+  },
+
+  /** 取任意一套课程的单元，不受"当前激活的是哪套"影响。 */
+  getUnitsOf(id) {
+    const b = getBuiltinCourse(id);
+    if (b) return b.units || buildUnitsFromCurriculum(b);
     const curr = store.state.curricula?.[id];
-    if (!curr) return petUnits;
+    if (!curr) return getBuiltinCourse(BUILT_IN_ID).units;
     return buildUnitsFromCurriculum(curr);
   },
 
@@ -93,9 +98,8 @@ export const curriculum = {
     return this.getUnits()[uid] || null;
   },
 
-  isBuiltIn() {
-    const id = store.state.activeCurriculumId;
-    return !id || id === BUILT_IN_ID;
+  isBuiltIn(id) {
+    return isBuiltinId(id === undefined ? store.state.activeCurriculumId : id);
   },
 
   getActiveId() {
@@ -103,9 +107,30 @@ export const curriculum = {
   },
 
   getActiveTitle() {
-    if (this.isBuiltIn()) return 'PET 语法训练';
-    const id = store.state.activeCurriculumId;
+    const id = this.getActiveId();
+    const b = getBuiltinCourse(id);
+    if (b) return b.title;
     return store.state.curricula?.[id]?.title || '自定义课程';
+  },
+
+  /** 课程的 CEFR 等级（语法提纲页要用）。自定义课程从 profile 里取。 */
+  getCefrOf(id) {
+    const b = getBuiltinCourse(id);
+    if (b) return b.cefr || '';
+    return store.state.curricula?.[id]?.profile?.cefr || '';
+  },
+
+  /** 课程大纲。内置课程直接有；PET 没有，返回空数组让调用方从题目里推。 */
+  getSyllabusOf(id) {
+    const b = getBuiltinCourse(id);
+    if (b) return b.syllabus || [];
+    return store.state.curricula?.[id]?.syllabus || [];
+  },
+
+  getGoalOf(id) {
+    const b = getBuiltinCourse(id);
+    if (b) return b.goal || '';
+    return store.state.curricula?.[id]?.goal || '';
   },
 
   isUnitGenerated(uid) {
@@ -116,7 +141,7 @@ export const curriculum = {
 
   saveUnitData(uid, data) {
     const id = store.state.activeCurriculumId;
-    if (!id || id === BUILT_IN_ID) return;
+    if (!id || isBuiltinId(id)) return;   // 内置课程是只读的
     const curr = store.state.curricula?.[id];
     if (!curr) return;
     if (!curr.unitsData) curr.unitsData = {};
@@ -125,10 +150,12 @@ export const curriculum = {
   },
 
   listAll() {
-    const list = [{ id: BUILT_IN_ID, title: 'PET 语法训练', description: '内置 PET 考试语法训练课程', builtIn: true }];
+    const list = BUILTIN_COURSES.map((c) => ({
+      id: c.id, title: c.title, description: c.description || '', builtIn: true,
+    }));
     const cc = store.state.curricula || {};
     for (const [id, c] of Object.entries(cc)) {
-      if (id === BUILT_IN_ID) continue;
+      if (isBuiltinId(id)) continue;   // 内置课程在 curricula 里只存进度，不算一套课
       list.push({ id, title: c.title || '自定义课程', description: c.description || '', builtIn: false });
     }
     return list;

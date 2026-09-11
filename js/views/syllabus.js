@@ -36,10 +36,9 @@ function skillsFromUnit(unitData) {
 /** 把课程统一成一份提纲：[{ id, title, description, skills, generated }] */
 function buildOutline() {
   const units = curriculum.getUnits();
-  const isBuiltIn = curriculum.isBuiltIn();
   const currId = curriculum.getActiveId();
-  const curr = isBuiltIn ? null : store.state.curricula?.[currId];
-  const syllabus = curr?.syllabus || [];
+  // 内置课程也可能自带大纲（PET 没有，两套雅思课程有），统一从这里取
+  const syllabus = curriculum.getSyllabusOf(currId);
 
   const ids = Object.keys(units).map(Number).sort((a, b) => a - b);
   return ids.map((uid, i) => {
@@ -50,7 +49,7 @@ function buildOutline() {
       title: s.title || u.title || `Unit ${uid}`,
       description: s.description || u.description || '',
       skills: (s.skills && s.skills.length ? s.skills : skillsFromUnit(u)),
-      generated: isBuiltIn || !u._needsGeneration,
+      generated: !u._needsGeneration,
     };
   });
 }
@@ -72,9 +71,8 @@ export function render() {
   const title = curriculum.getActiveTitle();
   const isBuiltIn = curriculum.isBuiltIn();
   const currId = curriculum.getActiveId();
-  const curr = isBuiltIn ? null : store.state.curricula?.[currId];
-  const cefr = curr?.profile?.cefr || (isBuiltIn ? 'B1' : '');
-  const goal = curr?.goal || '';
+  const cefr = curriculum.getCefrOf(currId);
+  const goal = curriculum.getGoalOf(currId);
   const outline = buildOutline();
 
   const generatedCount = outline.filter((o) => o.generated).length;
