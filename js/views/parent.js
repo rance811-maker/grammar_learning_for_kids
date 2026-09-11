@@ -157,7 +157,7 @@ function renderDashboard() {
           ? '<span class="badge badge--success" style="font-size:0.75rem;">✅ 孩子正在学</span>'
           : `<button class="btn btn--tiny btn--primary" data-switch-curr="${c.id}">让孩子学这套</button>`}
         ${!c.builtIn && genCount < 12 ? `<button class="btn btn--tiny btn--outline" data-genall-curr="${c.id}">⚡ 补齐剩余 ${12 - genCount} 单元</button>` : ''}
-        ${!c.builtIn ? `<button class="btn btn--tiny btn--outline" data-export-curr="${c.id}">导出</button>` : ''}
+        <button class="btn btn--tiny btn--outline" data-export-curr="${c.id}">导出</button>
         ${!c.builtIn ? `<button class="btn btn--tiny btn--danger-text" data-del-curr="${c.id}">删除</button>` : ''}
       </div>
     </div>`;
@@ -1334,7 +1334,72 @@ function mountLocked(storedHash) {
 // 属于隐私，不该跟着课程文件送到别人手上。
 const CURRICULUM_FILE_TAG = 'grammar-quest-curriculum';
 
+// 内置课程（PET）不在 store.state.curricula 里，它是代码里的现成数据。
+// 归一化之后的 discover / levels / mission 结构和 AI 生成课程完全一致，
+// 可以直接导出；syllabus 内置课程没有，从各单元用到的 subSkill 汇总出来。
+function buildBuiltInPayload() {
+  const units = curriculum.getUnits();
+  const ids = Object.keys(units).map(Number).sort((a, b) => a - b);
+
+  const syllabus = [];
+  const unitsData = {};
+
+  for (const uid of ids) {
+    const u = units[uid];
+
+    const skills = new Set();
+    for (const lv of Object.values(u.levels || {})) {
+      for (const q of lv.questions || []) if (q.subSkill) skills.add(q.subSkill);
+    }
+
+    syllabus.push({
+      title: u.title || `Unit ${uid}`,
+      description: u.description || '',
+      skills: [...skills],
+    });
+
+    // 只导出内容本身。id / icon / badge 会在导入时由
+    // buildUnitsFromCurriculum 重新生成，带上反而是冗余。
+    unitsData[uid] = {
+      discover: u.discover,
+      levels: u.levels,
+      mission: u.mission,
+    };
+  }
+
+  return { syllabus, unitsData };
+}
+
+function downloadCourse(payload) {
+  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${(payload.title || 'course').replace(/[\\/:*?"<>|]/g, '_')}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function exportCurriculum(id) {
+  // 内置课程走另一条路：它不在 curricula 里，而是代码里的现成数据
+  if (id === BUILT_IN_ID) {
+    const built = buildBuiltInPayload();
+    downloadCourse({
+      _type: CURRICULUM_FILE_TAG,
+      _version: 1,
+      title: 'PET 语法训练',
+      description: '内置 PET 考试语法训练课程（CEFR B1）',
+      goal: '剑桥 PET 语法（CEFR B1）',
+      material: '',
+      profile: { cefr: 'B1' },
+      syllabus: built.syllabus,
+      unitsData: built.unitsData,
+    });
+    return;
+  }
+
   const c = store.state.curricula?.[id];
   if (!c) return;
   const payload = {
@@ -1349,15 +1414,7 @@ function exportCurriculum(id) {
     unitsData: c.unitsData || {},
     // 注意：不含 progress（自家孩子的学习记录）
   };
-  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${(payload.title || 'course').replace(/[\\/:*?"<>|]/g, '_')}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadCourse(payload);
 }
 
 function importCurriculumFile(file) {
