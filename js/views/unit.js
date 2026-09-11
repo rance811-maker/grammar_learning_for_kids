@@ -159,7 +159,7 @@ export function mount(unitId) {
     genBtn.addEventListener('click', async () => {
       if (!hasApiKey()) {
         const msg = document.getElementById('genUnitMsg');
-        if (msg) msg.innerHTML = '<p style="color:var(--color-danger);font-size:var(--text-sm);">请先在家长专区 → AI 生成课程中配置 API key</p>';
+        if (msg) msg.innerHTML = '<p style="color:var(--color-danger);font-size:var(--text-sm);">请先在家长专区 → 定制专属课程中配置 API key</p>';
         return;
       }
       genBtn.disabled = true;

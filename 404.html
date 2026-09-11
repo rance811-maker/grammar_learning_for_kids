@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grammar Quest</title>
+<style>
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+         color:#3C3C3C; background:#F7F7F7; }
+  .box { text-align:center; padding:24px; max-width:420px; }
+  .box h1 { font-size:1.15rem; margin:0 0 8px; }
+  .box p { color:#777; font-size:0.9rem; margin:0 0 16px; }
+  .box a { display:inline-block; padding:10px 22px; border-radius:999px;
+           background:#58CC02; color:#fff; text-decoration:none; font-weight:700; }
+</style>
+</head>
+<body>
+<div class="box" id="box" hidden>
+  <h1>页面走丢了</h1>
+  <p>这个地址不存在，或者站点正在更新。稍等片刻再试，或直接回到首页。</p>
+  <a id="home" href="/">回到 Grammar Quest</a>
+</div>
+<script>
+// 这个应用用的是 hash 路由（#parent 之类）。hash 不发给服务器，
+// 所以路由本身不可能触发 404。会走到这里只有两种情况：
+//   1) 访问了不存在的路径（打错、旧书签、分享时被截断）→ 送回首页
+//   2) 站点正在重新部署，index.html 短暂取不到 → 送回首页也是 404，
+//      会绕回本页形成死循环，所以必须先判断"是不是已经在首页了"
+(function () {
+  // 站点根在哪：GitHub Pages 项目站点是 /<repo>/，其它（Netlify、自定义域名）是 /
+  var seg = location.pathname.split('/').filter(Boolean);
+  var isProjectPages = /(^|\.)github\.io$/i.test(location.hostname);
+  var base = (isProjectPages && seg.length) ? '/' + seg[0] + '/' : '/';
+
+  var home = document.getElementById('home');
+  if (home) home.href = base;
+
+  // 已经在首页却仍然 404 —— 多半是正在部署，再跳只会死循环
+  if (location.pathname === base) {
+    document.getElementById('box').hidden = false;
+    return;
+  }
+  location.replace(base + location.search + location.hash);
+})();
+</script>
+</body>
+</html>

@@ -206,7 +206,7 @@ async function runWritingReview(unitId, mission, scaffolds, userTexts) {
       <div class="card" style="border-left:3px solid var(--color-warning,#C08A2E);">
         <div style="font-weight:700;margin-bottom:4px;">✍️ 这次没有批改</div>
         <div style="font-size:var(--text-sm);color:var(--color-text-light);line-height:1.7;">
-          批改需要 AI，请到「家长专区 → 创建课程」里配置 API key。
+          批改需要 AI，请到「家长专区 → 定制专属课程」里配置 API key。
           配好之后，每次写完都会逐句指出问题、给整体点评和提升建议。
         </div>
       </div>`;

@@ -659,14 +659,29 @@ export async function generateAllUnits({ onProgress } = {}) {
   if (!curr) throw friendlyErr('无活跃课程体系');
 
   const total = Math.min((curr.syllabus || []).length, 12);
-  const results = { total, done: 0, generated: 0, failed: [] };
 
+  // 先把"真正要生成的单元"挑出来再跑。
+  //
+  // 原来是从 1 数到 12、已生成的走 skip 分支。功能上没问题（跳过的不发请求、
+  // 不花额度），但进度条每次都从 0% 重扫一遍、文字从"1/12"开始数，
+  // 重试 2 个失败单元时看起来和从头生成一模一样，让人以为额度在白烧。
+  const pending = [];
   for (let uid = 1; uid <= total; uid++) {
-    if (curriculum.isUnitGenerated(uid)) {
-      results.done++;
-      onProgress?.(results, uid, 'skip');
-      continue;
-    }
+    if (!curriculum.isUnitGenerated(uid)) pending.push(uid);
+  }
+
+  const results = {
+    total,
+    pending: pending.length,
+    skipped: total - pending.length,
+    done: 0,
+    generated: 0,
+    failed: [],
+  };
+  if (!pending.length) return results;
+
+  for (let i = 0; i < pending.length; i++) {
+    const uid = pending[i];
     try {
       await generateUnitContent(uid);
       results.generated++;
@@ -677,7 +692,7 @@ export async function generateAllUnits({ onProgress } = {}) {
       results.done++;
       onProgress?.(results, uid, 'fail');
     }
-    if (uid < total) await new Promise(r => setTimeout(r, 700));
+    if (i < pending.length - 1) await new Promise(r => setTimeout(r, 700));
   }
   return results;
 }

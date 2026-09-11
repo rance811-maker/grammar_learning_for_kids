@@ -1,4 +1,5 @@
 import { cloud, cloudEnabled } from "./cloud.js";
+import { PRESET_COURSES, isPresetComplete } from './data/presetCourses.js';
 
 const STORAGE_KEY = "grammar-quest-state";
 
@@ -102,6 +103,10 @@ export const store = {
     // 首页欢迎语要算"第几天"。云端账号有注册时间可用；访客模式没有账号，
     // 就以本机第一次打开的日期兜底。老用户此前没记过，用最早一条学习记录
     // 反推，避免把用了很久的人显示成"第 1 天"。
+    // 预置课程：随版本发布的现成课程，装一次即可。用户删掉后不再装回来
+    // （seededPresets 记着装过谁），内容升级时按 version 覆盖但保留学习进度。
+    this._seedPresetCourses();
+
     if (!this.state.startedAt) {
       const first = this.state.history?.[0]?.date;
       this.state.startedAt = first || new Date().toISOString().slice(0, 10);
@@ -965,6 +970,43 @@ export const store = {
 
     this.state.activeCurriculumId = newId === BUILT_IN ? null : newId;
     this.save();
+  },
+
+  _seedPresetCourses() {
+    if (!this.state.curricula) this.state.curricula = {};
+    if (!Array.isArray(this.state.seededPresets)) this.state.seededPresets = [];
+
+    for (const preset of PRESET_COURSES) {
+      if (!isPresetComplete(preset)) continue;          // 缺单元的不发布
+      const existing = this.state.curricula[preset.id];
+
+      if (!existing) {
+        if (this.state.seededPresets.includes(preset.id)) continue;  // 用户删过，尊重
+        this.state.curricula[preset.id] = {
+          title: preset.title,
+          description: preset.description || '',
+          goal: preset.goal || '',
+          material: '',
+          profile: preset.profile || null,
+          syllabus: preset.syllabus,
+          unitsData: preset.unitsData,
+          presetVersion: preset.version || 1,
+        };
+        this.state.seededPresets.push(preset.id);
+        continue;
+      }
+
+      // 已经装过：内容有新版就换掉课程本身，但绝不动 progress（孩子的学习记录）
+      if ((existing.presetVersion || 0) < (preset.version || 1)) {
+        existing.title = preset.title;
+        existing.description = preset.description || '';
+        existing.goal = preset.goal || '';
+        existing.profile = preset.profile || null;
+        existing.syllabus = preset.syllabus;
+        existing.unitsData = preset.unitsData;
+        existing.presetVersion = preset.version || 1;
+      }
+    }
   },
 
   addCurriculum(id, data) {
