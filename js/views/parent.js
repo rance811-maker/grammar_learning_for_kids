@@ -1337,8 +1337,11 @@ const CURRICULUM_FILE_TAG = 'grammar-quest-curriculum';
 // 内置课程（PET）不在 store.state.curricula 里，它是代码里的现成数据。
 // 归一化之后的 discover / levels / mission 结构和 AI 生成课程完全一致，
 // 可以直接导出；syllabus 内置课程没有，从各单元用到的 subSkill 汇总出来。
-function buildBuiltInPayload() {
-  const units = curriculum.getUnits();
+function buildBuiltInPayload(id) {
+  // 必须按 id 取：getUnits() 返回的是"当前激活课程"的单元。
+  // 早先这里用了 getUnits()，结果在激活别的课程时点内置课程的「导出」，
+  // 导出的是当前课程的内容却贴上了内置课程的标题。
+  const units = curriculum.getUnitsOf(id);
   const ids = Object.keys(units).map(Number).sort((a, b) => a - b);
 
   const syllabus = [];
@@ -1384,17 +1387,19 @@ function downloadCourse(payload) {
 
 function exportCurriculum(id) {
   // 内置课程走另一条路：它不在 curricula 里，而是代码里的现成数据
-  if (id === BUILT_IN_ID) {
-    const built = buildBuiltInPayload();
+  if (curriculum.isBuiltIn(id)) {
+    const meta = curriculum.listAll().find((c) => c.id === id) || {};
+    const built = buildBuiltInPayload(id);
     downloadCourse({
       _type: CURRICULUM_FILE_TAG,
       _version: 1,
-      title: 'PET 语法训练',
-      description: '内置 PET 考试语法训练课程（CEFR B1）',
-      goal: '剑桥 PET 语法（CEFR B1）',
+      title: meta.title || '课程',
+      description: meta.description || '',
+      goal: curriculum.getGoalOf(id),
       material: '',
-      profile: { cefr: 'B1' },
-      syllabus: built.syllabus,
+      profile: { cefr: curriculum.getCefrOf(id) },
+      // PET 没有 syllabus，buildBuiltInPayload 会从题目的 subSkill 汇总出来
+      syllabus: curriculum.getSyllabusOf(id).length ? curriculum.getSyllabusOf(id) : built.syllabus,
       unitsData: built.unitsData,
     });
     return;

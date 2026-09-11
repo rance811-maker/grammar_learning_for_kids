@@ -3603,3 +3603,31 @@ ul, ol {
   .status-strip { padding-left: 0; }
   .status-strip__more { display: none; }
 }
+
+/* 站点定位：第一次来的人要在三秒内知道这是什么。
+   放在首页最上方，窄屏下字号和内边距收紧，但不隐藏——
+   手机才是家长第一次点开链接的地方。 */
+.site-intro {
+  padding: var(--space-md) var(--space-md) var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+.site-intro__title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+.site-intro__desc {
+  margin: 6px 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.75;
+  color: var(--color-text-light);
+  max-width: 46em;
+}
+.site-intro__desc strong { color: var(--color-text); font-weight: 700; }
+
+@media (max-width: 720px) {
+  .site-intro { padding: var(--space-sm) var(--space-sm) 0; }
+  .site-intro__title { font-size: 1.08rem; }
+  .site-intro__desc { font-size: var(--text-xs); line-height: 1.7; }
+}
