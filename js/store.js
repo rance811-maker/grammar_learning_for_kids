@@ -180,17 +180,55 @@ export const store = {
     this._pushTimer = setTimeout(() => this._pushNow(), 1500);
   },
 
+  // 云端保存失败必须让人看见。
+  //
+  // 原来失败只有一行 console.warn：用户以为记录已经存到云端了，实际没有，
+  // 换台设备登录就会发现进度少了一截，而且完全不知道是什么时候丢的。
+  // 自己用还能忍，开放给别人之后这就是"别人家孩子的学习记录悄悄没了"。
+  //
+  // 做法：失败先自动重试两次（多数失败是网络抖动），仍然失败才提示，
+  // 并且记下待同步状态——同一轮里不重复弹，避免变成骚扰。
   async _pushNow() {
     if (this._pushTimer) {
       clearTimeout(this._pushTimer);
       this._pushTimer = null;
     }
     if (!this.isLoggedIn()) return;
-    try {
-      await cloud.saveState(this.state);
-    } catch (e) {
-      console.warn("Cloud save failed:", e.message);
+
+    let lastErr = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await cloud.saveState(this.state);
+        if (this._cloudSaveFailed) {
+          this._cloudSaveFailed = false;
+          this._notifyCloudSave({ ok: true });
+        }
+        return;
+      } catch (e) {
+        lastErr = e;
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+        }
+      }
     }
+
+    console.warn('Cloud save failed:', lastErr?.message);
+    if (!this._cloudSaveFailed) {
+      this._cloudSaveFailed = true;
+      this._notifyCloudSave({ ok: false, message: lastErr?.message || '' });
+    }
+  },
+
+  /** 云端保存状态变化时通知界面（app.js 挂的监听）。 */
+  _notifyCloudSave(detail) {
+    try {
+      window.dispatchEvent(new CustomEvent('gq-cloud-save', { detail }));
+    } catch { /* 非浏览器环境忽略 */ }
+  },
+
+  /** 是否有改动还没成功同步到云端。 */
+  hasUnsyncedChanges() {
+    return Boolean(this._cloudSaveFailed);
   },
 
   // Register a new account (email + password + 名字).
@@ -979,6 +1017,37 @@ export const store = {
       unitsData: data.unitsData || {},
     };
     this.save();
+  },
+
+  /**
+   * 把一套自定义课程的学习进度并到另一套（通常是内容相同的内置版），然后删掉副本。
+   *
+   * 为什么需要：这三套课程原本是用户自己生成的，后来做成了随代码发布的内置课程。
+   * 两者 id 不同，于是同一个标题在课程列表里出现两行，而孩子的进度只在旧的那一份上。
+   * 直接删旧的会连进度一起丢，直接用新的又等于从零开始——只能先搬再删。
+   *
+   * 返回 { ok, reason }。
+   */
+  mergeCurriculumProgress(fromId, toId) {
+    if (!fromId || !toId || fromId === toId) return { ok: false, reason: 'BAD_ARGS' };
+    if (!this.state.curricula?.[fromId]) return { ok: false, reason: 'NO_SOURCE' };
+
+    // 正在学的那套，进度在 state 顶层而不在 curricula 里。先切走一次让它落盘，
+    // 否则搬过去的会是一份过期快照。
+    const active = this.state.activeCurriculumId || '__pet__';
+    if (active === fromId || active === toId) {
+      const parking = BUILTIN_IDS.find((x) => x !== fromId && x !== toId) || '__pet__';
+      this.switchCurriculum(parking);
+    }
+
+    const from = this.state.curricula[fromId];
+    if (!from.progress) return { ok: false, reason: 'NO_PROGRESS' };
+
+    if (!this.state.curricula[toId]) this.state.curricula[toId] = {};
+    this.state.curricula[toId].progress = from.progress;
+    delete this.state.curricula[fromId];
+    this.save();
+    return { ok: true, reason: '' };
   },
 
   removeCurriculum(id) {

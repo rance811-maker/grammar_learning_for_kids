@@ -143,13 +143,16 @@ function renderDashboard() {
   // Curriculum section
   const allCurr = curriculum.listAll();
   const activeId = curriculum.getActiveId();
+  const builtInTitles = new Map(allCurr.filter(c => c.builtIn).map(c => [c.title, c.id]));
   const currItems = allCurr.map(c => {
     const isActive = c.id === activeId;
     const genCount = c.builtIn ? 12 : Object.keys(store.state.curricula?.[c.id]?.unitsData || {}).length;
+    const dupOf = !c.builtIn && builtInTitles.has(c.title) ? builtInTitles.get(c.title) : '';
     return `<div class="ce-pack-item">
       <div class="ce-pack-info">
         <strong>${isActive ? '✅ ' : ''}${esc(c.title)}${c.builtIn ? ' (内置)' : ''}</strong>
         <span class="ce-pack-meta">${c.builtIn ? '12 个单元 · 完整内容' : `${genCount}/12 单元已生成`}</span>
+        ${dupOf ? `<span class="ce-pack-dup">这套课程现在已内置。这是内置化之前你自己生成的那一份，内容相同，但孩子的进度记在这一份上。</span>` : ''}
         ${c.description && !c.builtIn ? `<span class="ce-pack-desc">${esc(c.description)}</span>` : ''}
       </div>
       <div class="ce-pack-btns">
@@ -158,6 +161,7 @@ function renderDashboard() {
           : `<button class="btn btn--tiny btn--primary" data-switch-curr="${c.id}">让孩子学这套</button>`}
         ${!c.builtIn && genCount < 12 ? `<button class="btn btn--tiny btn--outline" data-genall-curr="${c.id}">⚡ 补齐剩余 ${12 - genCount} 单元</button>` : ''}
         <button class="btn btn--tiny btn--outline" data-export-curr="${c.id}">导出</button>
+        ${dupOf ? `<button class="btn btn--tiny btn--primary" data-merge-from="${c.id}" data-merge-to="${dupOf}">并入内置版</button>` : ''}
         ${!c.builtIn ? `<button class="btn btn--tiny btn--danger-text" data-del-curr="${c.id}">删除</button>` : ''}
       </div>
     </div>`;
@@ -191,9 +195,15 @@ function renderDashboard() {
     </div>
 
     <div class="parent-grid" style="margin-top:var(--space-lg)">
+      <a class="parent-feature parent-feature--active" id="requestCard" href="#parent/request" style="cursor:pointer;text-decoration:none;color:inherit;display:block;">
+        <div class="parent-feature-icon">✉️</div>
+        <h3>请我们帮你定制</h3>
+        <p>说清孩子的年级、目标和当前水平，我们做好一整套课程发给你，导入即用——不需要你配置任何东西。</p>
+        <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">申请定制</span>
+      </a>
       <a class="parent-feature parent-feature--active" id="newCurrCard" href="#parent/curriculum" style="cursor:pointer;text-decoration:none;color:inherit;display:block;">
         <div class="parent-feature-icon">🤖</div>
-        <h3>定制专属课程</h3>
+        <h3>自己定制（需 API key）</h3>
         <p>按孩子的目标和当前水平，定制 12 个单元——只练该练的，不做无用功。可上传教材或考纲（PDF·拍照）。</p>
         <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">+ 定制课程</span>
       </a>
@@ -293,6 +303,51 @@ function esc(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function renderRequestPage() {
+  return `<div class="parent-card parent-card--wide">
+    <h2 style="margin-top:0;">✉️ 请我们帮你定制课程</h2>
+    <p class="parent-desc" style="text-align:left;">
+      内置的三套课程（PET、雅思 6 分、雅思 7 分）如果都不对路，可以让我们按孩子的实际情况做一套。
+      做好之后你会收到一个课程文件，在上面的「📥 导入课程文件」导入即可，
+      <strong>不需要你注册任何服务、也不需要配置 API key</strong>。
+    </p>
+
+    <div class="ce-section">
+      <div class="ce-section-header"><h3>把这几项告诉我们</h3></div>
+      <ol class="req-list">
+        <li><strong>孩子几年级</strong>，现在英语大概什么水平（有考试成绩最好，比如 KET/PET 分数、学校测验）</li>
+        <li><strong>目标是什么</strong>：考哪个试、什么时候考，或者只是想把某一块语法补扎实</li>
+        <li><strong>每天能练多久</strong>，一周几次</li>
+        <li>有没有<strong>指定教材或考纲</strong>要照着编（有的话把 PDF 或照片一起发来）</li>
+      </ol>
+      <p class="req-note">
+        前三项说不清也没关系，我们会追问。第 4 项没有就跳过。
+      </p>
+    </div>
+
+    <div class="ce-section">
+      <div class="ce-section-header"><h3>怎么联系</h3></div>
+      <div class="req-contact">
+        <div class="req-contact__row">
+          <span class="req-contact__label">微信</span>
+          <code class="req-contact__value">rance811</code>
+          <button class="btn btn--tiny btn--outline" data-copy="rance811">复制</button>
+        </div>
+        <div class="req-contact__row">
+          <span class="req-contact__label">邮箱</span>
+          <code class="req-contact__value" id="reqMail"></code>
+          <button class="btn btn--tiny btn--outline" id="reqMailCopy">复制</button>
+        </div>
+      </div>
+      <p class="req-note">定制课程是付费服务，具体费用我们按你的需求告诉你，谈妥再开始做。</p>
+    </div>
+
+    <div class="parent-actions">
+      <button class="btn btn--small btn--outline" onclick="location.hash='parent'">← 返回家长专区</button>
+    </div>
+  </div>`;
+}
+
 function renderReset() {
   return `<div class="parent-zone"><div class="parent-card">
     <div class="parent-icon">🔑</div>
@@ -345,6 +400,11 @@ async function loadAndRender(sub, param) {
       if (sub === 'report') {
         el.outerHTML = renderReport();
         mountReport();
+        return;
+      }
+      if (sub === 'request') {
+        el.outerHTML = renderRequestPage();
+        mountRequestPage();
         return;
       }
       if (sub === 'curriculum') {
@@ -1455,7 +1515,48 @@ function importCurriculumFile(file) {
   reader.readAsText(file);
 }
 
+function mountRequestPage() {
+  // 邮箱拼出来再显示：直接写在 HTML 里会被爬虫收录进垃圾邮件库
+  const mail = ['rance811', 'gmail.com'].join('@');
+  const mailEl = document.getElementById('reqMail');
+  if (mailEl) mailEl.textContent = mail;
+
+  const copy = (text, btn) => {
+    navigator.clipboard?.writeText(text).then(() => {
+      const old = btn.textContent;
+      btn.textContent = '已复制';
+      setTimeout(() => { btn.textContent = old; }, 1500);
+    }).catch(() => alert(text));
+  };
+  document.querySelectorAll('[data-copy]').forEach((b) =>
+    b.addEventListener('click', () => copy(b.dataset.copy, b))
+  );
+  document.getElementById('reqMailCopy')?.addEventListener('click', (e) => copy(mail, e.currentTarget));
+}
+
 function mountCurriculumTransfer() {
+  document.querySelectorAll('[data-merge-from]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const from = btn.dataset.mergeFrom;
+      const to = btn.dataset.mergeTo;
+      if (!confirm(
+        '把这一份上的学习进度（关卡、星星、错题本、徽章、作品集）搬到内置版，然后删掉这一份。\n\n' +
+        '内置版如果已经有进度，会被覆盖。确定继续吗？'
+      )) return;
+
+      const r = store.mergeCurriculumProgress(from, to);
+      if (!r.ok) {
+        alert(r.reason === 'NO_PROGRESS'
+          ? '这一份上没有学习记录，可以直接删除。'
+          : '合并失败，请刷新后重试。');
+        return;
+      }
+      alert('已并入内置版。到课程列表里点「让孩子学这套」选内置的那份即可继续。');
+      location.hash = 'parent';
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+  });
+
   document.querySelectorAll('[data-export-curr]').forEach((btn) => {
     btn.addEventListener('click', () => exportCurriculum(btn.dataset.exportCurr));
   });
