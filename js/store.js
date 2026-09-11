@@ -982,7 +982,9 @@ export const store = {
   },
 
   removeCurriculum(id) {
-    if (!this.state.curricula || id === '__pet__') return;
+    // 内置课程的那条记录只存进度，删掉等于抹掉孩子在该课程上的学习记录。
+    // 原先只挡了 __pet__，内置课程变成三套之后这条守卫就不够了。
+    if (!this.state.curricula || isBuiltinId(id)) return;
     if (this.state.activeCurriculumId === id) {
       this.switchCurriculum('__pet__');
     }

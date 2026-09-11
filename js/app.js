@@ -12,10 +12,11 @@ import * as review from './views/review.js';
 import * as account from './views/account.js';
 import * as parent from './views/parent.js';
 import * as syllabus from './views/syllabus.js';
+import * as about from './views/about.js';
 import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260620m';
+const BUILD_VERSION = '20260620n';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -46,10 +47,11 @@ const routes = {
   'account': account,
   'parent': parent,
   'syllabus': syllabus,
+  'about': about,
 };
 
 const titles = {
-  '': 'Grammar Quest',
+  '': '学习地图',
   'unit': '关卡详情',
   'discover': '发现',
   'practice': '练习',
@@ -61,6 +63,7 @@ const titles = {
   'account': '账号与同步',
   'parent': '家长专区',
   'syllabus': '语法提纲',
+  'about': '这是什么',
 };
 
 function router() {
@@ -123,11 +126,12 @@ function activeNavRoute(route) {
 }
 
 function renderShell(route, content) {
-  const topLevelRoutes = ['', 'review', 'portfolio', 'stats', 'account', 'parent'];
+  const topLevelRoutes = ['', 'review', 'portfolio', 'stats', 'account', 'parent', 'about'];
   const showBackBtn = !topLevelRoutes.includes(route);
   const title = titles[route] || 'Grammar Quest';
 
   return `
+    ${renderSiteBand()}
     <div class="layout">
       ${renderSidebar(route)}
       <div class="main-col">
@@ -141,6 +145,26 @@ function renderShell(route, content) {
         </header>
         <main class="content">${content}</main>
       </div>
+    </div>`;
+}
+
+// 站点带：全站唯一说明"这是什么网站、给谁用"的地方。
+//
+// 之前这段定位放在首页内容区，但新用户打开会被 isPlacementNeeded() 直接
+// 重定向到 #placement，根本到不了首页——对它真正的读者（第一次点开链接的
+// 家长）到达率是 0，却天天挡在孩子和练习按钮之间。
+//
+// 刻意不 sticky：家长在第 0 秒本来就在页面顶部，进站必见；孩子往下一滚
+// 它就让位，日常占用接近 0。sticky 的只有下面那条页面带。
+function renderSiteBand() {
+  return `
+    <div class="siteband">
+      <a class="siteband__brand" href="#about">
+        <span class="siteband__logo">🏆</span>
+        <span class="siteband__name">Grammar Quest<span class="siteband__sub"> 语法冒险</span></span>
+      </a>
+      <span class="siteband__tagline">给中国孩子的英语语法精准练习</span>
+      <a class="siteband__more" href="#about">这是什么 ›</a>
     </div>`;
 }
 
@@ -180,10 +204,6 @@ function renderSidebar(route) {
 
   return `
     <aside class="sidebar">
-      <div class="sidebar__brand">
-        <span class="sidebar__brand-logo">🏆</span>
-        <span class="sidebar__brand-text">Grammar Quest<small>语法冒险</small></span>
-      </div>
       ${currBadge}
       <nav class="sidebar__nav">${items}</nav>
       <div class="sidebar__footer">
