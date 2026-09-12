@@ -81,7 +81,20 @@ async function validAccessToken() {
   if (!s || !s.access_token) throw new Error('NO_SESSION');
   if (Date.now() < s.expires_at - 60000) return s.access_token;
   if (!s.refresh_token) throw new Error('NO_SESSION');
-  const r = await authFetch('/token?grant_type=refresh_token', { body: { refresh_token: s.refresh_token } });
+
+  let r;
+  try {
+    r = await authFetch('/token?grant_type=refresh_token', { body: { refresh_token: s.refresh_token } });
+  } catch {
+    // 续期失败：token 被轮换掉、已过期、或在别处登录导致这份失效。
+    //
+    // 关键是必须把这份坏 session 清掉。留着它的话，之后每一次请求都会以
+    // 同样的方式失败（界面上是一句 "Invalid Refresh Token" 加一个重试按钮，
+    // 而重试永远不可能成功），用户除了自己去清 localStorage 别无出路。
+    // 清掉之后退回访客模式，由上层提示重新登录——数据在云端，登录即可取回。
+    writeSession(null);
+    throw new Error('NO_SESSION');
+  }
   const next = sessionFromToken(r);
   // refresh 响应可能不带 user，沿用旧的。
   if (!next.user.id && s.user) next.user = s.user;

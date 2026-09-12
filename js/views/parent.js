@@ -439,6 +439,18 @@ async function loadAndRender(sub, param) {
     }
   } catch (e) {
     console.error('Parent zone load failed:', e);
+    // 会话过期不是"加载失败"，别拿一个重试按钮把人晾在那儿——重试也不会成功。
+    if (String(e.message).includes('NO_SESSION')) {
+      const target = document.getElementById('parentContent')
+        || document.querySelector('.parent-zone .parent-card');
+      if (target) {
+        target.innerHTML = `<div class="parent-icon">🔑</div>
+          <h2>登录已过期</h2>
+          <p class="parent-desc">重新登录一次就好，孩子的学习记录都在云端，不会丢。</p>
+          <button class="btn btn--primary" onclick="location.hash='account'">去登录</button>`;
+      }
+      return;
+    }
     showError(e.message);
   }
 }
