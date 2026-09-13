@@ -360,6 +360,12 @@ consumeAuthCallback().then(() => {
   // If logged in, pull the latest cloud state in the background and re-render
   // once it arrives (the local cached copy was already shown above).
   if (store.isLoggedIn()) {
-    store.syncFromCloud().then(changed => { if (changed) router(); });
+    store.syncFromCloud().then(changed => {
+      if (!changed) return;
+      // 正在答题/摸底时不要重跑路由：那会新建一场会话，孩子眼前的题突然换掉。
+      const r = (location.hash.slice(1) || '').split('/')[0];
+      if (r === 'practice' || r === 'placement') return;
+      router();
+    });
   }
 });

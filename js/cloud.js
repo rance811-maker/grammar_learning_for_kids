@@ -214,6 +214,8 @@ export const cloud = {
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: [{ id: u.id, state, updated_at: new Date().toISOString() }],
     });
+    // 上传成功，本机不再有"未上传的改动"（标记由 store.save 写入）
+    try { localStorage.removeItem('gq-dirty'); } catch { /* ignore */ }
   },
 
   async loadParentPin() {

@@ -66,7 +66,12 @@ function createDefaultState() {
 }
 
 function toDateString(date) {
-  return date.toISOString().split("T")[0];
+  // 用本地日期，不用 toISOString（那是 UTC）。国内用户早上 8 点前的练习
+  // 会被记成"昨天"：连续天数误归零、"今日已完成"早上清零、见过记录窗口错位。
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 function daysBetween(dateStrA, dateStrB) {
@@ -105,6 +110,22 @@ export const store = {
     // 首页欢迎语要算"第几天"。云端账号有注册时间可用；访客模式没有账号，
     // 就以本机第一次打开的日期兜底。老用户此前没记过，用最早一条学习记录
     // 反推，避免把用了很久的人显示成"第 1 天"。
+    // 通关判定修正：以前 0 星（能量耗尽）也会把 completed 置 true。
+    // 老存档里这类关卡改成"尝试过、未通过"，否则修好判定后它们仍然自相矛盾。
+    let fixed = false;
+    for (const u of Object.values(this.state.units || {})) {
+      for (const lv of Object.values(u?.practiceLevels || {})) {
+        if (!lv) continue;
+        if (lv.completed && (lv.bestStars || 0) < 1) { lv.completed = false; lv.attempted = true; fixed = true; }
+        else if (lv.completed && !lv.attempted) { lv.attempted = true; fixed = true; }
+      }
+    }
+    if (Array.isArray(this.state.history) && this.state.history.length > 500) {
+      this.state.history = this.state.history.slice(-500);
+      fixed = true;
+    }
+    if (fixed) this._saveLocal();
+
     if (!this.state.startedAt) {
       const first = this.state.history?.[0]?.date;
       this.state.startedAt = first || new Date().toISOString().slice(0, 10);
@@ -153,11 +174,28 @@ export const store = {
 
   save() {
     this._saveLocal();
+    // 记一个"本机有改动还没上传"的标记；cloud.saveState 成功后清掉。
+    // 启动同步看到这个标记，就先把本地推上去，而不是拿云端整包覆盖本地。
+    if (this.isLoggedIn()) { try { localStorage.setItem('gq-dirty', '1'); } catch { /* ignore */ } }
     this._scheduleCloudPush();
   },
 
   reset() {
-    this.state = createDefaultState();
+    // "重置全部进度"只清进度，不删课程。AI 生成的课程是花钱做出来的内容，
+    // 不是进度；变体、设置、起始日期同样保留。
+    const old = this.state || {};
+    const next = createDefaultState();
+    if (old.settings) next.settings = old.settings;
+    if (old.startedAt) next.startedAt = old.startedAt;
+    if (old.variants) next.variants = old.variants;
+    next.activeCurriculumId = old.activeCurriculumId || null;
+    next.curricula = {};
+    for (const [id, c] of Object.entries(old.curricula || {})) {
+      if (!c) continue;
+      const { progress, ...content } = c;
+      if (Object.keys(content).length) next.curricula[id] = content;
+    }
+    this.state = next;
     this.save();
     return this.state;
   },
@@ -250,6 +288,7 @@ export const store = {
 
   // Log in with email + password; the cloud copy becomes source of truth.
   async login(email, password) {
+    try { localStorage.removeItem('gq-dirty'); } catch { /* ignore */ }
     await cloud.signIn(email, password);
     this._refreshAccount();
     const remote = await cloud.loadState();
@@ -268,6 +307,11 @@ export const store = {
   // Pull the latest cloud state. Returns true if local state changed.
   async syncFromCloud() {
     if (!this.isLoggedIn()) return false;
+    // 本机有还没成功上传的改动时，绝不能拿云端整包覆盖本地——
+    // 那会把断网时做完的进度悄悄抹掉。此时反过来把本地推上去。
+    let dirty = false;
+    try { dirty = localStorage.getItem('gq-dirty') === '1'; } catch { /* ignore */ }
+    if (dirty) { await this._pushNow(); return false; }
     try {
       const remote = await cloud.loadState();
       if (remote) {
@@ -290,6 +334,7 @@ export const store = {
   // Log out and return to a clean guest state (so a shared device doesn't
   // leak the previous child's progress).
   async logout() {
+    try { localStorage.removeItem('gq-dirty'); } catch { /* ignore */ }
     await cloud.signOut();
     this._refreshAccount();
     this.state = createDefaultState();
@@ -387,6 +432,12 @@ export const store = {
     this.save();
   },
 
+  // 通关 = 至少 1 星。所有"这关过了没"的判断都必须走这里，
+  // 不要再读 completed——历史上 completed 在 0 星时也会被置 true。
+  isLevelPassed(unitId, level) {
+    return (this.state.units[unitId]?.practiceLevels[level]?.bestStars ?? 0) >= 1;
+  },
+
   completeLevel(unitId, level, stars, score) {
     const unit = this.state.units[unitId];
     if (!unit) return;
@@ -394,7 +445,11 @@ export const store = {
     const lv = unit.practiceLevels[level];
     if (!lv) return;
 
-    lv.completed = true;
+    // 能量耗尽（答错 3 题）是 0 星，那是"没通过"，不是"已完成"。
+    // 以前这里无条件置 completed=true，而下一关却按星数解锁，
+    // 于是出现"已完成 ☆☆☆，下一关仍然锁着"的自相矛盾。
+    lv.attempted = true;
+    if (stars >= 1) lv.completed = true;
     if (stars > lv.bestStars) {
       lv.bestStars = stars;
     }
@@ -418,7 +473,7 @@ export const store = {
     }
 
     // Unit unlock: unit N+1 unlocks when Lv.3 of unit N is completed
-    if (level === 3 && unit.practiceLevels[3].completed) {
+    if (level === 3 && this.isLevelPassed(unitId, 3)) {
       this.unlockNextUnit(unitId);
     }
 
@@ -517,6 +572,8 @@ export const store = {
       ...sessionData,
       date: sessionData.date || toDateString(new Date()),
     });
+    // 无上限会让每次 save 序列化、每次云端同步上传的体积一直涨
+    if (this.state.history.length > 500) this.state.history = this.state.history.slice(-500);
     this.save();
   },
 
@@ -670,6 +727,13 @@ export const store = {
     let reviewLevel = 2; // Start reviews at higher levels
     while (sessionId < 10 && masteredUnits.length > 0) {
       const unitId = masteredUnits[masteredIndex % masteredUnits.length];
+      // 计划指向的关卡必须在生成那一刻就是解锁的：摸底只解锁了这些单元的 Lv.1，
+      // 而复习从 Lv.2 起排，首页"开始今天的练习"会把孩子送进单元页上锁着的关。
+      const mu = this.state.units[unitId];
+      if (mu) {
+        mu.unlocked = true;
+        for (let l = 1; l <= reviewLevel; l++) if (mu.practiceLevels[l]) mu.practiceLevels[l].unlocked = true;
+      }
       sessions.push({
         id: sessionId,
         label: `第${sessionId}天`,
@@ -733,10 +797,22 @@ export const store = {
 
   addMistake(question, unitId, level) {
     if (!question || !question.id) return;
-    // Avoid duplicates: if already in the notebook, just refresh the date.
-    const existing = this.state.mistakes.find((m) => m.question.id === question.id);
-    if (existing) {
-      existing.date = toDateString(new Date());
+    // 复习/BOSS/自定义包里答错的题，传进来的 unitId 是 'review'/'boss'/'custom'，
+    // level 是 null，错题本和历史里会显示 "Unit review · Lv.null"。
+    // 题目 id 本身带着真实归属（u-l-i / gen-u-l-i），从那里解析。
+    if (typeof unitId !== 'number' || !level) {
+      const m = String(question.id).match(/^(?:gen-)?(\d+)-(\d+)-\d+/);
+      if (m) { unitId = Number(m[1]); level = Number(m[2]); }
+    }
+    const idx = this.state.mistakes.findIndex((m) => m.question.id === question.id);
+    if (idx >= 0) {
+      // 再次答错：刷新日期并挪到末尾。60 条上限从头淘汰，
+      // 不挪位的话最常错的老题反而最先被挤掉。
+      const [item] = this.state.mistakes.splice(idx, 1);
+      item.date = toDateString(new Date());
+      if (typeof unitId === 'number') item.unitId = unitId;
+      if (level) item.level = level;
+      this.state.mistakes.push(item);
       this.save();
       return;
     }
@@ -827,6 +903,7 @@ export const store = {
       }
     }
     if (this.state.reviewShown.length > 300) {
+      this.state.reviewShown.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
       this.state.reviewShown = this.state.reviewShown.slice(-300);
     }
     this.save();
@@ -867,6 +944,9 @@ export const store = {
       }
     }
     if (this.state.practiceShown.length > 500) {
+      // 按日期淘汰最旧的，不按数组位置——更新时只改 date 不移位，
+      // 按位置切会把今天刚见过的题先扔掉，明天就当"没见过"。
+      this.state.practiceShown.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
       this.state.practiceShown = this.state.practiceShown.slice(-500);
     }
     this.save();
@@ -921,7 +1001,7 @@ export const store = {
   isBossUnlocked() {
     let lv3Count = 0;
     for (let i = 1; i <= 12; i++) {
-      if (this.state.units[i]?.practiceLevels[3]?.completed) lv3Count++;
+      if (this.isLevelPassed(i, 3)) lv3Count++;
     }
     return lv3Count >= 6;
   },
@@ -1066,12 +1146,15 @@ export const store = {
 
   // After finishing a practice/review/boss, advance the learning plan if the
   // completed activity matches the current planned session.
-  advanceLearningPlan({ unitId, level, isBoss }) {
+  advanceLearningPlan({ unitId, level, isBoss, passed }) {
     const cur = this.getCurrentSession();
     if (!cur) return;
+    // 0 星（能量耗尽）不算完成这一天；综合测试不及格也不算。
+    // 以前只比对单元/关卡就打勾，结果计划把孩子推进下一个仍然锁着的关，
+    // 9 天全 0 星也能领"结业证书"。
     if (isBoss) {
-      if (cur.type === '综合测试') this.completeSession(cur.id);
-    } else if (cur.unitId === unitId && cur.level === level) {
+      if (cur.type === '综合测试' && passed) this.completeSession(cur.id);
+    } else if (cur.unitId === unitId && cur.level === level && this.isLevelPassed(unitId, level)) {
       this.completeSession(cur.id);
     }
   },

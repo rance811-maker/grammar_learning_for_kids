@@ -3775,3 +3775,15 @@ ul, ol {
   border-radius: var(--radius-sm, 6px);
   padding: 3px 10px;
 }
+
+/* 结果页说明：题库做完一遍后如实告知有旧题 */
+.result-note {
+  margin: var(--space-sm) auto 0;
+  max-width: 28em;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text-light);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}

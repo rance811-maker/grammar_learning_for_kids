@@ -202,6 +202,9 @@ function showResultsScreen() {
   }));
 
   store.completePlacement(results);
+  // 摸底用的就是各单元 Lv.1 的第一道题，不记成"见过"的话，
+  // 孩子几分钟后进 Lv.1 又会先碰到刚才那道。
+  store.addPracticeShown(testState.questions.map((it) => it.question.id));
 
   root.innerHTML = renderResults();
   sound.finish(3);

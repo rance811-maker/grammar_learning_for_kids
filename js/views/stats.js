@@ -138,7 +138,8 @@ export function render() {
   let badgesHtml = '';
   const badgeItems = [];
   for (let i = 1; i <= 12; i++) {
-    const earned = badges.find(b => b.unitId === i);
+    // 只认"单元大师"徽章。满星徽章也带 unitId，不过滤的话任意一关 3 星就把整个单元点亮。
+    const earned = badges.find(b => b.unitId === i && String(b.id || '').startsWith('unit_'));
     const icon = BADGE_ICONS[i - 1] || '🏅';
     const unitData = units[i];
     const name = unitData ? `Unit ${i}` : `Unit ${i}`;

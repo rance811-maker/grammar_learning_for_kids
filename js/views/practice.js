@@ -1,5 +1,5 @@
 import { store } from '../store.js';
-import { engine } from '../engine.js';
+import { engine, questionTextKey } from '../engine.js';
 import { cloud } from '../cloud.js';
 import { sound } from '../sound.js';
 import { confetti } from '../celebrate.js';
@@ -68,7 +68,16 @@ export function render(unitId, level) {
   } else if (unitId === 'demo') {
     session = engine.createDemoSession(level);
   } else {
-    session = engine.createSession(Number(unitId), Number(level));
+    const u = Number(unitId), l = Number(level);
+    const lv = store.state.units?.[u]?.practiceLevels?.[l];
+    if (!lv || !lv.unlocked) {
+      // 直接通过 URL / 计划按钮进入锁着的关：以前这里不校验，解锁规则形同虚设，
+      // 打完还会出现"已完成却 🔒 未解锁"的卡片。改为拦下并说明。
+      session = { unitId: u, level: l, questions: [], answers: [], energy: 0, maxEnergy: 3,
+        score: 0, combo: 0, maxCombo: 0, startTime: Date.now(), locked: true };
+    } else {
+      session = engine.createSession(u, l);
+    }
   }
   feedbackVisible = false;
   sessionEnded = false;
@@ -85,8 +94,10 @@ export function render(unitId, level) {
           <div class="practice-header__progress" style="flex:1;"></div>
         </div>
         <div class="question-area">
-          <p class="text-center text-muted mt-lg">暂无练习题目</p>
-          <button class="btn-secondary mt-md" id="practiceBackBtn">返回</button>
+          <p class="text-center text-muted mt-lg">${session.locked
+            ? `这一关还没解锁。通过前一关（至少 1 星）后就能进来。`
+            : '暂无练习题目'}</p>
+          <button class="btn-secondary mt-md" id="practiceBackBtn">返回关卡</button>
         </div>
       </div>`;
   }
@@ -225,6 +236,14 @@ function renderCurrentQuestion() {
   const q = session.questions[session.currentIndex];
   const area = document.getElementById('questionArea');
   if (!area) return;
+
+  // 一道题真正显示出来，才算"见过"。以前在选题时就把 12 道全记上，
+  // 能量耗尽 / 中途退出 / 刷新都会把没显示过的题烧掉，下次反而躲着它们。
+  if (q && q.id && !session._marked?.has(q.id)) {
+    (session._marked ||= new Set()).add(q.id);
+    if (session.unitId === 'review') store.addReviewShown([q.id]);
+    else if (typeof session.unitId === 'number') store.addPracticeShown([q.id]);
+  }
 
   area.innerHTML = renderQuestion(q);
   updateProgress();
@@ -698,7 +717,7 @@ function submitAnswer(question, userAnswer) {
     store.addMistake(question, session.unitId, session.level);
   } else if (session.unitId === 'review') {
     store.removeMistake(question.id);
-    store.addReviewCleared(question.id, question.sentence || question.instruction || '');
+    store.addReviewCleared(question.id, questionTextKey(question));
   }
 
   // Visual feedback on the question elements
@@ -860,7 +879,7 @@ function showResults() {
   } else if (isBoss) {
     store.addScore(results.score);
     bossPassed = store.recordBossResult(results.accuracy);
-    store.advanceLearningPlan({ isBoss: true });
+    store.advanceLearningPlan({ isBoss: true, passed: bossPassed });
   } else if (isReview) {
     // Review still earns points, just no level/unit progression.
     store.addScore(results.score);
@@ -897,9 +916,16 @@ function showResults() {
     ).join('');
     titleText = results.stars === 3 ? '太棒了！完美通关！' :
       results.stars === 2 ? '做得不错！' :
-      results.stars === 1 ? '通关成功！' : '再试一次吧';
+      results.stars === 1 ? '通关成功！' : '这关还没过，再试一次吧';
     subtitleText = isCustom ? customPackTitle : isReview ? '复习巩固' : `Unit ${session.unitId} - Lv.${session.level}`;
+    // 0 星时把规则说清楚，别让孩子以为"已完成"却发现下一关锁着
+    if (results.stars === 0 && !isReview && !isCustom) subtitleText += ' · 答错不超过 2 题就能通关';
   }
+
+  // 题库已经做完一遍、这次不得不出了旧题时，如实告诉孩子，而不是装作新题
+  const repeatHtml = session.repeatedCount > 0
+    ? `<div class="result-note">本单元的题你已经全部做过一遍，这次有 ${session.repeatedCount} 道是复习旧题。</div>`
+    : '';
 
   const weakHtml = results.weakPoints.length > 0
     ? `<div class="result-weakness">
@@ -964,6 +990,7 @@ function showResults() {
           </div>
         </div>
         ${badgeHtml}
+        ${repeatHtml}
         ${weakHtml}
         <div class="result-actions">
           <button class="btn-primary" id="resultContinue">继续</button>

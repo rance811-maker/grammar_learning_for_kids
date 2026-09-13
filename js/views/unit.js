@@ -71,7 +71,9 @@ export function render(unitId) {
   }
 
   const discoverDone = unitState.discoverCompleted;
-  const missionUnlocked = unitState.practiceLevels[3]?.completed || false;
+  // 写作任务的解锁条件必须和 Lv.4 / 下一单元一致：都看"通过"（≥1 星）。
+  // 以前这里读 completed，0 星的 Lv.3 会先解锁写作任务、却锁着 Lv.4。
+  const missionUnlocked = store.isLevelPassed(unitId, 3);
   const missionDone = unitState.missionCompleted;
 
   // Discover card
@@ -94,7 +96,8 @@ export function render(unitId) {
   for (let lv = 1; lv <= 5; lv++) {
     const lvState = unitState.practiceLevels[lv];
     const unlocked = lvState.unlocked;
-    const completed = lvState.completed;
+    const completed = lvState.completed;                 // 现在只表示"通过"（≥1 星）
+    const failedBefore = !completed && !!lvState.attempted;
     const stars = lvState.bestStars;
     const lockedClass = unlocked ? '' : ' phase-card--locked';
 
@@ -102,14 +105,23 @@ export function render(unitId) {
       ? '<span class="badge-locked">🔒 未解锁</span>'
       : completed
         ? `<span class="badge badge--success">${renderStars(stars)}</span>`
-        : '<span class="badge">开始练习</span>';
+        : failedBefore
+          ? '<span class="badge badge--warning">未通过</span>'
+          : '<span class="badge">开始练习</span>';
+    const desc = completed
+      ? '已通关 - 再次挑战可提升星级'
+      : failedBefore
+        ? '上次没过 - 答错不超过 2 题就能通关'
+        : unlocked
+          ? '点击开始练习'
+          : '通过前一关后解锁';
 
     levelsHtml += `
       <div class="phase-card phase-card--practice${lockedClass}" data-action="practice" data-unit="${unitId}" data-level="${lv}">
         <div class="phase-card__icon">${unlocked ? '📝' : '🔒'}</div>
         <div class="phase-card__info">
           <div class="phase-card__title">${LEVEL_NAMES[lv]}</div>
-          <div class="phase-card__desc">${completed ? '已完成 - 再次挑战可提升星级' : unlocked ? '点击开始练习' : '完成前一关后解锁'}</div>
+          <div class="phase-card__desc">${desc}</div>
           <div class="phase-card__progress mt-sm">${statusBadge}</div>
         </div>
         <div class="phase-card__chevron">›</div>
@@ -122,7 +134,7 @@ export function render(unitId) {
     ? '<span class="badge badge--success">✅ 已完成</span>'
     : missionUnlocked
       ? '<span class="badge badge--warning">开始任务</span>'
-      : '<span class="badge-locked">🔒 完成 Lv.3 后解锁</span>';
+      : '<span class="badge-locked">🔒 通过 Lv.3 后解锁</span>';
 
   const missionTitle = unitData.mission?.title || '写作任务';
   const missionCard = `

@@ -312,10 +312,18 @@ export function mount() {
       const session = store.getCurrentSession();
       if (!session) return;
       if (session.type === '综合测试') {
+        // 计划到了综合测试那天，但 BOSS 还没解锁（Lv.3 通过的单元不够 6 个）
+        if (!store.isBossUnlocked()) {
+          alert('综合测试还没解锁：先把 6 个单元的 Lv.3 通关（至少 1 星）。');
+          return;
+        }
         location.hash = 'practice/boss';
       } else if (!curriculum.isUnitGenerated(session.unitId)) {
         // Unit content not generated yet — send to the unit page (which has the
         // "generate content" button) instead of an empty practice session.
+        location.hash = `unit/${session.unitId}`;
+      } else if (!store.state.units[session.unitId]?.practiceLevels?.[session.level]?.unlocked) {
+        // 计划指向的关卡还锁着（比如前一天 0 星没过）——去单元页，让孩子看到该先过哪一关
         location.hash = `unit/${session.unitId}`;
       } else {
         location.hash = `practice/${session.unitId}/${session.level}`;

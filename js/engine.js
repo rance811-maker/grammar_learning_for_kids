@@ -88,6 +88,21 @@ function getUnits() {
   return curriculum.getUnits();
 }
 
+// 题目的"内容键"，用来判断两道题是不是同一句话。
+// 只看题干本身（句子 / 正确句 / 词块 / 配对项 / 情境），绝不用 instruction——
+// 那是"选择正确的形式"这类通用提示语，拿它去重会把整关同类型的题当成一道，
+// 一次练习里找错题、排序题、配对题各只能出 1 道。
+export function questionTextKey(q) {
+  if (!q) return '';
+  let t = q.sentence || q.correctSentence || q.context || '';
+  if (!t && Array.isArray(q.words)) t = q.words.join(' ');
+  if (!t && Array.isArray(q.left)) t = [...q.left, ...(q.right || [])].join(' | ');
+  if (!t && Array.isArray(q.dialogue)) {
+    t = q.dialogue.map((d) => (typeof d === 'string' ? d : (d && d.text) || '')).join(' ');
+  }
+  return String(t).trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 120);
+}
+
 function getQuestionsForLevel(unitId, level) {
   const unit = getUnits()[unitId];
   if (!unit?.levels?.[level]) return [];
@@ -137,6 +152,7 @@ export const engine = {
       unitId,
       level,
       questions,
+      repeatedCount: questions.repeatedCount || 0,
       currentIndex: 0,
       answers: [],
       energy: 3,
@@ -180,28 +196,29 @@ export const engine = {
     store.prunePracticeShown();
     const shown = store.getPracticeShown();   // Map: qid -> { date, n }
 
-    // 一道题最近见过的话，先看它有没有"还没见过的变体"可以顶上。
-    // 这样反复练同一关时，考的还是那个知识点，但句子换了。
-    function freshest(q) {
-      if (!q || !shown.has(q.id)) return q;
-      const vs = store.getVariants(q.id);
-      const unseenVariant = vs.find((v) => v && v.id && !shown.has(v.id));
-      return unseenVariant || q;
+    function byStaleness(a, b) {
+      const sa = shown.get(a.id) || { date: '', n: 0 };
+      const sb = shown.get(b.id) || { date: '', n: 0 };
+      if (sa.date !== sb.date) return sa.date < sb.date ? -1 : 1;
+      return (sa.n || 0) - (sb.n || 0);
     }
 
-    // 同一次练习里，同一句话不重复出现（变体没生成出来时的兜底）
-    const usedText = new Set();
-    function textKey(q) {
-      const t = (q.sentence || q.correctSentence || q.instruction ||
-        (Array.isArray(q.words) ? q.words.join(' ') : '') || '').trim().toLowerCase().replace(/\s+/g, ' ');
-      return t.slice(0, 120);
+    // 一道题最近见过，就看它有没有"没见过的变体"顶上；原题和变体都见过，
+    // 就挑其中最久没见的那个，而不是永远回到原题。
+    function freshest(q) {
+      if (!q || !shown.has(q.id)) return q;
+      const vs = store.getVariants(q.id).filter((v) => v && v.id);
+      const unseenVariant = vs.find((v) => !shown.has(v.id));
+      if (unseenVariant) return unseenVariant;
+      return [q, ...vs].sort(byStaleness)[0];
     }
 
     const picked = [];
     const pickedIds = new Set();
+    const usedText = new Set();
     function take(q) {
       if (!q || pickedIds.has(q.id)) return false;
-      const k = textKey(q);
+      const k = questionTextKey(q);
       if (k && usedText.has(k)) return false;
       picked.push(q);
       pickedIds.add(q.id);
@@ -209,56 +226,52 @@ export const engine = {
       return true;
     }
 
-    // 没见过的优先；都见过就挑"最久没见 + 见得最少"的
-    function byStaleness(a, b) {
-      const sa = shown.get(a.id) || { date: '', n: 0 };
-      const sb = shown.get(b.id) || { date: '', n: 0 };
-      if (sa.date !== sb.date) return sa.date < sb.date ? -1 : 1;
-      return (sa.n || 0) - (sb.n || 0);
+    // 候选池 = 整个单元，按"离本关多远"分层，近层优先。
+    // 原来是先把本关 8 题全部取走再补别的关的题——于是立刻重试时本关 8 题原样
+    // 再来一遍。现在的规则：只要单元里还有没见过的题，就绝不出已经见过的；
+    // 见过的题只在整个单元都做完一遍之后才会重新出现，并且如实告诉孩子。
+    const unit = getUnits()[unitId];
+    const tiers = [];
+    for (const [lk, lv] of Object.entries(unit?.levels || {})) {
+      const dist = Math.abs(Number(lk) - Number(level));
+      (tiers[dist] ||= []).push(...(lv.questions || []));
     }
-    function ordered(pool) {
+    const seen = [];
+    for (const pool of tiers) {
+      if (!pool) continue;
       const mapped = pool.map(freshest);
-      const unseen = shuffle(mapped.filter((q) => !shown.has(q.id)));
-      const seen = mapped.filter((q) => shown.has(q.id)).sort(byStaleness);
-      return [...unseen, ...seen];
+      // 1) 本单元没见过的题，离本关近的先出，同一层内打乱
+      for (const q of shuffle(mapped.filter((q) => !shown.has(q.id)))) {
+        if (picked.length >= count) break;
+        take(q);
+      }
+      for (const q of mapped) if (shown.has(q.id)) seen.push(q);
     }
 
+    // 2) 薄弱技能的复习题（来自其它单元），同样只要没见过的，最多占三成
     const weakSkills = store.getWeakestSkills(5);
-    const reviewCount = weakSkills.length > 0 ? Math.min(4, Math.floor(count * 0.3)) : 0;
-    const mainCount = count - reviewCount;
-
-    // 1) 本关的题（优先没见过的）
-    for (const q of ordered(getQuestionsForLevel(unitId, level))) {
-      if (picked.length >= mainCount) break;
-      take(q);
-    }
-
-    // 2) 不够就从整个单元补
-    if (picked.length < mainCount) {
-      for (const q of ordered(getAllQuestionsForUnit(unitId))) {
-        if (picked.length >= mainCount) break;
-        take(q);
+    if (weakSkills.length && picked.length < count) {
+      const reviewCount = Math.min(4, Math.floor(count * 0.3));
+      const before = picked.length;
+      for (const q of findReviewQuestions(unitId, weakSkills, reviewCount * 3).map(freshest)) {
+        if (picked.length >= count || picked.length - before >= reviewCount) break;
+        if (!shown.has(q.id)) take(q);
       }
     }
 
-    // 3) 薄弱技能的复习题
-    if (reviewCount > 0) {
-      for (const q of ordered(findReviewQuestions(unitId, weakSkills, reviewCount * 3))) {
-        if (picked.length >= count) break;
-        take(q);
-      }
-    }
-
-    // 4) 还不够，再从本关兜底（此时允许重复文本，总比题目不够强）
+    // 3) 全部见过了才允许重复：挑最久没见的，并记下重复了几道
+    let repeated = 0;
     if (picked.length < count) {
-      for (const q of ordered(getQuestionsForLevel(unitId, level))) {
+      for (const q of seen.sort(byStaleness)) {
         if (picked.length >= count) break;
-        if (!pickedIds.has(q.id)) { picked.push(q); pickedIds.add(q.id); }
+        if (take(q)) repeated++;
       }
     }
 
+    // 不在这里记"见过"——那会把没显示过的题也烧掉（能量耗尽、中途退出、刷新）。
+    // 改为每道题真正显示出来时再记（practice.js renderCurrentQuestion）。
     const final = shuffle(picked).slice(0, count);
-    store.addPracticeShown(final.map((q) => q.id));
+    final.repeatedCount = Math.min(repeated, final.length);
     return final;
   },
 
@@ -276,7 +289,7 @@ export const engine = {
     const questions = [];
 
     function sentenceKey(q) {
-      return (q.sentence || q.instruction || q.context || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 120);
+      return questionTextKey(q);
     }
 
     function canAdd(q) {
@@ -339,7 +352,7 @@ export const engine = {
       }
     }
 
-    store.addReviewShown(questions.map(q => q.id));
+    // "见过"改为显示时再记，见 practice.js renderCurrentQuestion
 
     return {
       unitId: 'review',
@@ -538,7 +551,7 @@ export const engine = {
       const unit = store.state.units[unitId];
 
       // Check if mission is available but not done
-      const lv3Done = unit.practiceLevels[3]?.completed;
+      const lv3Done = store.isLevelPassed(unitId, 3);
       if (lv3Done && !unit.missionCompleted) {
         return { type: "mission", unitId, level: null };
       }
@@ -546,7 +559,8 @@ export const engine = {
       // Find the next incomplete level
       for (let lv = 1; lv <= 5; lv++) {
         const level = unit.practiceLevels[lv];
-        if (level.unlocked && !level.completed) {
+        // 0 星的关 completed 曾为 true 被跳过，推荐从此退化成永远指回 Lv.1
+        if (level.unlocked && (level.bestStars ?? 0) < 1) {
           return { type: "level", unitId, level: lv };
         }
       }
