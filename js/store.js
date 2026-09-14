@@ -1,4 +1,7 @@
 import { cloud, cloudEnabled } from "./cloud.js";
+import { isBuiltinId, BUILTIN_COURSES } from "./data/builtinCourses.js";
+
+const BUILTIN_IDS = BUILTIN_COURSES.map((c) => c.id);
 
 const STORAGE_KEY = "grammar-quest-state";
 
