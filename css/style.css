@@ -3776,14 +3776,41 @@ ul, ol {
   padding: 3px 10px;
 }
 
-/* 结果页说明：题库做完一遍后如实告知有旧题 */
+/* 结果页说明：题库做完一遍后如实告知有旧题。
+   宽度跟着文字走（原来固定 28em，一句话正好挤成两行，末尾孤零零掉个"题。"）。 */
 .result-note {
+  width: fit-content;
+  max-width: min(100%, 44em);
   margin: var(--space-sm) auto 0;
-  max-width: 28em;
-  padding: 8px 12px;
+  padding: 8px 14px;
   border-radius: var(--radius-md);
   background: var(--color-bg);
   color: var(--color-text-light);
   font-size: var(--text-xs);
-  line-height: 1.6;
+  line-height: 1.7;
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* 语法点的英文原名：中文是主角，英文留个小字方便对照大纲 */
+.weakness-item__en {
+  margin-top: 1px;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  opacity: 0.85;
+}
+.result-weakness__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.result-weakness__item {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.4;
+}
+.result-weakness__en {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  opacity: 0.85;
 }

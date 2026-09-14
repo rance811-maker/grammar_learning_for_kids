@@ -1,6 +1,6 @@
 import { store } from '../store.js';
 import { curriculum } from '../curriculum.js';
-import { skillName } from '../data/skill-names.js';
+import { skillName, skillEnglish, hasChineseName } from '../data/skill-names.js';
 
 const TYPE_LABELS = {
   choice: '选择',
@@ -52,6 +52,8 @@ export function render() {
         <div class="weakness-item" style="cursor:default;">
           <div>
             <div class="weakness-item__name">${skillName(w.skill)}</div>
+            ${hasChineseName(w.skill)
+              ? `<div class="weakness-item__en">${skillEnglish(w.skill)}</div>` : ''}
             <div style="font-size:var(--text-xs);color:var(--color-muted);">练习 ${w.attempts} 次</div>
           </div>
           <div class="weakness-item__accuracy">${pct}%</div>
