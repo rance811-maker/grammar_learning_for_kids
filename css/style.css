@@ -2715,6 +2715,47 @@ ul, ol {
   gap: var(--space-md);
   margin-bottom: var(--space-lg);
 }
+/* 两张「怎么拿到一套课程」的卡是一对，固定两列，不让 auto-fit 把它们
+   拉成三列的宽度、也不让学习报告混进来凑数 */
+.parent-grid--pair { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+.parent-section-title {
+  margin: var(--space-lg) 0 var(--space-sm);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* 学习报告跟「定制课程」不是一回事：那两张是「去拿一套课」，这条是
+   「看看孩子学得怎么样」。挤在同一行会让人以为三选一。 */
+.parent-report-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+  background: var(--color-bg);
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.parent-report-row:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
+}
+.parent-report-row:active { transform: translateY(0); }
+.parent-report-row__icon { font-size: 28px; flex-shrink: 0; line-height: 1; }
+.parent-report-row__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.parent-report-row__text strong { font-size: 1rem; }
+.parent-report-row__text span { font-size: var(--text-xs); color: var(--color-text-light); }
+.parent-report-row__btn { flex-shrink: 0; margin: 0; }
+
+@media (max-width: 480px) {
+  .parent-report-row { flex-wrap: wrap; }
+  .parent-report-row__btn { width: 100%; text-align: center; }
+}
 .parent-feature {
   background: var(--color-bg);
   border-radius: 12px;

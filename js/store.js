@@ -164,20 +164,25 @@ export const store = {
   },
 
   // Write to localStorage only (no cloud push).
+  // 返回是否真的写进去了。配额写满时浏览器会抛异常，以前只 console.warn，
+  // 调用方无从知道，界面照样显示"已保存"。
   _saveLocal() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+      return true;
     } catch {
       console.warn("Failed to save state to localStorage");
+      return false;
     }
   },
 
   save() {
-    this._saveLocal();
+    const ok = this._saveLocal();
     // 记一个"本机有改动还没上传"的标记；cloud.saveState 成功后清掉。
     // 启动同步看到这个标记，就先把本地推上去，而不是拿云端整包覆盖本地。
     if (this.isLoggedIn()) { try { localStorage.setItem('gq-dirty', '1'); } catch { /* ignore */ } }
     this._scheduleCloudPush();
+    return ok;
   },
 
   reset() {
@@ -1099,7 +1104,10 @@ export const store = {
       syllabus: data.syllabus,
       unitsData: data.unitsData || {},
     };
-    this.save();
+    // 存不下时把刚加的这套摘掉，别让内存里有、刷新后没有。
+    const ok = this.save();
+    if (!ok) delete this.state.curricula[id];
+    return ok;
   },
 
   /**
