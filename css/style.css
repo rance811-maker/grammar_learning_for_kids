@@ -3441,24 +3441,26 @@ ul, ol {
 .siteband { position: relative; }
 .siteband__what {
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
   padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: 50%;
-  background: transparent;
-  color: var(--color-text-light);
-  font: 700 11px/1 inherit;
+  border: 0;
+  background: none;
+  color: var(--color-muted);
   cursor: pointer;
   /* 跟在定位语文字后面，换行时一起走，不会自己掉到下一行去 */
   margin-left: 6px;
-  vertical-align: 1px;
+  vertical-align: -3px;
+  transition: color 0.15s;
 }
+.siteband__what svg { display: block; fill: currentColor; }
+/* 挖空的部分用站点带自己的底色，深色底上也不会变成一块白 */
+.siteband__what .siteband__what-mark { fill: var(--color-card); }
 .siteband__what:hover,
-.siteband__what[aria-expanded="true"] {
-  border-color: var(--color-secondary);
-  color: var(--color-secondary);
-}
+.siteband__what[aria-expanded="true"] { color: var(--color-secondary); }
 
 .siteband__pop {
   position: absolute;
