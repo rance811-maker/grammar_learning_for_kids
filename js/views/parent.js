@@ -186,21 +186,33 @@ function renderDashboard() {
         AI 课程的单元在孩子首次进入时会自动生成；也可点「补齐剩余单元」提前一次性生成好。
       </p>
       ${currItems}
-      <div style="margin-top:var(--space-sm);">
-        <button class="btn btn--tiny btn--outline" id="currImportBtn">📥 导入课程文件</button>
-        <input type="file" id="currImportFile" accept="application/json,.json" style="display:none;">
-        <span style="font-size:0.75rem;color:var(--color-muted);margin-left:8px;">导入别人发给你的 .json 课程文件</span>
-      </div>
     </div>
 
     <h3 class="parent-section-title">想要一套新课程？</h3>
     <div class="parent-grid parent-grid--pair">
-      <a class="parent-feature parent-feature--active" id="requestCard" href="#parent/request" style="cursor:pointer;text-decoration:none;color:inherit;display:block;">
+      <div class="parent-feature parent-feature--steps">
         <div class="parent-feature-icon">✉️</div>
         <h3>申请专业定制</h3>
-        <p>说清孩子的年级、目标和当前水平，我们做好一整套课程发给你，导入即用——不需要你配置任何东西。</p>
-        <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">申请定制</span>
-      </a>
+        <p>说清孩子的年级、目标和当前水平，我们做好一整套课程发给你——不需要你配置任何东西。</p>
+        <ol class="feature-steps">
+          <li>
+            <span class="feature-steps__n">1</span>
+            <span class="feature-steps__body">
+              <span class="feature-steps__t">告诉我们孩子的情况</span>
+              <a class="btn btn--primary btn--small" href="#parent/request">申请定制</a>
+            </span>
+          </li>
+          <li>
+            <span class="feature-steps__n">2</span>
+            <span class="feature-steps__body">
+              <span class="feature-steps__t">收到课程文件后，导入进来</span>
+              <button class="btn btn--outline btn--small" id="currImportBtn">📥 导入课程文件</button>
+              <input type="file" id="currImportFile" accept="application/json,.json" style="display:none;">
+              <span class="feature-steps__hint">别人发给你的 .json 课程文件也从这里导入</span>
+            </span>
+          </li>
+        </ol>
+      </div>
       <a class="parent-feature parent-feature--active" id="newCurrCard" href="#parent/curriculum" style="cursor:pointer;text-decoration:none;color:inherit;display:block;">
         <div class="parent-feature-icon">🤖</div>
         <h3>自己定制（需 API key）</h3>
@@ -311,7 +323,8 @@ function renderRequestPage() {
     <h2 style="margin-top:0;">✉️ 请我们帮你定制课程</h2>
     <p class="parent-desc" style="text-align:left;">
       内置的三套课程（PET、雅思 6 分、雅思 7 分）如果都不对路，可以让我们按孩子的实际情况做一套。
-      做好之后你会收到一个课程文件，在上面的「📥 导入课程文件」导入即可，
+      做好之后你会收到一个课程文件，回到家长专区首页，在「申请专业定制」那张卡的
+      第 2 步「📥 导入课程文件」导入即可，
       <strong>不需要你注册任何服务、也不需要配置 API key</strong>。
     </p>
 

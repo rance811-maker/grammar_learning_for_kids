@@ -2719,6 +2719,62 @@ ul, ol {
    拉成三列的宽度、也不让学习报告混进来凑数 */
 .parent-grid--pair { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 
+/* 「申请专业定制」是一条两步流程：先申请，收到文件再导入。
+   导入按钮原来孤零零挂在课程列表下面，看不出属于哪一步。 */
+.parent-feature.parent-feature--steps {
+  text-align: left;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+}
+.parent-feature--steps .parent-feature-icon,
+.parent-feature--steps h3 { text-align: center; }
+.parent-feature--steps > p { text-align: center; }
+
+.feature-steps {
+  list-style: none;
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.feature-steps > li {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+}
+.feature-steps__n {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+.feature-steps__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.feature-steps__t { font-size: var(--text-sm); line-height: 1.6; text-align: left; }
+.feature-steps__hint {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  line-height: 1.6;
+  text-align: left;
+}
+.feature-steps .btn { margin: 0; }
+
 .parent-section-title {
   margin: var(--space-lg) 0 var(--space-sm);
   font-size: 1rem;
