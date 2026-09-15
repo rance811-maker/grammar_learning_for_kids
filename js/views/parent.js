@@ -1,11 +1,10 @@
 import { store } from '../store.js';
 import { cloud, friendlyError } from '../cloud.js';
-import * as courseEditor from './courseEditor.js';
 import { SUB_SKILL_NAMES } from '../data/skill-names.js';
 import { curriculum, BUILT_IN_ID } from '../curriculum.js';
 import { generateSyllabus, generateAllUnits, hasApiKey, friendlyAiError, buildMaterial, generateUnitPreview, generateCoverage, hasBlueprint, deterministicCoverage } from '../unitGenerator.js';
 
-// AI 服务配置（与 unitGenerator/courseEditor 共用的存储键）
+// AI 服务配置（与 unitGenerator 共用的存储键）
 const AI_PROVIDER_KEY = 'gq-ai-provider';
 function getAiProvider() { try { return localStorage.getItem(AI_PROVIDER_KEY) || 'gemini'; } catch { return 'gemini'; } }
 function setAiProvider(p) { try { localStorage.setItem(AI_PROVIDER_KEY, p); } catch { /* */ } }
@@ -412,21 +411,8 @@ async function loadAndRender(sub, param) {
         mountCurriculumCreator();
         return;
       }
-      if (sub === 'new' || sub === 'edit') {
-        el.outerHTML = '<div class="parent-card parent-card--wide" id="ceRoot"><p>加载编辑器…</p></div>';
-        const ceRoot = document.getElementById('ceRoot');
-        try {
-          await courseEditor.init(ceRoot, sub === 'edit' ? param : null);
-        } catch (e2) {
-          console.error('Course editor init failed:', e2);
-          ceRoot.innerHTML = `<div class="parent-icon">⚠️</div>
-            <p>编辑器加载失败：${e2.message}</p>
-            <button class="btn btn--primary" onclick="location.hash='parent'">返回</button>`;
-        }
-      } else {
-        el.outerHTML = renderDashboard();
-        mountDashboard();
-      }
+      el.outerHTML = renderDashboard();
+      mountDashboard();
       return;
     }
     const hash = await cloud.loadParentPin();

@@ -16,7 +16,7 @@ import * as about from './views/about.js';
 import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260620t';
+const BUILD_VERSION = '20260620u';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -358,10 +358,6 @@ function mountBackButton() {
 
       if (route === 'practice' && parts[1] === 'review') {
         location.hash = 'review';
-        return;
-      }
-      if (route === 'practice' && parts[1] === 'pack') {
-        location.hash = '';
         return;
       }
       if (route === 'discover' || route === 'practice' || route === 'mission') {
