@@ -3651,23 +3651,75 @@ ul, ol {
   min-width: 0;
 }
 .siteband__tagline::before { content: "·"; margin-right: var(--space-sm); color: var(--color-border); }
-.siteband__more {
-  margin-left: auto;
-  margin-right: 2px;
+/* 「?」按钮：紧跟定位语，不抢位置；浮层挂在站点带上定位 */
+.siteband { position: relative; }
+.siteband__what {
   flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-light);
+  font: 700 11px/1 inherit;
+  cursor: pointer;
+  /* 跟在定位语文字后面，换行时一起走，不会自己掉到下一行去 */
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+.siteband__what:hover,
+.siteband__what[aria-expanded="true"] {
+  border-color: var(--color-secondary);
+  color: var(--color-secondary);
+}
+
+.siteband__pop {
+  position: absolute;
+  top: calc(100% - 4px);
+  left: var(--space-xl);
+  right: var(--space-xl);
+  max-width: 420px;
+  z-index: 60;
+  padding: var(--space-md);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.13);
+  text-align: left;
+}
+.siteband__pop-lead {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-sm);
+  line-height: 1.75;
+  color: var(--color-text);
+}
+.siteband__pop-list {
+  margin: 0 0 var(--space-sm);
+  padding-left: 1.2em;
+  font-size: var(--text-xs);
+  line-height: 1.85;
+  color: var(--color-text-light);
+}
+.siteband__pop-more {
   font-size: var(--text-xs);
   font-weight: 700;
   color: var(--color-secondary);
   text-decoration: none;
-  white-space: nowrap;
 }
-.siteband__more:hover { text-decoration: underline; }
+.siteband__pop-more:hover { text-decoration: underline; }
+
+@media (max-width: 720px) {
+  .siteband__pop { left: var(--space-md); right: var(--space-md); }
+}
 
 @media (max-width: 720px) {
   .siteband { padding: 8px var(--space-md); row-gap: 0; }
   .siteband__sub { display: none; }          /* 390px 上省掉「语法冒险」，定位本身已说清 */
-  .siteband__tagline { flex-basis: 100%; font-size: var(--text-xs); }
+  /* 定位语独占一行，音效提到第一行的右端——否则它自己撑起第三行 */
+  .siteband__tagline { order: 3; flex-basis: 100%; font-size: var(--text-xs); }
   .siteband__tagline::before { content: none; }
+  .siteband .topbar__sound { order: 2; margin-left: auto; }
 }
 
 /* ---------------------------------------------------------------
