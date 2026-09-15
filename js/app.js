@@ -16,7 +16,7 @@ import * as about from './views/about.js';
 import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260620r';
+const BUILD_VERSION = '20260620t';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -163,9 +163,31 @@ function renderSiteBand() {
         <span class="siteband__logo">🏆</span>
         <span class="siteband__name">Grammar Quest<span class="siteband__sub"> 语法冒险</span></span>
       </a>
-      <span class="siteband__tagline">给中国孩子的英语语法精准练习</span>
-      <a class="siteband__more" href="#about">这是什么 ›</a>
+      <span class="siteband__tagline">给中国孩子的英语语法精准练习<button
+              class="siteband__what" id="siteWhatBtn" type="button"
+              aria-label="这是什么网站" aria-expanded="false" aria-controls="siteWhatPop"
+              title="这是什么网站">?</button></span>
       ${renderSoundBtn()}
+      ${renderSiteWhatPop()}
+    </div>`;
+}
+
+// 「这是什么 ›」原来是个链接，点一下把人从当前页面带走——对一个只想
+// 扫一眼「这网站是干嘛的」的家长来说代价太大。改成浮层：原地看完，
+// 想看全文再走。
+function renderSiteWhatPop() {
+  return `
+    <div class="siteband__pop" id="siteWhatPop" role="dialog"
+         aria-label="这是什么网站" hidden>
+      <p class="siteband__pop-lead">
+        不做通用题库——按孩子的<strong>考试目标</strong>和<strong>当前水平</strong>定制课程，只练该练的。
+      </p>
+      <ul class="siteband__pop-list">
+        <li>先做 12 道题摸底，学习计划按结果排，不是所有孩子都从第一单元开始</li>
+        <li>内置 PET、雅思 6 分、雅思 7 分三套课程，打开就能用</li>
+        <li>写作由 AI 逐句批改，指出错在哪、为什么错</li>
+      </ul>
+      <a class="siteband__pop-more" href="#about">看完整介绍 ›</a>
     </div>`;
 }
 
@@ -268,6 +290,8 @@ function mountNav() {
     });
   });
 
+  mountSiteWhat();
+
   // 音效不跟着「设置」搬进家长专区——孩子在安静场合想静音，
   // 不该还得叫家长来输一次 6 位密码。
   const soundBtn = document.getElementById('soundBtn');
@@ -283,6 +307,44 @@ function mountNav() {
       soundBtn.classList.toggle('topbar__sound--off', !on);
     });
   }
+}
+
+// 浮层的开合。每次路由重绘都会重新挂一遍，所以监听器绑在按钮和 document
+// 上的那份要能反复安装而不叠加——document 上的两个用具名函数 + 先摘后挂。
+let whatOutsideHandler = null;
+let whatKeyHandler = null;
+
+function mountSiteWhat() {
+  const btn = document.getElementById('siteWhatBtn');
+  const pop = document.getElementById('siteWhatPop');
+
+  if (whatOutsideHandler) document.removeEventListener('click', whatOutsideHandler);
+  if (whatKeyHandler) document.removeEventListener('keydown', whatKeyHandler);
+  whatOutsideHandler = null;
+  whatKeyHandler = null;
+  if (!btn || !pop) return;
+
+  const close = () => {
+    pop.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  };
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = pop.hidden;
+    pop.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+  });
+
+  // 浮层里点链接要能正常跳转，所以只拦冒泡、不 preventDefault。
+  pop.addEventListener('click', (e) => e.stopPropagation());
+
+  whatOutsideHandler = () => { if (!pop.hidden) close(); };
+  whatKeyHandler = (e) => {
+    if (e.key === 'Escape' && !pop.hidden) { close(); btn.focus(); }
+  };
+  document.addEventListener('click', whatOutsideHandler);
+  document.addEventListener('keydown', whatKeyHandler);
 }
 
 function mountBackButton() {

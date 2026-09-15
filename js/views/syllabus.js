@@ -1,6 +1,6 @@
 import { store } from '../store.js';
 import { curriculum, BUILT_IN_ID } from '../curriculum.js';
-import { SUB_SKILL_NAMES } from '../data/skill-names.js';
+import { skillName, skillEnglish } from '../data/skill-names.js';
 
 // 语法提纲：把这套课程"到底教哪些语法点、按什么顺序教"摊开给家长看。
 //
@@ -15,8 +15,7 @@ function esc(t) {
 }
 
 function skillLabel(id) {
-  if (!id) return '';
-  return SUB_SKILL_NAMES[id] || id.replace(/_/g, ' ');
+  return skillName(id);
 }
 
 /** 内置课程没有 syllabus 字段，从单元题目里把用到的 subSkill 收集出来。 */
@@ -81,7 +80,7 @@ export function render() {
     const p = unitProgress(o.id);
     const chips = o.skills.length
       ? `<div class="syl-item__skills">${o.skills
-          .map((s) => `<span class="syl-chip">${esc(skillLabel(s))}</span>`)
+          .map((s) => `<span class="syl-chip" title="${esc(skillEnglish(s))}">${esc(skillLabel(s))}</span>`)
           .join('')}</div>`
       : '';
 

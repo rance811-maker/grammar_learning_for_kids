@@ -4,6 +4,7 @@ import { cloud } from '../cloud.js';
 import { sound } from '../sound.js';
 import { confetti } from '../celebrate.js';
 import { pregenerateVariants } from '../variantGenerator.js';
+import { skillName, skillEnglish, hasChineseName } from '../data/skill-names.js';
 
 let session = null;
 let customPackTitle = '';
@@ -927,10 +928,15 @@ function showResults() {
     ? `<div class="result-note">本单元的题你已经全部做过一遍，这次有 ${session.repeatedCount} 道是复习旧题。</div>`
     : '';
 
+  // 语法点原样是 mixed_tense_sequences 这样的英文 id，家长一眼看不懂。
+  // 中文放大字，英文留成小字，方便对照课程大纲。
   const weakHtml = results.weakPoints.length > 0
     ? `<div class="result-weakness">
         <div class="result-weakness__title">⚠️ 需要加强</div>
-        <div class="result-weakness__list">${results.weakPoints.join('、')}</div>
+        <div class="result-weakness__list">${results.weakPoints.map((s) => `
+          <span class="result-weakness__item">${skillName(s)}${
+            hasChineseName(s) ? `<span class="result-weakness__en">${skillEnglish(s)}</span>` : ''
+          }</span>`).join('')}</div>
       </div>`
     : '';
 
