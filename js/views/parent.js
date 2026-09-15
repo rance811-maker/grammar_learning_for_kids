@@ -1,11 +1,10 @@
 import { store } from '../store.js';
 import { cloud, friendlyError } from '../cloud.js';
-import * as courseEditor from './courseEditor.js';
 import { SUB_SKILL_NAMES } from '../data/skill-names.js';
 import { curriculum, BUILT_IN_ID } from '../curriculum.js';
 import { generateSyllabus, generateAllUnits, hasApiKey, friendlyAiError, buildMaterial, generateUnitPreview, generateCoverage, hasBlueprint, deterministicCoverage } from '../unitGenerator.js';
 
-// AI 服务配置（与 unitGenerator/courseEditor 共用的存储键）
+// AI 服务配置（与 unitGenerator 共用的存储键）
 const AI_PROVIDER_KEY = 'gq-ai-provider';
 function getAiProvider() { try { return localStorage.getItem(AI_PROVIDER_KEY) || 'gemini'; } catch { return 'gemini'; } }
 function setAiProvider(p) { try { localStorage.setItem(AI_PROVIDER_KEY, p); } catch { /* */ } }
@@ -187,33 +186,49 @@ function renderDashboard() {
         AI 课程的单元在孩子首次进入时会自动生成；也可点「补齐剩余单元」提前一次性生成好。
       </p>
       ${currItems}
-      <div style="margin-top:var(--space-sm);">
-        <button class="btn btn--tiny btn--outline" id="currImportBtn">📥 导入课程文件</button>
-        <input type="file" id="currImportFile" accept="application/json,.json" style="display:none;">
-        <span style="font-size:0.75rem;color:var(--color-muted);margin-left:8px;">导入别人发给你的 .json 课程文件</span>
-      </div>
     </div>
 
-    <div class="parent-grid" style="margin-top:var(--space-lg)">
-      <a class="parent-feature parent-feature--active" id="requestCard" href="#parent/request" style="cursor:pointer;text-decoration:none;color:inherit;display:block;">
+    <h3 class="parent-section-title">想要一套新课程？</h3>
+    <div class="parent-grid parent-grid--pair">
+      <div class="parent-feature parent-feature--steps">
         <div class="parent-feature-icon">✉️</div>
-        <h3>请我们帮你定制</h3>
-        <p>说清孩子的年级、目标和当前水平，我们做好一整套课程发给你，导入即用——不需要你配置任何东西。</p>
-        <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">申请定制</span>
-      </a>
+        <h3>申请专业定制</h3>
+        <p>说清孩子的年级、目标和当前水平，我们做好一整套课程发给你——不需要你配置任何东西。</p>
+        <ol class="feature-steps">
+          <li>
+            <span class="feature-steps__n">1</span>
+            <span class="feature-steps__body">
+              <span class="feature-steps__t">告诉我们孩子的情况</span>
+              <a class="btn btn--primary btn--small" href="#parent/request">申请定制</a>
+            </span>
+          </li>
+          <li>
+            <span class="feature-steps__n">2</span>
+            <span class="feature-steps__body">
+              <span class="feature-steps__t">收到课程文件后，导入进来</span>
+              <button class="btn btn--outline btn--small" id="currImportBtn">📥 导入课程文件</button>
+              <input type="file" id="currImportFile" accept="application/json,.json" style="display:none;">
+              <span class="feature-steps__hint">别人发给你的 .json 课程文件也从这里导入</span>
+            </span>
+          </li>
+        </ol>
+      </div>
       <a class="parent-feature parent-feature--active" id="newCurrCard" href="#parent/curriculum" style="cursor:pointer;text-decoration:none;color:inherit;display:block;">
         <div class="parent-feature-icon">🤖</div>
         <h3>自己定制（需 API key）</h3>
         <p>按孩子的目标和当前水平，定制 12 个单元——只练该练的，不做无用功。可上传教材或考纲（PDF·拍照）。</p>
         <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">+ 定制课程</span>
       </a>
-      <a class="parent-feature parent-feature--active" id="reportCard" href="#parent/report" style="cursor:pointer;text-decoration:none;color:inherit;display:block;">
-        <div class="parent-feature-icon">📊</div>
-        <h3>学习报告</h3>
-        <p>查看孩子的学习进度和薄弱环节分析</p>
-        <span class="btn btn--primary btn--small" style="margin-top:var(--space-sm);">查看报告</span>
-      </a>
     </div>
+
+    <a class="parent-report-row" id="reportCard" href="#parent/report">
+      <span class="parent-report-row__icon">📊</span>
+      <span class="parent-report-row__text">
+        <strong>学习报告</strong>
+        <span>查看孩子的学习进度和薄弱环节分析</span>
+      </span>
+      <span class="btn btn--primary btn--small parent-report-row__btn">查看报告</span>
+    </a>
 
     ${renderSettingsSection()}
 
@@ -308,7 +323,8 @@ function renderRequestPage() {
     <h2 style="margin-top:0;">✉️ 请我们帮你定制课程</h2>
     <p class="parent-desc" style="text-align:left;">
       内置的三套课程（PET、雅思 6 分、雅思 7 分）如果都不对路，可以让我们按孩子的实际情况做一套。
-      做好之后你会收到一个课程文件，在上面的「📥 导入课程文件」导入即可，
+      做好之后你会收到一个课程文件，回到家长专区首页，在「申请专业定制」那张卡的
+      第 2 步「📥 导入课程文件」导入即可，
       <strong>不需要你注册任何服务、也不需要配置 API key</strong>。
     </p>
 
@@ -412,21 +428,8 @@ async function loadAndRender(sub, param) {
         mountCurriculumCreator();
         return;
       }
-      if (sub === 'new' || sub === 'edit') {
-        el.outerHTML = '<div class="parent-card parent-card--wide" id="ceRoot"><p>加载编辑器…</p></div>';
-        const ceRoot = document.getElementById('ceRoot');
-        try {
-          await courseEditor.init(ceRoot, sub === 'edit' ? param : null);
-        } catch (e2) {
-          console.error('Course editor init failed:', e2);
-          ceRoot.innerHTML = `<div class="parent-icon">⚠️</div>
-            <p>编辑器加载失败：${e2.message}</p>
-            <button class="btn btn--primary" onclick="location.hash='parent'">返回</button>`;
-        }
-      } else {
-        el.outerHTML = renderDashboard();
-        mountDashboard();
-      }
+      el.outerHTML = renderDashboard();
+      mountDashboard();
       return;
     }
     const hash = await cloud.loadParentPin();
@@ -1494,7 +1497,73 @@ function exportCurriculum(id) {
   downloadCourse(payload);
 }
 
+// 导入的文件是别人发来的，家长没法自己判断里面是什么。所以这里当成
+// 不可信输入处理：先卡住明显不对的，再把内容摘要给家长确认，最后才写进去。
+//
+// 单元数上限 12：整个应用的进度模型是写死 12 个单元的（store.state.units、
+// 段位、BOSS 解锁都按这个数），多出来的单元会静静地永远到不了。
+const MAX_IMPORT_BYTES = 8 * 1024 * 1024;   // 8MB。真实课程约 200-400KB
+const MAX_UNITS = 12;
+
+/** 返回 null 表示没问题，否则返回一句给家长看的人话。 */
+function validateCourseFile(data) {
+  if (!data || typeof data !== 'object') return '文件内容不是课程数据。';
+  if (data._type !== CURRICULUM_FILE_TAG) return '这个文件不是 Grammar Quest 的课程文件。';
+
+  if (!Array.isArray(data.syllabus) || !data.syllabus.length) {
+    return '课程文件里没有教学大纲，无法使用。';
+  }
+  if (data.syllabus.length > MAX_UNITS) {
+    return `课程文件里有 ${data.syllabus.length} 个单元，超过了上限 ${MAX_UNITS} 个。`;
+  }
+  for (let i = 0; i < data.syllabus.length; i++) {
+    const u = data.syllabus[i];
+    if (!u || typeof u !== 'object' || typeof u.title !== 'string' || !u.title.trim()) {
+      return `第 ${i + 1} 个单元缺少标题，文件可能损坏了。`;
+    }
+    if (u.skills != null && !Array.isArray(u.skills)) {
+      return `第 ${i + 1} 个单元的语法点格式不对，文件可能损坏了。`;
+    }
+  }
+
+  const units = data.unitsData;
+  if (units != null && (typeof units !== 'object' || Array.isArray(units))) {
+    return '课程文件里的题目部分格式不对。';
+  }
+  for (const [key, u] of Object.entries(units || {})) {
+    const n = Number(key);
+    if (!Number.isInteger(n) || n < 1 || n > MAX_UNITS) {
+      return `课程文件里有一个编号不对的单元（${key}）。`;
+    }
+    if (!u || typeof u !== 'object' || !u.levels || typeof u.levels !== 'object') {
+      return `第 ${n} 单元的题目格式不对，文件可能损坏了。`;
+    }
+    for (const [lv, qs] of Object.entries(u.levels)) {
+      if (!Array.isArray(qs)) return `第 ${n} 单元 Lv.${lv} 的题目不是一个列表。`;
+      if (qs.some((q) => !q || typeof q !== 'object' || typeof q.type !== 'string')) {
+        return `第 ${n} 单元 Lv.${lv} 里有题目缺少必要字段，文件可能损坏了。`;
+      }
+    }
+  }
+  return null;
+}
+
+function countQuestions(unitsData) {
+  let n = 0;
+  for (const u of Object.values(unitsData || {})) {
+    for (const qs of Object.values(u.levels || {})) n += Array.isArray(qs) ? qs.length : 0;
+  }
+  return n;
+}
+
 function importCurriculumFile(file) {
+  // 先看体积。超大的 JSON 光是 parse 就能把手机浏览器卡死，
+  // 而且 localStorage 根本存不下，存不下时只会 console.warn，家长看不见。
+  if (file.size > MAX_IMPORT_BYTES) {
+    alert(`这个文件有 ${(file.size / 1024 / 1024).toFixed(1)}MB，超过了 8MB 上限，不像是课程文件。`);
+    return;
+  }
+
   const reader = new FileReader();
   reader.onload = () => {
     let data;
@@ -1504,22 +1573,42 @@ function importCurriculumFile(file) {
       alert('这个文件不是有效的课程文件（JSON 解析失败）。');
       return;
     }
-    if (!data || data._type !== CURRICULUM_FILE_TAG || !Array.isArray(data.syllabus) || !data.syllabus.length) {
-      alert('这个文件不是 Grammar Quest 的课程文件。');
-      return;
-    }
+
+    const problem = validateCourseFile(data);
+    if (problem) { alert(problem); return; }
+
+    // 校验只能证明"格式没坏"，证明不了"内容是你要的"。所以把摘要摆出来，
+    // 由家长自己确认——他知道对方答应发的是什么课。
+    const title = String(data.title || '未命名课程').slice(0, 80);
+    const done = Object.keys(data.unitsData || {}).length;
+    const qs = countQuestions(data.unitsData);
+    const ok = confirm(
+      `即将导入这套课程：\n\n` +
+      `名称：${title}\n` +
+      `单元：${data.syllabus.length} 个，其中 ${done} 个已生成题目\n` +
+      `题目：${qs} 道\n\n` +
+      `确认是别人答应发给你的那一套吗？`
+    );
+    if (!ok) return;
+
     const id = `imp-${Date.now().toString(36)}`;
-    store.addCurriculum(id, {
-      title: data.title || '导入的课程',
-      description: data.description || '',
-      goal: data.goal || '',
+    const saved = store.addCurriculum(id, {
+      title,
+      description: String(data.description || '').slice(0, 300),
+      goal: String(data.goal || '').slice(0, 300),
       material: '',
       profile: data.profile || null,
       syllabus: data.syllabus,
       unitsData: data.unitsData || {},
     });
-    const done = Object.keys(data.unitsData || {}).length;
-    alert(`已导入「${data.title || '课程'}」（${done}/12 单元已生成）。\n在上面的课程列表里点「让孩子学这套」即可开始。`);
+
+    // 存不下就当场说，别让家长以为导入成功、刷新后却发现课程没了。
+    if (!saved) {
+      alert('导入失败：本机存储空间不够了。\n可以先在课程列表里删掉不用的课程，再试一次。');
+      return;
+    }
+
+    alert(`已导入「${title}」（${done}/12 单元已生成）。\n在上面的课程列表里点「让孩子学这套」即可开始。`);
     location.hash = 'parent';
     window.dispatchEvent(new HashChangeEvent('hashchange'));
   };

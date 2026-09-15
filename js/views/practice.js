@@ -7,7 +7,6 @@ import { pregenerateVariants } from '../variantGenerator.js';
 import { skillName, skillEnglish, hasChineseName } from '../data/skill-names.js';
 
 let session = null;
-let customPackTitle = '';
 let feedbackVisible = false;
 let sessionEnded = false;
 let selectedMatch = null; // for match questions: { side, index }
@@ -36,31 +35,6 @@ function advanceToNext() {
 }
 
 export function render(unitId, level) {
-  if (unitId === 'pack') {
-    session = null;
-    customPackTitle = '';
-    feedbackVisible = false;
-    sessionEnded = false;
-    selectedMatch = null;
-    matchPairs = [];
-    reorderAnswer = [];
-    selectedErrorIdx = null;
-    return `
-      <div class="view view-practice">
-        <div class="practice-header">
-          <button class="practice-header__close" id="practiceClose">✕</button>
-          <div class="practice-header__progress" style="flex:1;"></div>
-        </div>
-        <div class="question-area" id="questionArea">
-          <div style="text-align:center;padding:var(--space-xl);">
-            <div class="ce-spinner" style="margin:0 auto var(--space-md);"></div>
-            <p style="color:var(--color-text-light);">正在加载课程包…</p>
-          </div>
-        </div>
-        <div id="comboArea"></div>
-        <div id="feedbackArea"></div>
-      </div>`;
-  }
 
   if (unitId === 'review') {
     session = engine.createReviewSession();
@@ -127,21 +101,7 @@ export function mount(unitId, level) {
   const backTarget = unitId === 'review' ? 'review'
     : unitId === 'boss' ? ''
     : unitId === 'demo' ? ''
-    : unitId === 'pack' ? ''
     : `unit/${unitId}`;
-
-  if (unitId === 'pack') {
-    const closeBtn = document.getElementById('practiceClose');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        clearAdvanceTimer();
-        if (sessionEnded) { location.hash = backTarget; return; }
-        if (confirm('确定要退出练习吗？当前进度不会保存。')) location.hash = backTarget;
-      });
-    }
-    loadPackAndStart(level);
-    return;
-  }
 
   // Back button for empty sessions
   const backBtn = document.getElementById('practiceBackBtn');
@@ -167,57 +127,6 @@ export function mount(unitId, level) {
   }
 
   renderCurrentQuestion();
-}
-
-async function loadPackAndStart(packId) {
-  try {
-    const pack = await cloud.loadCoursePack(packId);
-    if (!pack || !pack.questions || pack.questions.length === 0) {
-      const area = document.getElementById('questionArea');
-      if (area) area.innerHTML = `
-        <div style="text-align:center;padding:var(--space-xl);">
-          <p style="color:var(--color-text-light);">课程包为空或已删除</p>
-          <button class="btn-secondary mt-md" onclick="location.hash=''">返回首页</button>
-        </div>`;
-      return;
-    }
-    customPackTitle = pack.title || '自定义课程';
-    session = engine.createCustomSession(pack.questions);
-
-    const area = document.getElementById('questionArea');
-    if (area) {
-      area.innerHTML = '';
-      const header = document.querySelector('.practice-header__progress');
-      if (header) {
-        header.innerHTML = `
-          <div class="progress-bar progress-bar--secondary progress-bar--small">
-            <div class="progress-bar__fill" id="practiceProgressFill" style="width:0%"></div>
-          </div>`;
-      }
-      const practiceHeader = document.querySelector('.practice-header');
-      if (practiceHeader && !document.getElementById('energyBar')) {
-        const energyDiv = document.createElement('div');
-        energyDiv.className = 'energy-bar';
-        energyDiv.id = 'energyBar';
-        energyDiv.innerHTML = renderHearts(session.energy, session.maxEnergy);
-        practiceHeader.appendChild(energyDiv);
-
-        const scoreDiv = document.createElement('div');
-        scoreDiv.className = 'practice-header__score';
-        scoreDiv.id = 'practiceScore';
-        scoreDiv.textContent = '⭐ 0';
-        practiceHeader.appendChild(scoreDiv);
-      }
-      renderCurrentQuestion();
-    }
-  } catch (e) {
-    const area = document.getElementById('questionArea');
-    if (area) area.innerHTML = `
-      <div style="text-align:center;padding:var(--space-xl);">
-        <p style="color:var(--color-danger);">加载失败：${e.message}</p>
-        <button class="btn-secondary mt-md" onclick="location.hash=''">返回首页</button>
-      </div>`;
-  }
 }
 
 function renderCurrentQuestion() {
@@ -866,17 +775,14 @@ function showResults() {
   const isReview = session.unitId === 'review';
   const isBoss = session.unitId === 'boss';
   const isDemo = session.unitId === 'demo';
-  const isCustom = session.unitId === 'custom';
   const results = engine.calculateResults(session);
 
   schedulePregenerateVariants(session, results);
 
-  // Save results (demo/test/custom sessions never touch level progress).
+  // Save results (demo/test sessions never touch level progress).
   let bossPassed = false;
   if (isDemo) {
     // no-op
-  } else if (isCustom) {
-    store.addScore(results.score);
   } else if (isBoss) {
     store.addScore(results.score);
     bossPassed = store.recordBossResult(results.accuracy);
@@ -918,9 +824,9 @@ function showResults() {
     titleText = results.stars === 3 ? '太棒了！完美通关！' :
       results.stars === 2 ? '做得不错！' :
       results.stars === 1 ? '通关成功！' : '这关还没过，再试一次吧';
-    subtitleText = isCustom ? customPackTitle : isReview ? '复习巩固' : `Unit ${session.unitId} - Lv.${session.level}`;
+    subtitleText = isReview ? '复习巩固' : `Unit ${session.unitId} - Lv.${session.level}`;
     // 0 星时把规则说清楚，别让孩子以为"已完成"却发现下一关锁着
-    if (results.stars === 0 && !isReview && !isCustom) subtitleText += ' · 答错不超过 2 题就能通关';
+    if (results.stars === 0 && !isReview) subtitleText += ' · 答错不超过 2 题就能通关';
   }
 
   // 题库已经做完一遍、这次不得不出了旧题时，如实告诉孩子，而不是装作新题
@@ -946,7 +852,7 @@ function showResults() {
     const b = { id: 'combo_king', name: '连击之王', icon: '⚡' };
     if (!store.getBadges().some(x => x.id === b.id)) { store.earnBadge(b); newBadges.push(b); }
   }
-  if (results.stars === 3 && !isReview && !isBoss && !isDemo && !isCustom) {
+  if (results.stars === 3 && !isReview && !isBoss && !isDemo) {
     const b = { id: `perfect_${session.unitId}_${session.level}`, unitId: session.unitId, name: `Unit ${session.unitId} Lv.${session.level} 满星`, icon: '🌟' };
     if (!store.getBadges().some(x => x.id === b.id)) { store.earnBadge(b); newBadges.push(b); }
   }
@@ -1032,20 +938,15 @@ function showResults() {
 
     if (continueBtn) {
       continueBtn.addEventListener('click', () => {
-        location.hash = isCustom ? '' : isBoss ? '' : isReview ? 'review' : `unit/${session.unitId}`;
+        location.hash = isBoss ? '' : isReview ? 'review' : `unit/${session.unitId}`;
       });
     }
     if (retryBtn) {
       retryBtn.addEventListener('click', () => {
-        const packHash = location.hash.slice(1);
-        if (isCustom && packHash.startsWith('practice/pack/')) {
-          window.dispatchEvent(new HashChangeEvent('hashchange'));
-        } else {
-          location.hash = isBoss ? 'practice/boss'
-            : isReview ? 'practice/review'
-            : `practice/${session.unitId}/${session.level}`;
-          window.dispatchEvent(new HashChangeEvent('hashchange'));
-        }
+        location.hash = isBoss ? 'practice/boss'
+          : isReview ? 'practice/review'
+          : `practice/${session.unitId}/${session.level}`;
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
       });
     }
   }, 0);

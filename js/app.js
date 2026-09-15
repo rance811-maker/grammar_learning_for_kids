@@ -16,7 +16,7 @@ import * as about from './views/about.js';
 import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260620t';
+const BUILD_VERSION = '20260620x';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -166,10 +166,21 @@ function renderSiteBand() {
       <span class="siteband__tagline">给中国孩子的英语语法精准练习<button
               class="siteband__what" id="siteWhatBtn" type="button"
               aria-label="这是什么网站" aria-expanded="false" aria-controls="siteWhatPop"
-              title="这是什么网站">?</button></span>
+              title="这是什么网站">${infoIcon()}</button></span>
       ${renderSoundBtn()}
       ${renderSiteWhatPop()}
     </div>`;
+}
+
+// 图标用 SVG 画，不用字符「?」：字符的位置由字体度量决定，在 18px 的圆圈里
+// 既压不住基线也居不了中，不同系统字体下还会偏得不一样。圆点加圆角竖条这两个
+// 形状是自己定的坐标，任何字体、任何缩放下都正。
+function infoIcon() {
+  return `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+    <circle cx="8" cy="8" r="8"></circle>
+    <circle class="siteband__what-mark" cx="8" cy="4.3" r="1.15"></circle>
+    <rect class="siteband__what-mark" x="7" y="6.7" width="2" height="5.3" rx="1"></rect>
+  </svg>`;
 }
 
 // 「这是什么 ›」原来是个链接，点一下把人从当前页面带走——对一个只想
@@ -358,10 +369,6 @@ function mountBackButton() {
 
       if (route === 'practice' && parts[1] === 'review') {
         location.hash = 'review';
-        return;
-      }
-      if (route === 'practice' && parts[1] === 'pack') {
-        location.hash = '';
         return;
       }
       if (route === 'discover' || route === 'practice' || route === 'mission') {
