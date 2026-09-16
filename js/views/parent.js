@@ -267,6 +267,16 @@ function renderSettingsSection() {
       </div>
 
       <div class="settings-group">
+        <div class="settings-group__title">🔑 AI 服务（选填）</div>
+        <div class="settings-group__desc">
+          三套内置课程和全部练习都不需要它。只有两件事要用：<b>作文的逐句批改</b>，
+          以及<b>自己定制新课程</b>。配一次，两件事都能用；不配也不影响孩子日常练习。
+          key 只存在这台设备的浏览器里，不会上传服务器。
+        </div>
+        <div class="ai-key-panel" style="margin-top:var(--space-sm);"></div>
+      </div>
+
+      <div class="settings-group">
         <div class="settings-group__title">👤 账号</div>
         <div class="settings-group__desc">已登录为「${esc(store.account.name)}」，学习记录正在云端自动同步</div>
         <button class="btn btn--secondary" id="goAccountBtn" style="margin-top:var(--space-sm);">账号管理</button>
@@ -281,6 +291,8 @@ function renderSettingsSection() {
 }
 
 function mountSettingsSection() {
+  mountCurrKeyPanel();
+
   document.querySelectorAll('.goal-option').forEach((btn) => {
     btn.addEventListener('click', () => {
       const goal = Number(btn.dataset.goal);
@@ -550,7 +562,7 @@ function renderCurriculumCreator() {
         <input type="text" id="currTitleInput" placeholder="例如：雅思 Band7 冲刺">
       </div>
 
-      <div id="currKeyPanel"></div>
+      <div class="ai-key-panel"></div>
 
       <div id="currGenArea">
         <button class="btn btn--primary btn--block" id="currGenBtn" style="margin-top:var(--space-md);">
@@ -583,8 +595,15 @@ const PROVIDER_NAMES = { gemini: 'Gemini', claude: 'Claude' };
 // key 编辑器是否展开。已配置时默认收起，点「更换 / 重新录入」再展开。
 let _keyEditorOpen = false;
 
+// API key 是个全局设置：生成课程要用它，写作逐句批改也要用它
+// （writingCoach.hasWritingCoach() 直接返回 hasApiKey()）。所以配置面板
+// 不能只长在课程定制表单里——那会逼着"只想要作文批改"的家长先假装去建一门课。
+// 改成按 class 找宿主，学习设置和课程定制页各挂一个，共用同一份状态。
 function mountCurrKeyPanel() {
-  const host = document.getElementById('currKeyPanel');
+  document.querySelectorAll('.ai-key-panel').forEach(mountOneKeyPanel);
+}
+
+function mountOneKeyPanel(host) {
   if (!host) return;
   const p = getAiProvider();
   const configured = hasApiKey();
@@ -594,33 +613,33 @@ function mountCurrKeyPanel() {
     host.innerHTML = `
       <div class="parent-field" style="background:var(--color-bg-soft,#F1F8E9);border:1px solid #C5E1A5;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span style="font-size:0.9rem;">🔑 AI 服务：<b>${PROVIDER_NAMES[p] || p}</b> · 已配置 ✓</span>
-        <button class="btn btn--tiny btn--outline" id="currKeyEdit" style="margin-left:auto;">更换 / 重新录入 key</button>
+        <button class="btn btn--tiny btn--outline" data-key-edit style="margin-left:auto;">更换 / 重新录入 key</button>
       </div>`;
-    document.getElementById('currKeyEdit')?.addEventListener('click', () => { _keyEditorOpen = true; mountCurrKeyPanel(); });
+    host.querySelector('[data-key-edit]')?.addEventListener('click', () => { _keyEditorOpen = true; mountCurrKeyPanel(); });
     return;
   }
 
   // 未配置，或用户主动点了「更换」→ 显示完整编辑器。
   host.innerHTML = `
     <div class="parent-field" style="background:#FFF8E1;border:1px solid #F0E0A8;border-radius:10px;padding:12px 14px;">
-      <label>🔑 ${configured ? '更换 / 重新录入 API key' : '配置 AI 服务（生成需要，配一次即可）'}</label>
-      <select id="currProvider" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;margin-bottom:8px;">
+      <label>🔑 ${configured ? '更换 / 重新录入 API key' : '配置 AI 服务（作文批改和课程生成共用，配一次即可）'}</label>
+      <select data-key-provider style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;margin-bottom:8px;">
         <option value="gemini" ${p === 'gemini' ? 'selected' : ''}>Gemini（免费额度·输出上限较低，长单元可能被截断）</option>
         <option value="claude" ${p === 'claude' ? 'selected' : ''}>Claude（按量付费·质量更高更稳，推荐正式生成）</option>
       </select>
-      <input type="password" id="currKeyInput" placeholder="粘贴${configured ? '新的 ' : ''}API key" autocomplete="off" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;">
+      <input type="password" data-key-input placeholder="粘贴${configured ? '新的 ' : ''}API key" autocomplete="off" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;">
       <div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap;">
-        <button class="btn btn--small btn--primary" id="currKeySave">保存 key</button>
-        ${configured ? '<button class="btn btn--small btn--outline" id="currKeyCancel">取消</button>' : ''}
+        <button class="btn btn--small btn--primary" data-key-save>保存 key</button>
+        ${configured ? '<button class="btn btn--small btn--outline" data-key-cancel>取消</button>' : ''}
         <span style="font-size:0.72rem;color:#999;">Gemini: aistudio.google.com/apikey · Claude: console.anthropic.com</span>
       </div>
       <div style="font-size:0.72rem;color:#999;margin-top:6px;">key 只存在你这台设备的浏览器里，不会上传服务器。</div>
     </div>`;
-  document.getElementById('currProvider')?.addEventListener('change', e => setAiProvider(e.target.value));
-  document.getElementById('currKeyCancel')?.addEventListener('click', () => { _keyEditorOpen = false; mountCurrKeyPanel(); });
-  document.getElementById('currKeySave')?.addEventListener('click', () => {
-    const prov = document.getElementById('currProvider').value;
-    const key = document.getElementById('currKeyInput').value.trim();
+  host.querySelector('[data-key-provider]')?.addEventListener('change', e => setAiProvider(e.target.value));
+  host.querySelector('[data-key-cancel]')?.addEventListener('click', () => { _keyEditorOpen = false; mountCurrKeyPanel(); });
+  host.querySelector('[data-key-save]')?.addEventListener('click', () => {
+    const prov = host.querySelector('[data-key-provider]').value;
+    const key = host.querySelector('[data-key-input]').value.trim();
     if (!key) return;
     setAiProvider(prov);
     setAiKeyVal(prov, key);
@@ -758,7 +777,7 @@ async function renderAndRunBatch(hostEl, title) {
   if (!hasApiKey()) {
     hostEl.innerHTML = `<div class="parent-card parent-card--wide" style="text-align:center;">
       <div class="parent-icon">🔑</div>
-      <p>请先在「独立练习包」中配置 AI API key，再生成单元内容。</p>
+      <p>请先在「学习设置 → AI 服务」里配置 API key，再生成单元内容。</p>
       <button class="btn btn--primary" id="batchToHomeBtn">进入学习地图</button>
     </div>`;
     document.getElementById('batchToHomeBtn')?.addEventListener('click', goHome);
