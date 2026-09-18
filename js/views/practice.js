@@ -708,8 +708,11 @@ function showFeedback(isCorrect, question, userAnswer, result) {
 
   // The plain "correct answer" line is only useful on wrong answers, and not for
   // error questions (whose answer is the wrong word — shown via correctionHtml).
+  const altHtml = !isCorrect && result.altAnswers?.length
+    ? `<div class="feedback-banner__alt">这样写也算对：${result.altAnswers.join('；')}</div>`
+    : '';
   const correctAnswerHtml = !isCorrect && result.correctAnswer && question.type !== 'error'
-    ? `<div class="feedback-banner__correct-answer">正确答案：${result.correctAnswer}</div>`
+    ? `<div class="feedback-banner__correct-answer">正确答案：${result.correctAnswer}</div>${altHtml}`
     : '';
 
   const explanationHtml = !isCorrect && result.explanation

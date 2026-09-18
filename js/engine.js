@@ -55,12 +55,36 @@ function matchFillAnswer(userAnswer, acceptable, sentence) {
       }
       candidates.add(norm(rebuilt));
     }
+
+    // 句型转换题的括号里印的是"改写的开头"，例如 "(The experiment ___)"，
+    // 而参考答案存的是改写后的整句 "The experiment must yield ..."。
+    // 学习者只填空里那段，拿它跟整句比永远对不上——这 8 道题原本无论
+    // 怎么填都做不对。所以把括号里已经印出来的提示词和他填的内容拼回去，
+    // 还原成完整的改写句再比。
+    const paren = String(sentence).match(/[(（]([^)）]*_+[^)）]*)[)）]/);
+    if (paren) {
+      const segs = paren[1].split(/_+/);
+      if (segs.length - 1 === blanks.length) {
+        let rebuilt = segs[0];
+        for (let i = 0; i < blanks.length; i++) {
+          rebuilt += blanks[i] + (segs[i + 1] || '');
+        }
+        candidates.add(norm(rebuilt));
+      }
+    }
   }
+
+  // 末尾的句号、问号之类不该影响判分：参考答案常带句号，没人填空时会打。
+  const stripEdge = (s) => s
+    .replace(/^[\s"'\u201c\u2018]+/, '')
+    .replace(/[\s.,!?;:"'\u201d\u2019\u3002\uff01\uff1f\uff1b\uff1a]+$/, '');
+  const loose = new Set([...candidates].map(stripEdge));
 
   return acceptable.some((ans) => {
     const a = norm(ans);
     const ac = normComma(ans);
-    return candidates.has(a) || candidates.has(ac);
+    return candidates.has(a) || candidates.has(ac)
+      || loose.has(stripEdge(a)) || loose.has(stripEdge(ac));
   });
 }
 
@@ -419,6 +443,7 @@ export const engine = {
     const type = question.type;
     let correct = false;
     let correctAnswer = "";
+    let altAnswers = [];
     const explanation = question.explanation || "";
     // For "error" (click-the-wrong-word) questions, the word that should
     // replace the mistake — surfaced so learners always see the right word.
@@ -481,6 +506,9 @@ export const engine = {
           : [question.correctAnswer || question.answer].filter(Boolean);
         correct = matchFillAnswer(userAnswer, acceptable, question.sentence);
         correctAnswer = acceptable[0] || "";
+        // 一道题常常不止一种改法（题目解析里写着"两者均可"）。只显示第一个，
+        // 学习者会以为自己那种写法是错的。把其余的也带出来。
+        if (acceptable.length > 1) altAnswers = acceptable.slice(1);
         break;
       }
 
@@ -489,7 +517,7 @@ export const engine = {
         correctAnswer = "";
     }
 
-    return { correct, correctAnswer, explanation, correction };
+    return { correct, correctAnswer, altAnswers, explanation, correction };
   },
 
   calculateResults(session) {
