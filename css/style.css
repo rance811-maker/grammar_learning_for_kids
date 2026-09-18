@@ -1121,6 +1121,14 @@ ul, ol {
   line-height: 1.6;
 }
 
+/* 一题多解时，把其余写法也列出来，别让学习者以为自己那种是错的 */
+.feedback-banner__alt {
+  margin-top: 6px;
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  opacity: 0.92;
+}
+
 .feedback-banner__correct-answer {
   margin-top: var(--space-sm);
   padding: var(--space-sm) var(--space-md);
