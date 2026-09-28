@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /reorder-test.html
+
+Sitemap: https://www.grammar-quest.net/sitemap.xml

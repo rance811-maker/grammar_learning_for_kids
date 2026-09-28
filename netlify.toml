@@ -11,3 +11,11 @@
   [headers.values]
     X-Content-Type-Options = "nosniff"
     Cache-Control = "no-cache"
+
+# 默认的 netlify.app 地址统一 301 到正式域名，搜索引擎只认一个网址。
+# 只匹配这个主机名，PR 预览用的 deploy-preview-N--grammar-quest-pet.netlify.app 不受影响。
+[[redirects]]
+  from = "https://grammar-quest-pet.netlify.app/*"
+  to = "https://www.grammar-quest.net/:splat"
+  status = 301
+  force = true
