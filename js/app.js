@@ -16,7 +16,7 @@ import * as about from './views/about.js';
 import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260620z';
+const BUILD_VERSION = '20260621a';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -223,10 +223,14 @@ function renderSidebar(route) {
 
   const p = store.state.player;
   const rank = RANKS[p.rank] || RANKS.bronze;
-  const accountLine = store.isLoggedIn()
-    ? `<span class="sidebar__account-name">☁️ ${escapeHtml(store.account.name)}</span>
+  // 图标和文字分开包：手机上导航条是一行图标，账号块只留图标，
+  // 否则名字加一行小字会把它挤出屏幕，只露半个字。
+  const loggedIn = store.isLoggedIn();
+  const accountLabel = loggedIn ? `账号：${store.account.name}` : '登录 / 注册';
+  const accountLine = loggedIn
+    ? `<span class="sidebar__account-name"><span class="sidebar__account-icon">☁️</span><span class="sidebar__account-text"> ${escapeHtml(store.account.name)}</span></span>
        <span class="sidebar__account-role">当前家长账号登录中</span>`
-    : `<span class="sidebar__account-name">👤 登录 / 注册</span>
+    : `<span class="sidebar__account-name"><span class="sidebar__account-icon">👤</span><span class="sidebar__account-text"> 登录 / 注册</span></span>
        <span class="sidebar__account-role">登录后可跨设备同步</span>`;
 
   const currTitle = curriculum.getActiveTitle();
@@ -243,7 +247,8 @@ function renderSidebar(route) {
       <nav class="sidebar__nav">${items}</nav>
       <div class="sidebar__footer">
         <div class="sidebar__account-panel">
-          <button class="sidebar__account" data-route="account">${accountLine}</button>
+          <button class="sidebar__account" data-route="account"
+                  aria-label="${escapeHtml(accountLabel)}" title="${escapeHtml(accountLabel)}">${accountLine}</button>
           <div class="sidebar__stats">
             <span class="sidebar__stat sidebar__stat--rank">${rank.icon} ${rank.name}</span>
             <span class="sidebar__stat sidebar__stat--score">⭐ ${p.totalScore} 积分</span>
