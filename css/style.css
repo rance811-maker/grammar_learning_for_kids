@@ -3687,3 +3687,11 @@ ul, ol {
   color: var(--color-muted);
   opacity: 0.85;
 }
+
+/* 首页源码里的静态介绍：给不执行脚本的爬虫读。能跑脚本时隐藏，避免应用加载前闪一下；
+   脚本真没跑起来时，按一篇正常文章显示。 */
+.js .seo-static { display: none; }
+.seo-static { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; line-height: 1.8; color: var(--color-text); }
+.seo-static h1 { font-size: 1.6rem; line-height: 1.4; margin: 0 0 12px; }
+.seo-static h2 { font-size: 1.15rem; margin: 24px 0 6px; }
+.seo-static p, .seo-static li { color: var(--color-text-light); }
