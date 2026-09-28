@@ -12,11 +12,12 @@ import * as review from './views/review.js';
 import * as account from './views/account.js';
 import * as parent from './views/parent.js';
 import * as syllabus from './views/syllabus.js';
+import * as feedback from './views/feedback.js';
 import * as about from './views/about.js';
 import { curriculum } from './curriculum.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260621d';
+const BUILD_VERSION = '20260621e';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -47,6 +48,7 @@ const routes = {
   'account': account,
   'parent': parent,
   'syllabus': syllabus,
+  'feedback': feedback,
   'about': about,
 };
 
@@ -63,6 +65,7 @@ const titles = {
   'account': '账号与同步',
   'parent': '家长专区',
   'syllabus': '语法提纲',
+  'feedback': '意见反馈',
   'about': '这是什么',
 };
 
@@ -107,6 +110,7 @@ const NAV_ITEMS = [
   { route: 'portfolio', icon: '📁', label: '我的作品集' },
   { route: 'stats', icon: '📊', label: '我的进度' },
   { route: 'parent', icon: '🔒', label: '家长专区' },
+  { route: 'feedback', icon: '💬', label: '意见反馈' },
 ];
 
 const RANKS = {
@@ -123,11 +127,11 @@ function activeNavRoute(route) {
     // The review-mode practice session belongs under the 复习中心 tab.
     return location.hash.startsWith('#practice/review') ? 'review' : '';
   }
-  return ['review', 'portfolio', 'stats', 'parent'].includes(route) ? route : '';
+  return ['review', 'portfolio', 'stats', 'parent', 'feedback'].includes(route) ? route : '';
 }
 
 function renderShell(route, content) {
-  const topLevelRoutes = ['', 'review', 'portfolio', 'stats', 'account', 'parent', 'about'];
+  const topLevelRoutes = ['', 'review', 'portfolio', 'stats', 'account', 'parent', 'about', 'feedback'];
   const showBackBtn = !topLevelRoutes.includes(route);
   const title = titles[route] || 'Grammar Quest';
 
