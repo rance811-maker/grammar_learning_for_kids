@@ -45,6 +45,14 @@ export function render() {
         </p>
       </div>
 
+      <div class="about-section">
+        <h2>放到手机桌面，像 App 一样用</h2>
+        <p>
+          不用下载安装包。在浏览器里把网站添加到主屏幕，桌面上就多一个图标，点开是全屏的。
+          <a href="#install">看怎么添加 ›</a>
+        </p>
+      </div>
+
       <div class="about-section about-section--plain">
         <h2>关于"精准"这两个字</h2>
         <p>

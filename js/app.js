@@ -14,10 +14,12 @@ import * as parent from './views/parent.js';
 import * as syllabus from './views/syllabus.js';
 import * as feedback from './views/feedback.js';
 import * as about from './views/about.js';
+import * as install from './views/install.js';
 import { curriculum } from './curriculum.js';
+import { initPwa, mountInstallHint } from './pwa.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260621e';
+const BUILD_VERSION = '20260621f';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -50,6 +52,7 @@ const routes = {
   'syllabus': syllabus,
   'feedback': feedback,
   'about': about,
+  'install': install,
 };
 
 const titles = {
@@ -67,6 +70,7 @@ const titles = {
   'syllabus': '语法提纲',
   'feedback': '意见反馈',
   'about': '这是什么',
+  'install': '添加到桌面',
 };
 
 function router() {
@@ -98,6 +102,7 @@ function router() {
   if (view.mount) {
     view.mount(...params);
   }
+  if (route === '') mountInstallHint(app.querySelector('.content > .view') || app.querySelector('.content'));
 
   mountNav();
   mountBackButton();
@@ -430,6 +435,7 @@ async function consumeAuthCallback() {
 
 // Initialize
 store.init();
+initPwa();
 window.addEventListener('hashchange', router);
 
 consumeAuthCallback().then(() => {
