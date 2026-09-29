@@ -3743,3 +3743,11 @@ ul, ol {
 }
 .inst-url { white-space: nowrap; }
 @media (max-width: 400px) { .install-hint__icon { display: none; } .install-hint { gap: 6px; padding-left: var(--space-sm); } .install-hint__go { padding: 6px 12px; } .install-hint__close { width: 26px; } }
+
+/* 改写题的原句：从题目说明里拆出来单独成卡，学生先看清要改写哪句话 */
+.question-source { display: flex; gap: var(--space-sm); align-items: baseline; margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md); border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--color-bg); border-left: 4px solid var(--color-secondary); }
+.question-source__label { flex: none; font-size: var(--text-xs); font-weight: 800; color: var(--color-secondary);
+  border: 1.5px solid currentColor; border-radius: 6px; padding: 0 6px; line-height: 1.6; }
+.question-source__text { font-size: var(--text-base); line-height: 1.7; color: var(--color-text); }

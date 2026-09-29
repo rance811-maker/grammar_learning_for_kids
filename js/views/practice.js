@@ -172,10 +172,49 @@ function renderQuestion(q) {
   }
 }
 
+// 改写题（关键词转换）的原句原来藏在题目说明那行灰色小字的末尾，
+// 学生一眼看到的只有「The painting (believe) ___ …」，以为是动词变形，
+// 根本不知道要把原句里的 forged 也改写进去。所以把「原句：…」从说明里拆出来，
+// 单独放一张醒目的卡片；说明里那句重复的「改写：…」题干也一并去掉。
+const CJK = '\u3000-\u303f\u4e00-\u9fff\uff00-\uffef';
+const SOURCE_RE = new RegExp(`原句[:：]\\s*([^${CJK}]+)`);
+const REWRITE_RE = new RegExp(`改写句?(（[^）]*）)?[:：]\\s*[^${CJK}]+`);
+
+function splitSource(instruction) {
+  const m = instruction.match(SOURCE_RE);
+  if (!m) return { text: instruction, source: '' };
+  const source = m[1].trim().replace(/^['"\u2018\u201c]+|['"\u2019\u201d]+$/g, '').trim();
+  if (!/[A-Za-z]{2,}/.test(source)) return { text: instruction, source: '' };
+  const text = (instruction.slice(0, m.index) + instruction.slice(m.index + m[0].length))
+    .replace(REWRITE_RE, (_, note) => note || '')
+    .replace(/[：:]\s*$/, '')
+    .trim();
+  return { text, source };
+}
+
+function sourceCard(source) {
+  return source
+    ? `<div class="question-source"><span class="question-source__label">原句</span><span class="question-source__text">${source}</span></div>`
+    : '';
+}
+
+// 改写题只有一个空、但要填好几个词时，告诉学生要填几个词——剑桥关键词转换题的通行做法。
+// 不然像 is believed to have been forged 这种 6 个词的答案，谁也想不到要写这么长。
+function wordCountHint(q, blankCount) {
+  if (blankCount !== 1) return '';
+  if (/[(（][^)）]*_+[^)）]*[)）]/.test(q.sentence || '')) return '';   // 括号里印了改写开头的，答案存的是整句，数不准
+  const acceptable = q.acceptableAnswers?.length ? q.acceptableAnswers : [q.correctAnswer || q.answer].filter(Boolean);
+  const counts = acceptable.map((a) => String(a).trim().split(/\s+/).length);
+  if (!counts.length) return '';
+  const lo = Math.min(...counts), hi = Math.max(...counts);
+  if (hi < 2 || hi > 8) return '';
+  return lo === hi ? `填 ${lo} 个词` : `填 ${lo}–${hi} 个词`;
+}
+
 function renderChoiceQuestion(q) {
   const sentence = q.sentence || '';
   const displaySentence = sentence.replace(/_+/g, '<span class="blank">______</span>');
-  const instruction = q.instruction || '选择正确答案';
+  const { text: instruction, source } = splitSource(q.instruction || '选择正确答案');
 
   const optionsHtml = (q.options || []).map((opt, i) =>
     `<button class="choice-btn" data-type="choice" data-index="${i}">${opt}</button>`
@@ -183,7 +222,8 @@ function renderChoiceQuestion(q) {
 
   return `
     <div class="question-instruction">${instruction}</div>
-    <div class="question-sentence">${displaySentence}</div>
+    ${sourceCard(source)}
+    ${displaySentence ? `<div class="question-sentence">${displaySentence}</div>` : ''}
     <div class="choices-grid mt-md">${optionsHtml}</div>`;
 }
 
@@ -263,15 +303,16 @@ function renderMatchQuestion(q) {
 }
 
 function renderFillQuestion(q) {
-  const instruction = q.instruction || '填入正确的单词';
+  const { text: instruction, source } = splitSource(q.instruction || '填入正确的单词');
   const sentence = q.sentence || '';
-  const hint = q.hint || '';
-
   const parts = sentence.split(/_+/);
+  const hint = q.hint || (source ? wordCountHint(q, parts.length - 1) : '');
+
   let sentenceHtml = '';
   let blankIdx = 0;
   for (let i = 0; i < parts.length; i++) {
-    sentenceHtml += parts[i];
+    // 有些改写题把原句和改写句存在同一个 sentence 里，用换行隔开；HTML 会把换行吃成空格，两句挤成一句
+    sentenceHtml += parts[i].replace(/\n/g, '<br>');
     if (i < parts.length - 1) {
       sentenceHtml += `<input type="text" class="fill-input" data-fill-idx="${blankIdx}" placeholder="${hint}" autocomplete="off" autocapitalize="off" spellcheck="false">`;
       blankIdx++;
@@ -280,6 +321,7 @@ function renderFillQuestion(q) {
 
   return `
     <div class="question-instruction">${instruction}</div>
+    ${sourceCard(source)}
     <div class="question-sentence mt-md">${sentenceHtml}</div>
     <div class="practice-action mt-md">
       <button class="btn-primary" id="fillSubmit">检查答案</button>
