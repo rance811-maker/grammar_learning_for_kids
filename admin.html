@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Grammar Quest 运营后台</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+<style>
+/* 运营后台：先看汇总数字，再看每天的走势，最后是明细。颜色只用站点品牌绿做强调，图表系列用固定的两色。 */
+:root {
+  color-scheme: light;
+  --bg: #f4f6f2;
+  --card: #ffffff;
+  --ink: #1d2433;
+  --ink-2: #4f586a;
+  --muted: #8a93a5;
+  --line: #e2e7df;
+  --grid: #eef1ec;
+  --brand: #3f9a00;
+  --brand-soft: #eaf6de;
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --warn-bg: #fff6e0; --warn-ink: #6b4e00;
+  --err-bg: #fdecea;  --err-ink: #8e2f28;
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #14171c; --card: #1d2128; --ink: #eef1f5; --ink-2: #c1c7d2; --muted: #8a93a5;
+    --line: #2c323c; --grid: #262b33; --brand: #7fd13b; --brand-soft: #24341a;
+    --s1: #3987e5; --s2: #d95926;
+    --warn-bg: #3a3218; --warn-ink: #f3de9a; --err-bg: #3d1f1c; --err-ink: #f5b4ad;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #14171c; --card: #1d2128; --ink: #eef1f5; --ink-2: #c1c7d2; --muted: #8a93a5;
+  --line: #2c323c; --grid: #262b33; --brand: #7fd13b; --brand-soft: #24341a;
+  --s1: #3987e5; --s2: #d95926;
+  --warn-bg: #3a3218; --warn-ink: #f3de9a; --err-bg: #3d1f1c; --err-ink: #f5b4ad;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.55; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; display: flex; flex-direction: column; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+header h1 { margin: 0; font-size: 20px; font-weight: 800; text-wrap: balance; }
+header h1 small { font-weight: 500; color: var(--muted); font-size: 13px; margin-left: 6px; }
+.spacer { flex: 1; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); }
+.seg button { font: inherit; border: 0; background: none; color: var(--ink-2); padding: 6px 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--brand-soft); color: var(--brand); font-weight: 700; }
+.btn { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 10px; padding: 6px 12px; cursor: pointer; }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 700; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); cursor: pointer; }
+.note { border-radius: 12px; padding: 10px 14px; font-size: 13px; }
+.note.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.note.err { background: var(--err-bg); color: var(--err-ink); }
+.note code { font-family: var(--mono); font-size: 12px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; min-width: 0; position: relative; }
+.card h2 { margin: 0 0 2px; font-size: 15px; font-weight: 700; }
+.card .sub { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.kpi { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+.kpi .k { color: var(--ink-2); font-size: 12px; letter-spacing: .02em; }
+.kpi .v { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.kpi .d { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .grid3 { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); margin-bottom: 6px; }
+.legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.legend i.box { height: 10px; width: 10px; border-radius: 3px; }
+svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
+svg.chart text { fill: var(--muted); font-size: 11px; font-family: var(--font); }
+svg.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+svg.chart .axis { stroke: var(--line); stroke-width: 1; }
+svg.chart .cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.tip { position: absolute; pointer-events: none; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12); padding: 8px 10px; font-size: 12px; min-width: 120px; z-index: 5; }
+.tip b { display: block; margin-bottom: 4px; color: var(--ink); }
+.tip .row { display: flex; align-items: center; gap: 6px; color: var(--ink-2); }
+.tip .row strong { margin-left: auto; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tip i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.bars { display: flex; flex-direction: column; gap: 8px; }
+.bar { display: grid; grid-template-columns: minmax(70px, 34%) 1fr auto; align-items: center; gap: 8px; font-size: 13px; }
+.bar .lab { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .track { height: 10px; background: var(--grid); border-radius: 0 5px 5px 0; overflow: hidden; }
+.bar .fill { height: 100%; background: var(--s1); border-radius: 0 5px 5px 0; }
+.bar .num { font-variant-numeric: tabular-nums; color: var(--ink); min-width: 4.5em; text-align: right; }
+.bar .num small { color: var(--muted); margin-left: 4px; }
+.empty { color: var(--muted); font-size: 13px; padding: 18px 0; text-align: center; }
+details.data { margin-top: 8px; font-size: 12px; color: var(--ink-2); }
+details.data summary { cursor: pointer; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; position: sticky; top: 0; background: var(--card); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.pill { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--grid); color: var(--ink-2); }
+.pill.on { background: var(--brand-soft); color: var(--brand); }
+.login { max-width: 380px; margin: 40px auto; display: flex; flex-direction: column; gap: 10px; }
+.login input { font: inherit; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); }
+.foot { color: var(--muted); font-size: 12px; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Grammar Quest 运营后台<small id="who"></small></h1>
+    <span class="spacer"></span>
+    <div class="seg" role="group" aria-label="时间范围" id="range">
+      <button type="button" data-days="7">近 7 天</button>
+      <button type="button" data-days="30" aria-pressed="true">近 30 天</button>
+      <button type="button" data-days="90">近 90 天</button>
+    </div>
+    <button class="btn" type="button" id="refresh">刷新</button>
+    <label class="toggle" title="打开后，这台设备上的访问不会被统计"><input type="checkbox" id="notrack"> 本机不计入统计</label>
+    <button class="btn" type="button" id="logout" hidden>退出</button>
+  </header>
+
+  <div id="msg"></div>
+
+  <form class="card login" id="loginForm" hidden>
+    <h2>登录管理员账号</h2>
+    <p class="sub">用你在 Grammar Quest 注册的邮箱和密码登录。</p>
+    <input type="email" id="email" placeholder="邮箱" autocomplete="username" required>
+    <input type="password" id="password" placeholder="密码" autocomplete="current-password" required>
+    <button class="btn primary" type="submit" id="loginBtn">登录</button>
+  </form>
+
+  <main id="dash" hidden>
+    <div class="wrap" style="padding:0">
+      <section class="kpis" id="kpis" aria-label="汇总"></section>
+
+      <section class="card">
+        <h2>每日访客与访问次数</h2>
+        <p class="sub">访客 = 不同的浏览器；访问次数 = 30 分钟内的连续使用算一次</p>
+        <div class="legend"><span><i style="background:var(--s1)"></i>访客</span><span><i style="background:var(--s2)"></i>访问次数</span></div>
+        <div id="chartVisits"></div>
+      </section>
+
+      <div class="grid2">
+        <section class="card">
+          <h2>每日练习次数</h2>
+          <p class="sub">埋点：所有人完成的关卡；学习记录：已登录用户存在云端的练习（埋点上线前的也有）</p>
+          <div class="legend"><span><i class="box" style="background:var(--s1)"></i>埋点</span><span><i class="box" style="background:var(--s2)"></i>学习记录</span></div>
+          <div id="chartPractice"></div>
+        </section>
+        <section class="card">
+          <h2>每日新注册</h2>
+          <p class="sub">来自账号系统，包含埋点上线之前的注册</p>
+          <div id="chartSignups"></div>
+        </section>
+      </div>
+
+      <div class="grid2">
+        <section class="card">
+          <h2>一次访问停留多久</h2>
+          <p class="sub">按访问次数统计</p>
+          <div id="chartDwell"></div>
+        </section>
+        <section class="card">
+          <h2>从来访到注册</h2>
+          <p class="sub">所选时间内，走到每一步的访客数和占比</p>
+          <div id="funnel"></div>
+        </section>
+      </div>
+
+      <div class="grid3">
+        <section class="card"><h2>来源</h2><p class="sub">按访问次数</p><div id="sources"></div></section>
+        <section class="card"><h2>设备</h2><p class="sub">按访问次数</p><div id="devices"></div></section>
+        <section class="card"><h2>看得最多的页面</h2><p class="sub">按页面访问次数</p><div id="routes"></div></section>
+      </div>
+
+      <section class="card">
+        <h2>注册用户</h2>
+        <p class="sub" id="usersSub"></p>
+        <div class="tablewrap"><table id="users"></table></div>
+      </section>
+
+      <p class="foot" id="foot"></p>
+    </div>
+  </main>
+</div>
+<script type="module" src="js/admin.js?v=20260621g"></script>
+</body>
+</html>

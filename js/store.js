@@ -1,4 +1,5 @@
 import { cloud, cloudEnabled } from "./cloud.js";
+import { track } from "./analytics.js";
 import { isBuiltinId, BUILTIN_COURSES } from "./data/builtinCourses.js";
 
 const BUILTIN_IDS = BUILTIN_COURSES.map((c) => c.id);
@@ -281,6 +282,7 @@ export const store = {
   // 返回 { needsConfirm }: true 表示需要去邮箱点确认链接后才能登录。
   async register(name, email, password) {
     const res = await cloud.signUp(email, password, name.trim());
+    track("signup");
     if (!res.confirmed) {
       return { needsConfirm: true };
     }
@@ -296,6 +298,7 @@ export const store = {
     try { localStorage.removeItem('gq-dirty'); } catch { /* ignore */ }
     await cloud.signIn(email, password);
     this._refreshAccount();
+    track("login");
     const remote = await cloud.loadState();
     if (remote) {
       this.state = remote;

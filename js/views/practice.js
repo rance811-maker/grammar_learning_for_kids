@@ -1,6 +1,8 @@
 import { store } from '../store.js';
 import { engine, questionTextKey } from '../engine.js';
 import { cloud } from '../cloud.js';
+import { curriculum } from '../curriculum.js';
+import { track } from '../analytics.js';
 import { sound } from '../sound.js';
 import { confetti } from '../celebrate.js';
 import { pregenerateVariants } from '../variantGenerator.js';
@@ -851,6 +853,11 @@ function showResults() {
       accuracy: results.accuracy,
       maxCombo: results.comboMax,
     });
+    track('practice_done', { props: {
+      u: session.unitId, l: session.level,
+      c: session.answers.filter(a => a.correct).length, t: session.answers.length,
+      cur: curriculum.isBuiltIn() ? curriculum.getActiveId() : 'custom',
+    } });
   }
 
   const accuracyPct = Math.round(results.accuracy * 100);
