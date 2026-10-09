@@ -1,6 +1,6 @@
 import { store } from "./store.js";
 import { curriculum } from "./curriculum.js";
-import { fillBlankSets, gradeBlanks, foldText, expandContractions, fillKey, isZeroForm, displayForm, blankCount, fillSentence, invertedBlank } from "./fillAnswers.js";
+import { fillBlankSets, gradeBlanks, foldText, expandContractions, expandLeading, fillKey, isZeroForm, displayForm, blankCount, fillSentence, invertedBlank } from "./fillAnswers.js";
 
 function shuffle(arr) {
   const a = [...arr];
@@ -30,7 +30,8 @@ function matchFillAnswer(userAnswer, acceptable, sentence, fold = true) {
   const norm = (s) => normalizeStr(fold ? expandContractions(foldText(s).toLowerCase()) : foldText(s));
   const normComma = (s) => norm(s).replace(/\s*,\s*/g, ', ');
 
-  const blanks = String(userAnswer).split(/\s*,\s*/).map((b) => b.trim());
+  const blanks = String(userAnswer).split(/\s*,\s*/).map((b) => (fold ? expandLeading(b) : b.trim()));
+  if (fold) userAnswer = blanks.join(', ');
 
   // Per-blank convention: AI-authored multi-blank fills often store one answer
   // per blank as separate array entries (e.g. blanks ["will become","was","is"]

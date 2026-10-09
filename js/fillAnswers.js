@@ -63,11 +63,16 @@ export function expandContractions(s) {
     .replace(/\b(\w+)n't\b/g, '$1 not').replace(/\bcan not\b/g, 'cannot');
 }
 
+// 空前面印着 I / they 时，孩子可能接着打缩写：I ___ → 've been learning、'll have visited。
+// 'd 既可能是 had 也可能是 would，没法折叠，不管它
+const LEADING = { ll: 'will', ve: 'have', re: 'are', m: 'am' };
+export const expandLeading = (s) => foldText(s).trim().replace(/^'(ll|ve|re|m)\b/i, (_, w) => LEADING[w.toLowerCase()]);
+
 // 判分用的比较键：在 normFill 的基础上折叠缩写，「不填」一律记成空串，空里的逗号不算。
 // fold=false 时不折叠缩写（倒装位置用）。
 export function fillKey(s, fold = true) {
   if (isZeroForm(s)) return '';
-  const n = normFill(s);
+  const n = normFill(fold ? expandLeading(s) : s);
   return (fold ? expandContractions(n) : n).replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
