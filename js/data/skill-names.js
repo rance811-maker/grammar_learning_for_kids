@@ -192,6 +192,9 @@ export const SUB_SKILL_NAMES = {
   'key_word_transformation_paraphrase': '关键词句型转换',
   'error_correction_in_written_text': '书面语法改错',
   'integrated_grammar_accuracy_review': '语法准确性综合复习',
+  // IELTS 7 改版新增
+  'mixed_conditionals_present_to_past': '混合条件句：现在的情况影响过去的结果',
+  'real_vs_hypothetical_conditionals': '真实条件和假设条件的区别',
 };
 
 // 自定义课程的语法点是 AI 现取的名字，表里不一定有。至少把下划线拆开、

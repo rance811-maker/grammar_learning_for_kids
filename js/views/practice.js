@@ -224,7 +224,7 @@ function renderChoiceQuestion(q) {
   ).join('');
 
   // 选项是整句话时两列挤得一行只剩几个词，改成单列
-  const long = (q.options || []).some((o) => String(o).replace(/<[^>]*>/g, '').length > 38);
+  const long = (q.options || []).some((o) => optionWidth(o) > 38);
   return `
     <div class="question-instruction">${instruction}</div>
     ${sourceCard(source)}
@@ -306,6 +306,9 @@ function renderMatchQuestion(q) {
       <button class="btn-primary" id="matchSubmit" disabled>检查配对</button>
     </div>`;
 }
+
+// 选项的显示宽度：中文一个字按两个英文字符算
+const optionWidth = (o) => { const t = String(o).replace(/<[^>]*>/g, ''); return t.length + (t.match(/[\u3000-\u9fff\uff00-\uffef]/g) || []).length; };
 
 const fillInput = (idx, hint) =>
   `<input type="text" class="fill-input" data-fill-idx="${idx}" placeholder="${hint}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">`;

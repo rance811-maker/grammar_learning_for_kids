@@ -26,7 +26,16 @@ function headingOf(line) {
 function lineHtml(raw) {
   const line = raw.replace(/^\s+/, '');
   if (/^(✔|✓|正确[：:])/.test(line)) return `<li class="tip-ex tip-ex--ok">${inline(line.replace(/^(✔|✓|正确[：:])\s*/, ''))}</li>`;
-  if (/^(✘|✗|×|错误[：:])/.test(line)) return `<li class="tip-ex tip-ex--bad">${inline(line.replace(/^(✘|✗|×|错误[：:])\s*/, ''))}</li>`;
+  if (/^(✘|✗|×|错误[：:])/.test(line)) {
+    // 「错句 → 改法（原因）」：只划掉错句，改法照常显示
+    const body = line.replace(/^(✘|✗|×|错误[：:])\s*/, '');
+    const at = body.search(/\s*(→|->|⇒)\s*/);
+    if (at > 0) {
+      const fix = body.slice(at).replace(/^\s*(→|->|⇒)\s*/, '');
+      return `<li class="tip-ex tip-ex--bad"><s>${inline(body.slice(0, at))}</s> <span class="tip-fix">→ ${inline(fix)}</span></li>`;
+    }
+    return `<li class="tip-ex tip-ex--bad"><s>${inline(body)}</s></li>`;
+  }
   if (/^(常见错误|易错|注意)[：:]/.test(line)) return `<li class="tip-warn">${inline(line)}</li>`;
   if (/^(例|例句|e\.g\.)[：:]/i.test(line)) return `<li class="tip-ex">${inline(line.replace(/^(例|例句|e\.g\.)[：:]\s*/i, ''))}</li>`;
   if (/^[-•·]\s+/.test(line)) return `<li>${inline(line.replace(/^[-•·]\s+/, ''))}</li>`;

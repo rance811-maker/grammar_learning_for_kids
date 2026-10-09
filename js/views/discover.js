@@ -2,6 +2,9 @@ import { store } from '../store.js';
 import { curriculum } from '../curriculum.js';
 import { renderTip } from '../tipFormat.js';
 
+// 选项的显示宽度：中文一个字按两个英文字符算
+const optionWidth = (o) => { const t = String(o).replace(/<[^>]*>/g, ''); return t.length + (t.match(/[\u3000-\u9fff\uff00-\uffef]/g) || []).length; };
+
 export function render(unitId) {
   unitId = Number(unitId);
   const unitData = curriculum.getUnit(unitId);
@@ -37,7 +40,7 @@ export function render(unitId) {
       `<button class="choice-btn discover-option" data-q="${idx}" data-opt="${oi}">${opt}</button>`
     ).join('');
 
-    const long = (q.options || []).some((o) => String(o).replace(/<[^>]*>/g, '').length > 38);
+    const long = (q.options || []).some((o) => optionWidth(o) > 38);
     questionsHtml += `
       <div class="card mb-md discover-question" data-q="${idx}">
         <div class="question-instruction">问题 ${idx + 1}</div>

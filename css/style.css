@@ -3784,7 +3784,9 @@ details.tip-sec[open] > summary.tip-h::before { transform: rotate(90deg); }
 .tip-list li.tip-ex { color: var(--color-text); font-family: var(--font-sans); background: rgba(28, 176, 246, 0.07); border-radius: 6px; padding: 3px 8px 3px 24px; }
 .tip-list li.tip-ex::before { content: "例"; left: 6px; font-size: 0.8em; font-weight: 700; color: var(--color-secondary); top: 5px; }
 .tip-list li.tip-ex--ok::before { content: "✔"; color: var(--color-primary-dark); }
-.tip-list li.tip-ex--bad { background: rgba(255, 75, 75, 0.07); text-decoration: line-through; text-decoration-color: rgba(255, 75, 75, 0.6); }
+.tip-list li.tip-ex--bad { background: rgba(255, 75, 75, 0.07); }
+.tip-list li.tip-ex--bad s { text-decoration-color: rgba(255, 75, 75, 0.7); color: var(--color-text-light); }
+.tip-fix { color: var(--color-primary-dark); font-weight: 600; }
 .tip-list li.tip-ex--bad::before { content: "✘"; color: var(--color-danger); }
 .tip-list li.tip-warn { background: rgba(255, 200, 0, 0.12); border-radius: 6px; padding: 3px 8px 3px 24px; color: var(--color-text); }
 .tip-list li.tip-warn::before { content: "⚠"; left: 6px; font-size: 0.85em; top: 3px; }
