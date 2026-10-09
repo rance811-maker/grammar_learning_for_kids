@@ -713,13 +713,45 @@ function showAnswerFeedback(question, userAnswer, isCorrect, result) {
       break;
     }
     case 'fill': {
-      document.querySelectorAll('.fill-input').forEach(inp => {
+      // 多空题答错时逐空标对错，填错的空后面紧跟着写出正确答案，一眼看出是哪个空错了
+      const inputs = [...document.querySelectorAll('.fill-input')];
+      const per = perBlank(result, isCorrect, inputs.length);
+      inputs.forEach((inp, i) => {
         inp.disabled = true;
-        inp.classList.add(isCorrect ? 'fill-input--correct' : 'fill-input--wrong');
+        const ok = per ? per[i].ok : isCorrect;
+        inp.classList.add(ok ? 'fill-input--correct' : 'fill-input--wrong');
+        if (per && !ok) {
+          const fix = document.createElement('span');
+          fix.className = 'fill-fix';
+          fix.textContent = per[i].answers[0];
+          inp.after(fix);
+        }
       });
       break;
     }
   }
+}
+
+// 多空填空题答错时的逐空结果；单空题、整句作答的题、或者答对了，返回 null
+function perBlank(result, isCorrect, inputCount) {
+  return !isCorrect && result.blanks && result.blanks.length === inputCount && inputCount > 1 ? result.blanks : null;
+}
+
+const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// 「第 1 空 has been confirmed ✗ 你填的是 is confirmed」——多空题不再把第二个空的答案说成「也算对」
+function blanksAnswerHtml(per) {
+  const items = per.map((b, i) => {
+    const alt = b.answers.length > 1 ? `<span class="fb-blank__alt">也可以写 ${b.answers.slice(1).map(escHtml).join('、')}</span>` : '';
+    const mark = b.ok
+      ? '<span class="fb-blank__mark">✓ 填对了</span>'
+      : `<span class="fb-blank__mark">✗ 你填的是 ${b.user ? `<s>${escHtml(b.user)}</s>` : '（空着）'}</span>`;
+    return `<li class="fb-blank ${b.ok ? 'fb-blank--ok' : 'fb-blank--bad'}">
+      <span class="fb-blank__no">第 ${i + 1} 空</span>
+      <span class="fb-blank__ans">${escHtml(b.answers[0])}</span>${alt}${mark}
+    </li>`;
+  }).join('');
+  return `<div class="feedback-banner__correct-answer">正确答案<ol class="fb-blanks">${items}</ol></div>`;
 }
 
 const CORRECT_PHRASES = ['回答正确！', '答对了！', '没错！', '厉害！', '完全正确！', '漂亮！', 'Excellent!', 'Perfect!', 'Well done!'];
@@ -755,9 +787,12 @@ function showFeedback(isCorrect, question, userAnswer, result) {
   const altHtml = !isCorrect && result.altAnswers?.length
     ? `<div class="feedback-banner__alt">这样写也算对：${result.altAnswers.join('；')}</div>`
     : '';
-  const correctAnswerHtml = !isCorrect && result.correctAnswer && question.type !== 'error'
-    ? `<div class="feedback-banner__correct-answer">正确答案：${result.correctAnswer}</div>${altHtml}`
-    : '';
+  const per = question.type === 'fill' ? perBlank(result, isCorrect, document.querySelectorAll('.fill-input').length) : null;
+  const correctAnswerHtml = per
+    ? blanksAnswerHtml(per)
+    : !isCorrect && result.correctAnswer && question.type !== 'error'
+      ? `<div class="feedback-banner__correct-answer">正确答案：${result.correctAnswer}</div>${altHtml}`
+      : '';
 
   const explanationHtml = !isCorrect && result.explanation
     ? `<div class="feedback-banner__explanation">${result.explanation}</div>`

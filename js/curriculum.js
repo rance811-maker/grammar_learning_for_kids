@@ -1,5 +1,6 @@
 import { store } from './store.js';
 import { BUILT_IN_ID, BUILTIN_COURSES, getBuiltinCourse, isBuiltinId } from './data/builtinCourses.js';
+import { cleanBlankAnswers } from './fillAnswers.js';
 
 export { BUILT_IN_ID };
 
@@ -18,7 +19,9 @@ function normalizeGenQ(q, unitId, levelKey, idx) {
       return { ...base, context: q.context || '', dialogue: q.dialogue || [], options: q.options || [], correctIndex: Number(q.correctIndex ?? 0) };
     case 'fill': {
       const aa = q.acceptableAnswers?.length ? q.acceptableAnswers : q.answer ? [q.answer] : q.correctAnswer ? [q.correctAnswer] : [];
-      return { ...base, sentence: q.sentence || '', hint: q.hint || '', acceptableAnswers: aa, correctAnswer: aa[0] || '' };
+      const out = { ...base, sentence: q.sentence || '', hint: q.hint || '', acceptableAnswers: aa, correctAnswer: aa[0] || '' };
+      const blankAnswers = cleanBlankAnswers(q.blankAnswers, out.sentence);
+      return blankAnswers ? { ...out, blankAnswers } : out;
     }
     case 'reorder':
       return { ...base, words: q.words || [], correctSentence: q.correctSentence ?? '' };

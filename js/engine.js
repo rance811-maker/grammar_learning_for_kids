@@ -1,5 +1,6 @@
 import { store } from "./store.js";
 import { curriculum } from "./curriculum.js";
+import { fillBlankSets, gradeBlanks, normFill } from "./fillAnswers.js";
 
 function shuffle(arr) {
   const a = [...arr];
@@ -444,6 +445,7 @@ export const engine = {
     let correct = false;
     let correctAnswer = "";
     let altAnswers = [];
+    let blanks = null;   // 多空填空题：每个空的 { answers, user, ok }
     const explanation = question.explanation || "";
     // For "error" (click-the-wrong-word) questions, the word that should
     // replace the mistake — surfaced so learners always see the right word.
@@ -504,11 +506,26 @@ export const engine = {
         const acceptable = question.acceptableAnswers?.length
           ? question.acceptableAnswers
           : [question.correctAnswer || question.answer].filter(Boolean);
+        // 多空题逐空判：每个空都要对。原来拿「整串」去和每一条参考答案比，
+        // 一空一条的题只填对第一个空、后面留空，去掉末尾逗号后就和第一条对上了，被误判为全对。
+        const sets = fillBlankSets(question);
+        if (sets) {
+          blanks = gradeBlanks(sets, userAnswer);
+          correct = blanks.every((b) => b.ok);
+          correctAnswer = sets.map((forms) => forms[0]).join(" … ");
+          break;
+        }
         correct = matchFillAnswer(userAnswer, acceptable, question.sentence);
         correctAnswer = acceptable[0] || "";
         // 一道题常常不止一种改法（题目解析里写着"两者均可"）。只显示第一个，
-        // 学习者会以为自己那种写法是错的。把其余的也带出来。
-        if (acceptable.length > 1) altAnswers = acceptable.slice(1);
+        // 学习者会以为自己那种写法是错的。把其余的也带出来。只差空格、大小写、标点的不算另一种。
+        const seen = new Set([normFill(correctAnswer)]);
+        altAnswers = acceptable.slice(1).filter((a) => {
+          const k = normFill(a);
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
         break;
       }
 
@@ -517,7 +534,7 @@ export const engine = {
         correctAnswer = "";
     }
 
-    return { correct, correctAnswer, altAnswers, explanation, correction };
+    return { correct, correctAnswer, altAnswers, blanks, explanation, correction };
   },
 
   calculateResults(session) {

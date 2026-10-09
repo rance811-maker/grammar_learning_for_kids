@@ -1,6 +1,7 @@
 import { store } from '../store.js';
 import { cloud, friendlyError } from '../cloud.js';
 import { SUB_SKILL_NAMES } from '../data/skill-names.js';
+import { fillAnswerText } from '../fillAnswers.js';
 import { curriculum, BUILT_IN_ID } from '../curriculum.js';
 import { generateSyllabus, generateAllUnits, hasApiKey, friendlyAiError, buildMaterial, generateUnitPreview, generateCoverage, hasBlueprint, deterministicCoverage } from '../unitGenerator.js';
 
@@ -985,7 +986,7 @@ function briefQuestion(q) {
     if (Array.isArray(q.options)) body += `　【${q.options.join(' / ')}】`;
     ans = (q.options || [])[q.correctIndex] || '';
   } else if (q.type === 'fill') {
-    ans = (q.acceptableAnswers && q.acceptableAnswers.length ? q.acceptableAnswers : [q.answer || q.correctAnswer]).filter(Boolean).join(' / ');
+    ans = fillAnswerText(q);
   } else if (q.type === 'reorder') {
     ans = q.correctSentence || '';
   } else if (q.type === 'error') {

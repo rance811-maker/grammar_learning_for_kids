@@ -1,5 +1,6 @@
 import { curriculum } from './curriculum.js';
 import { store } from './store.js';
+import { fillAnswerText } from './fillAnswers.js';
 
 const PROVIDERS = {
   gemini: { keyStorageKey: 'gq-ai-key-gemini' },
@@ -61,13 +62,13 @@ SCOPE: WRITTEN grammar accuracy only (writing/reading) — no listening/speaking
 Question formats:
 - choice: { "type":"choice", "instruction":"(Chinese)", "sentence":"She ___ to school.", "options":["go","goes","going","went"], "correctIndex":1, "explanation":"(Chinese)", "subSkill":"skill_id" }
 - fill: { "type":"fill", "instruction":"(Chinese)", "sentence":"He (play) ___ now.", "acceptableAnswers":["is playing"], "explanation":"(Chinese)", "subSkill":"skill_id" }
-  - PREFER a SINGLE blank (one ___). If the sentence truly needs multiple blanks, put ONE answer per blank in "acceptableAnswers", in the SAME order as the blanks — e.g. sentence "It (be) ___ cold in 1900 but (be) ___ warm now." → "acceptableAnswers":["was","is"]. The number of entries MUST equal the number of ___ blanks. Do NOT put the whole phrase or the static words in the answers.
+  - PREFER a SINGLE blank (one ___). If the sentence truly needs multiple blanks, put ONE answer per blank in "acceptableAnswers", in the SAME order as the blanks — e.g. sentence "It (be) ___ cold in 1900 but (be) ___ warm now." → "acceptableAnswers":["was","is"]. The number of entries MUST equal the number of ___ blanks. Do NOT put the whole phrase or the static words in the answers. If any blank has more than one correct form (e.g. British/American), ALSO add "blankAnswers": one array per blank, in order, listing every accepted form — e.g. "blankAnswers":[["had brought"],["would not have got","would not have gotten"]] — and keep "acceptableAnswers" as the first form of each blank. NEVER add extra entries to "acceptableAnswers" of a multi-blank question.
 - reorder: { "type":"reorder", "instruction":"(Chinese)", "words":["she","is","reading"], "correctSentence":"She is reading.", "explanation":"(Chinese)", "subSkill":"skill_id" }
 - error: { "type":"error", "instruction":"(Chinese)", "words":["She","go","to","school"], "errorIndex":1, "correction":"goes", "explanation":"(Chinese)", "subSkill":"skill_id" }
 
 QUALITY RULES (critical — follow all):
 - Each question MUST contain a clear context clue that determines the answer; there should ideally be exactly ONE best answer.
-- If both British and American English are correct, include BOTH in "acceptableAnswers".
+- If both British and American English are correct, include BOTH in "acceptableAnswers" (single-blank questions; for multi-blank questions use "blankAnswers" as described above).
 - Explanations must explain the MEANING/why (e.g. "by 2031 = completed before a future point → future perfect"), not just point at a surface word.
 - Keep timelines, tenses and characters logically consistent across all questions.
 - For B1 and above, include a few key-word-transformation style items (rewrite a sentence keeping the meaning, testing the target structure) among the fill questions where natural.
@@ -445,7 +446,7 @@ export async function generateSyllabus(goal, material = '') {
 // 取一道题的「预期答案」，供校验用。
 function answerOf(q) {
   if (q.type === 'choice' || q.type === 'scenario') return (q.options || [])[q.correctIndex] ?? '';
-  if (q.type === 'fill') return (q.acceptableAnswers && q.acceptableAnswers.length ? q.acceptableAnswers : [q.answer || q.correctAnswer]).filter(Boolean).join(' / ');
+  if (q.type === 'fill') return fillAnswerText(q);
   if (q.type === 'reorder') return q.correctSentence || '';
   if (q.type === 'error') return q.correction || '';
   return '(见题目)';

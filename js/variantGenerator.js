@@ -1,5 +1,6 @@
 import { store } from './store.js';
 import { hasApiKey, aiJson } from './unitGenerator.js';
+import { fillAnswerText } from './fillAnswers.js';
 
 // 题目变体：给一道题生成"考同一个知识点、但句子完全不同"的新题。
 //
@@ -24,12 +25,12 @@ QUALITY RULES:
 - Exactly ONE best answer, with a clear context clue in the sentence that forces it
 - "explanation" in Chinese, explaining the MEANING/why (e.g. "last week 是过去时间 → 用过去式"), not just naming the rule
 - Keep it age-appropriate (about 10-12 years old) and natural English
-- If both British and American forms are correct, include both in acceptableAnswers
+- If both British and American forms are correct, include both in acceptableAnswers (single-blank questions; for multi-blank questions use "blankAnswers", see the fill format below)
 
 Question formats (return exactly the shape matching "type"):
 - choice: {"type":"choice","instruction":"(中文)","sentence":"She ___ to school.","options":["go","goes","going","went"],"correctIndex":1,"explanation":"(中文)","subSkill":"..."}
 - fill: {"type":"fill","instruction":"(中文)","sentence":"He (play) ___ now.","acceptableAnswers":["is playing"],"explanation":"(中文)","subSkill":"..."}
-  PREFER a single blank. If multiple blanks, put ONE answer per blank, in order, and the count must equal the number of ___ .
+  PREFER a single blank. If multiple blanks, put ONE answer per blank, in order, and the count must equal the number of ___ . If any blank has more than one correct form (e.g. British/American), ALSO add "blankAnswers": one array per blank, in order, listing every accepted form — e.g. "blankAnswers":[["had brought"],["would not have got","would not have gotten"]] — and keep "acceptableAnswers" as the first form of each blank. NEVER add extra entries to "acceptableAnswers" of a multi-blank question.
 - reorder: {"type":"reorder","instruction":"(中文)","words":["she","is","reading"],"correctSentence":"She is reading.","explanation":"(中文)","subSkill":"..."}
 - error: {"type":"error","instruction":"(中文)","words":["She","go","to","school"],"errorIndex":1,"correction":"goes","explanation":"(中文)","subSkill":"..."}
 
@@ -44,7 +45,8 @@ function describe(q) {
   if (Array.isArray(q.words) && q.words.length) parts.push(`words: ${q.words.join(' ')}`);
   if (Array.isArray(q.options) && q.options.length) parts.push(`options: ${q.options.join(' / ')}`);
   if (q.correctIndex !== undefined) parts.push(`correctIndex: ${q.correctIndex}`);
-  if (q.acceptableAnswers?.length) parts.push(`answers: ${q.acceptableAnswers.join(' / ')}`);
+  if (q.type === 'fill') parts.push(`answers: ${fillAnswerText(q)}`);
+  else if (q.acceptableAnswers?.length) parts.push(`answers: ${q.acceptableAnswers.join(' / ')}`);
   if (q.correctSentence) parts.push(`correctSentence: ${q.correctSentence}`);
   if (q.correction) parts.push(`correction: ${q.correction}`);
   if (q.explanation) parts.push(`explanation: ${q.explanation}`);
