@@ -1,5 +1,6 @@
 import { store } from '../store.js';
 import { curriculum } from '../curriculum.js';
+import { renderTip } from '../tipFormat.js';
 
 export function render(unitId) {
   unitId = Number(unitId);
@@ -64,9 +65,9 @@ export function render(unitId) {
         </div>` : ''}
 
         ${tip ? `
-        <div class="card mb-lg" style="border-left:4px solid var(--color-warning);background:rgba(255,200,0,0.06);">
-          <div style="font-weight:700;margin-bottom:var(--space-sm);">💡 语法小贴士</div>
-          <div style="font-size:var(--text-sm);line-height:1.8;color:var(--color-text-light);">${tip}</div>
+        <div class="card mb-lg tip-card">
+          <div class="tip-card__label">💡 语法小贴士</div>
+          <div class="tip-body">${renderTip(tip)}</div>
         </div>` : ''}
 
         <button class="btn-primary discover-complete-btn" id="discoverCompleteBtn">

@@ -2,6 +2,7 @@ import { store } from '../store.js';
 import { cloud, friendlyError } from '../cloud.js';
 import { SUB_SKILL_NAMES } from '../data/skill-names.js';
 import { fillAnswerText } from '../fillAnswers.js';
+import { renderTip } from '../tipFormat.js';
 import { curriculum, BUILT_IN_ID } from '../curriculum.js';
 import { generateSyllabus, generateAllUnits, hasApiKey, friendlyAiError, buildMaterial, generateUnitPreview, generateCoverage, hasBlueprint, deterministicCoverage } from '../unitGenerator.js';
 
@@ -1031,7 +1032,7 @@ async function runTrialUnit(sylItem, material, cefr = '') {
         <div style="font-weight:700;margin-bottom:6px;">📖 第 1 单元 · 试生成结果（仅预览，不影响课程）</div>
         ${story.title ? `<div style="font-weight:600;font-size:0.9rem;">${esc(story.title)}</div>` : ''}
         ${story.text ? `<div style="font-size:0.8rem;color:var(--color-text-light);margin:4px 0;line-height:1.5;">${esc(String(story.text).slice(0, 160))}…</div>` : ''}
-        ${tip ? `<div style="font-size:0.8rem;color:var(--color-secondary-dark);margin:4px 0;">💡 ${esc(tip)}</div>` : ''}
+        ${tip ? `<div class="tip-body" style="font-size:0.8rem;margin:6px 0;"><div style="font-weight:700;">💡 语法小贴士</div>${renderTip(tip)}</div>` : ''}
         <div style="font-weight:600;font-size:0.82rem;margin-top:8px;">练习题样例：</div>
         ${samples || '<div style="font-size:0.8rem;color:var(--color-muted);">（本单元第 1 关暂无题目样例）</div>'}
         ${renderVerifyNote(data._verify)}

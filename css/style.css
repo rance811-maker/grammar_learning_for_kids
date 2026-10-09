@@ -3764,3 +3764,27 @@ ul, ol {
 .fb-blank__mark { font-size: 0.85em; }
 .fb-blank--ok .fb-blank__ans { opacity: 0.85; }
 @media (prefers-color-scheme: dark) { .fill-fix { color: #8EE000; background: rgba(88, 204, 2, 0.2); } }
+
+/* 语法小贴士：排成「标题 + 要点 + 例句 + 易错」，分节多的折叠起来（js/tipFormat.js） */
+.tip-card { border-left: 4px solid var(--color-warning); background: rgba(255, 200, 0, 0.06); }
+.tip-card__label { font-weight: 700; margin-bottom: var(--space-sm); }
+.tip-body { font-size: var(--text-sm); line-height: 1.75; color: var(--color-text); display: flex; flex-direction: column; gap: 8px; }
+.tip-title { font-weight: 800; font-size: var(--text-base); }
+.tip-lead { margin: 0; color: var(--color-text-light); }
+.tip-sec { background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 8px 12px; }
+.tip-h { font-weight: 700; cursor: default; }
+details.tip-sec > summary.tip-h { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+details.tip-sec > summary.tip-h::-webkit-details-marker { display: none; }
+details.tip-sec > summary.tip-h::before { content: "▸"; color: var(--color-text-light); transition: transform 0.15s; }
+details.tip-sec[open] > summary.tip-h::before { transform: rotate(90deg); }
+.tip-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.tip-list li { position: relative; padding-left: 14px; color: var(--color-text-light); overflow-wrap: anywhere; }
+.tip-list li::before { content: "·"; position: absolute; left: 3px; font-weight: 800; }
+.tip-list li.tip-p { padding-left: 0; } .tip-list li.tip-p::before { content: none; }
+.tip-list li.tip-ex { color: var(--color-text); font-family: var(--font-sans); background: rgba(28, 176, 246, 0.07); border-radius: 6px; padding: 3px 8px 3px 24px; }
+.tip-list li.tip-ex::before { content: "例"; left: 6px; font-size: 0.8em; font-weight: 700; color: var(--color-secondary); top: 5px; }
+.tip-list li.tip-ex--ok::before { content: "✔"; color: var(--color-primary-dark); }
+.tip-list li.tip-ex--bad { background: rgba(255, 75, 75, 0.07); text-decoration: line-through; text-decoration-color: rgba(255, 75, 75, 0.6); }
+.tip-list li.tip-ex--bad::before { content: "✘"; color: var(--color-danger); }
+.tip-list li.tip-warn { background: rgba(255, 200, 0, 0.12); border-radius: 6px; padding: 3px 8px 3px 24px; color: var(--color-text); }
+.tip-list li.tip-warn::before { content: "⚠"; left: 6px; font-size: 0.85em; top: 3px; }
