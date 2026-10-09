@@ -5,7 +5,10 @@ import { cleanBlankAnswers } from './fillAnswers.js';
 export { BUILT_IN_ID };
 
 function normalizeGenQ(q, unitId, levelKey, idx) {
-  const id = `gen-${unitId}-${levelKey}-${idx}`;
+  // 题目自带的 id（gen-单元-关-1xx）优先：按位置生成的 id 在换题后会把旧题的作答记录、
+  // AI 变体挂到新题上。只认同一单元、同一关的格式，防止 AI 生成的随意 id 撞车。
+  const own = typeof q.id === 'string' && new RegExp(`^gen-${unitId}-${levelKey}-\\d+$`).test(q.id);
+  const id = own ? q.id : `gen-${unitId}-${levelKey}-${idx}`;
   const base = {
     id, type: q.type,
     instruction: q.instruction || '',
@@ -24,7 +27,8 @@ function normalizeGenQ(q, unitId, levelKey, idx) {
       return blankAnswers ? { ...out, blankAnswers } : out;
     }
     case 'reorder':
-      return { ...base, words: q.words || [], correctSentence: q.correctSentence ?? '' };
+      return { ...base, words: q.words || [], correctSentence: q.correctSentence ?? '',
+        ...(Array.isArray(q.acceptableSentences) ? { acceptableSentences: q.acceptableSentences } : {}) };
     case 'error':
       return { ...base, words: q.words ?? q.sentence ?? [], errorIndex: Number(q.errorIndex ?? 0), correction: q.correction || '' };
     case 'match': {
@@ -117,6 +121,11 @@ export const curriculum = {
   },
 
   /** 课程的 CEFR 等级（语法提纲页要用）。自定义课程从 profile 里取。 */
+  /** 当前课程在界面上的简称（综合挑战卡片等处用）：PET / 雅思 6 分 / 雅思 7 分 / 自定义课程用「综合」。 */
+  examLabel(id = this.getActiveId()) {
+    return { __pet__: 'PET', 'preset-ielts6': '雅思 6 分', 'preset-ielts7': '雅思 7 分' }[id] || '综合';
+  },
+
   getCefrOf(id) {
     const b = getBuiltinCourse(id);
     if (b) return b.cefr || '';

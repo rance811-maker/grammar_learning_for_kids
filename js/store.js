@@ -1025,7 +1025,7 @@ export const store = {
       this.earnBadge({
         id: 'boss_pet_clear',
         unitId: 0,
-        name: 'PET 模拟通关',
+        name: `${{ __pet__: 'PET', 'preset-ielts6': '雅思 6 分', 'preset-ielts7': '雅思 7 分' }[this.state.activeCurriculumId || '__pet__'] || '综合'} 模拟通关`,
         icon: '🎓',
       });
     }

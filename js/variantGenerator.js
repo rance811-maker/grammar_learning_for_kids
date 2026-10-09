@@ -24,7 +24,7 @@ MUST change:
 QUALITY RULES:
 - Exactly ONE best answer, with a clear context clue in the sentence that forces it
 - "explanation" in Chinese, explaining the MEANING/why (e.g. "last week 是过去时间 → 用过去式"), not just naming the rule
-- Keep it age-appropriate (about 10-12 years old) and natural English
+- Keep it age-appropriate and natural English; never ask the learner to name or identify a grammar structure — test understanding and use
 - If both British and American forms are correct, include both in acceptableAnswers (single-blank questions; for multi-blank questions use "blankAnswers", see the fill format below)
 
 Question formats (return exactly the shape matching "type"):

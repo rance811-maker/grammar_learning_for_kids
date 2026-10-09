@@ -223,11 +223,13 @@ function renderChoiceQuestion(q) {
     `<button class="choice-btn" data-type="choice" data-index="${i}">${opt}</button>`
   ).join('');
 
+  // 选项是整句话时两列挤得一行只剩几个词，改成单列
+  const long = (q.options || []).some((o) => String(o).replace(/<[^>]*>/g, '').length > 38);
   return `
     <div class="question-instruction">${instruction}</div>
     ${sourceCard(source)}
     ${displaySentence ? `<div class="question-sentence">${displaySentence}</div>` : ''}
-    <div class="choices-grid mt-md">${optionsHtml}</div>`;
+    <div class="choices-grid mt-md${long ? ' choices-grid--single' : ''}">${optionsHtml}</div>`;
 }
 
 function renderReorderQuestion(q) {
@@ -804,8 +806,11 @@ function showFeedback(isCorrect, question, userAnswer, result) {
       ? `<div class="feedback-banner__correct-answer">正确答案：${result.correctAnswer}</div>${altHtml}`
       : '';
 
-  const explanationHtml = !isCorrect && result.explanation
-    ? `<div class="feedback-banner__explanation">${result.explanation}</div>`
+  // 答错直接给解析；答对也可以点「为什么？」看——猜对的人也该知道为什么对
+  const explanationHtml = result.explanation
+    ? (isCorrect
+      ? `<button class="feedback-banner__why" id="whyBtn" type="button">为什么？</button><div class="feedback-banner__explanation" id="whyText" hidden>${result.explanation}</div>`
+      : `<div class="feedback-banner__explanation">${result.explanation}</div>`)
     : '';
 
   // Correct → brief toast that auto-advances (no need to reach for a button).
@@ -829,7 +834,21 @@ function showFeedback(isCorrect, question, userAnswer, result) {
 
   if (isCorrect) {
     clearAdvanceTimer();
-    advanceTimer = setTimeout(advanceToNext, AUTO_ADVANCE_MS);
+    advanceTimer = setTimeout(advanceToNext, result.explanation ? AUTO_ADVANCE_MS + 1200 : AUTO_ADVANCE_MS);
+    // 点开解析就停下自动跳题，等看完自己点「继续」
+    document.getElementById('whyBtn')?.addEventListener('click', (e) => {
+      clearAdvanceTimer();
+      e.currentTarget.remove();
+      const t = document.getElementById('whyText');
+      if (t) t.hidden = false;
+      const btn = document.createElement('button');
+      btn.className = 'btn-primary';
+      btn.id = 'continueBtn';
+      btn.textContent = '继续';
+      btn.style.cssText = 'background:rgba(255,255,255,0.25);box-shadow:0 4px 0 rgba(0,0,0,0.15);';
+      btn.addEventListener('click', advanceToNext);
+      feedbackArea.querySelector('.feedback-banner')?.append(btn);
+    });
   } else {
     const continueBtn = document.getElementById('continueBtn');
     if (continueBtn) {
@@ -910,7 +929,7 @@ function showResults() {
   let titleText, subtitleText, starsHtml;
   if (isBoss) {
     starsHtml = `<div style="font-size:3.5rem;">${bossPassed ? '🎓' : '💪'}</div>`;
-    titleText = bossPassed ? 'PET 模拟通过！' : '再接再厉！';
+    titleText = bossPassed ? `${curriculum.examLabel()} 模拟通过！` : '再接再厉！';
     subtitleText = bossPassed
       ? `综合正确率 ${accuracyPct}% · 已达标(≥70%)`
       : `综合正确率 ${accuracyPct}% · 距达标还差一点`;

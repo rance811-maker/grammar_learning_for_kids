@@ -500,7 +500,9 @@ export const engine = {
             .replace(/[.,!?;:'"，。！？；：''""]+/g, "")
             .replace(/\s+/g, " ")
             .trim();
-        correct = clean(userAnswer) === clean(question.correctSentence);
+        // 有些句子不止一种正确语序（状语放句首或句末），acceptableSentences 列出其余写法
+        correct = [question.correctSentence, ...(question.acceptableSentences || [])]
+          .some((s) => s && clean(userAnswer) === clean(s));
         correctAnswer = question.correctSentence;
         break;
       }
@@ -620,6 +622,12 @@ export const engine = {
       if (!store.isUnitUnlocked(unitId)) continue;
 
       const unit = store.state.units[unitId];
+
+      // 新单元先读「发现」：先懂意思、自己找出规则，再去 Lv.1 练。已经练过 Lv.1 的就不拦了。
+      if (!unit.discoverCompleted && curriculum.getUnit(unitId)?.discover
+          && (unit.practiceLevels[1]?.bestStars ?? 0) < 1) {
+        return { type: "discover", unitId, level: null };
+      }
 
       // Check if mission is available but not done
       const lv3Done = store.isLevelPassed(unitId, 3);

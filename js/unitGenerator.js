@@ -73,6 +73,8 @@ QUALITY RULES (critical — follow all):
 - Keep timelines, tenses and characters logically consistent across all questions.
 - For B1 and above, include a few key-word-transformation style items (rewrite a sentence keeping the meaning, testing the target structure) among the fill questions where natural.
 - Do NOT invent coverage percentages or claim official exam status anywhere in the content.
+- NO LABELLING: never ask the learner to name or identify a structure ("What structure is this?", "Which sentence is an example of the X?", "这是什么结构"). Test whether they can UNDERSTAND and USE the form: choose the form that fits a stated meaning/time, complete or rewrite a sentence, fix a realistic learner error.
+- CONTEXT: set sentences in a situation that matches the learner's goal (for exam courses, e.g. IELTS: Writing Task 2 arguments, Task 1 data descriptions where the grammar naturally fits, Speaking answers). Write the instruction in Chinese as the MEANING or PURPOSE ("想说『万一将来…』"), not as the name of the structure, and do not print the answer in brackets.
 
 STRICT JSON: the whole output must be ONE valid JSON value. Return ONLY the JSON, no markdown code blocks, no other text. Inside every string, escape double quotes as \\" and never put a raw line break — keep each string on a single line (write the story as one continuous paragraph). Do not use smart/curly quotes ("" '') anywhere; use straight quotes only. No trailing commas. Do NOT use direct speech or any double quotation marks INSIDE a string value — write the story with reported speech instead (He said that... not He said, "...").`;
 
@@ -82,8 +84,12 @@ const UNIT_PROMPT_A = `${UNIT_CORE}
 Generate ONLY these parts for the given unit topic:
 1. "discover":
    - "story": { "title": string, "text": string (150-250 word English story demonstrating the grammar, ONE single-line paragraph), "highlights": [key grammar words] }
-   - "questions": array of 3 objects { "question": string, "options": [4 strings], "correctIndex": number, "explanation": string (Chinese) }
-   - "tip": string — a real mini-lesson (contrast the unit's target structures and list 1-2 common errors), not a one-liner.
+   - "questions": array of 3-5 objects { "question": string, "options": [3-4 strings], "correctIndex": number, "nudge": string (Chinese hint shown after a wrong first try, pointing back to the story), "explanation": string (Chinese) }
+     GUIDED DISCOVERY, MEANING FIRST: each question quotes a sentence from the story and asks about its MEANING or TIME (Did it happen? Is it true now? Which happened first? What does the writer want?), never "what structure/tense is this" or "which sentence is an example of X" — learners must not be asked to NAME structures. The Chinese explanation then reveals ONE piece of the rule in plain words; after all questions the learner has built the rule. Vary the position of the correct option; do not make the correct option the longest.
+   - "tip": string — a SHORT summary card read AFTER the questions, under ~250 Chinese characters plus examples, using this plain-text layout (each part on its own line, blank line between sections, no markdown **):
+     【一句话规则】 one or two lines in plain Chinese
+     【例句】 2-3 lines each starting with ✔ (taken from the story)
+     【常见错误】 2-3 lines each starting with ✘: wrong sentence → fix (why, in a few Chinese words)
 2. "levels": object with keys "1","2","3", each an array of 8 practice questions, progressively harder:
    - Level 1: Mostly "choice" (easy recognition)
    - Level 2: "choice" + "fill"
