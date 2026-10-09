@@ -1,6 +1,6 @@
 import { store } from "./store.js";
 import { curriculum } from "./curriculum.js";
-import { fillBlankSets, gradeBlanks, normFill } from "./fillAnswers.js";
+import { fillBlankSets, gradeBlanks, foldText, expandContractions, fillKey, isZeroForm, displayForm, blankCount } from "./fillAnswers.js";
 
 function shuffle(arr) {
   const a = [...arr];
@@ -25,7 +25,8 @@ function normalizeStr(s) {
 //   3. the blanks re-interleaved with   → "will you visit"
 //      the sentence's static text between blanks (parenthetical hints stripped)
 function matchFillAnswer(userAnswer, acceptable, sentence) {
-  const norm = (s) => normalizeStr(s);
+  // 弯引号（iPhone 智能标点）和缩写 / 全写（wouldn't / would not）不影响判分
+  const norm = (s) => normalizeStr(expandContractions(foldText(s).toLowerCase()));
   const normComma = (s) => norm(s).replace(/\s*,\s*/g, ', ');
 
   const blanks = String(userAnswer).split(/\s*,\s*/).map((b) => b.trim());
@@ -346,8 +347,22 @@ export const engine = {
       return candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : null;
     }
 
+    // 错题本存的是答错那一刻的题目副本。题库后来修过（比如补了 blankAnswers）的话，
+    // 复习时要用现在的版本，不然修好的题在复习里照样判错。编号在不同课程间会重复，
+    // 所以只有编号相同、句子也相同时才替换。
+    const current = new Map();
+    for (const unit of Object.values(getUnits())) {
+      for (const level of Object.values(unit.levels || {})) {
+        for (const cq of level.questions || []) current.set(cq.id, cq);
+      }
+    }
+    const latest = (q) => {
+      const cq = q && current.get(q.id);
+      return cq && questionTextKey(cq) === questionTextKey(q) ? cq : q;
+    };
+
     for (let i = mistakes.length - 1; i >= 0 && questions.length < count; i--) {
-      const q = mistakes[i].question;
+      const q = latest(mistakes[i].question);
       if (!canAdd(q)) continue;
       if (shownIds.has(q.id) && q.subSkill) {
         const alt = findAlternative(q.subSkill);
@@ -512,20 +527,25 @@ export const engine = {
         if (sets) {
           blanks = gradeBlanks(sets, userAnswer);
           correct = blanks.every((b) => b.ok);
-          correctAnswer = sets.map((forms) => forms[0]).join(" … ");
+          correctAnswer = sets.map((forms) => displayForm(forms[0])).join(" … ");
           break;
         }
-        correct = matchFillAnswer(userAnswer, acceptable, question.sentence);
-        correctAnswer = acceptable[0] || "";
+        // 单空题留空：只有「不填」本身就是答案时才算对（省略关系代词、零冠词）
+        if (blankCount(question.sentence) <= 1 && fillKey(userAnswer) === "") {
+          correct = acceptable.some(isZeroForm);
+        } else {
+          correct = matchFillAnswer(userAnswer, acceptable, question.sentence);
+        }
+        correctAnswer = acceptable.length ? displayForm(acceptable[0]) : "";
         // 一道题常常不止一种改法（题目解析里写着"两者均可"）。只显示第一个，
-        // 学习者会以为自己那种写法是错的。把其余的也带出来。只差空格、大小写、标点的不算另一种。
-        const seen = new Set([normFill(correctAnswer)]);
+        // 学习者会以为自己那种写法是错的。把其余的也带出来。只差空格、大小写、标点、缩写的不算另一种。
+        const seen = new Set([isZeroForm(acceptable[0] ?? "") ? "∅" : fillKey(acceptable[0] ?? "")]);
         altAnswers = acceptable.slice(1).filter((a) => {
-          const k = normFill(a);
+          const k = isZeroForm(a) ? "∅" : fillKey(a);
           if (seen.has(k)) return false;
           seen.add(k);
           return true;
-        });
+        }).map(displayForm);
         break;
       }
 

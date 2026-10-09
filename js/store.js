@@ -817,6 +817,7 @@ export const store = {
       // 再次答错：刷新日期并挪到末尾。60 条上限从头淘汰，
       // 不挪位的话最常错的老题反而最先被挤掉。
       const [item] = this.state.mistakes.splice(idx, 1);
+      item.question = question;   // 换成最新的题目副本，题库修过的数据（如 blankAnswers）才能带进错题本
       item.date = toDateString(new Date());
       if (typeof unitId === 'number') item.unitId = unitId;
       if (level) item.level = level;

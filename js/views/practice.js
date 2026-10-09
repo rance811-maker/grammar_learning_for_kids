@@ -3,6 +3,7 @@ import { engine, questionTextKey } from '../engine.js';
 import { cloud } from '../cloud.js';
 import { curriculum } from '../curriculum.js';
 import { track } from '../analytics.js';
+import { displayForm } from '../fillAnswers.js';
 import { sound } from '../sound.js';
 import { confetti } from '../celebrate.js';
 import { pregenerateVariants } from '../variantGenerator.js';
@@ -304,6 +305,9 @@ function renderMatchQuestion(q) {
     </div>`;
 }
 
+const fillInput = (idx, hint) =>
+  `<input type="text" class="fill-input" data-fill-idx="${idx}" placeholder="${hint}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">`;
+
 function renderFillQuestion(q) {
   const { text: instruction, source } = splitSource(q.instruction || '填入正确的单词');
   const sentence = q.sentence || '';
@@ -316,10 +320,12 @@ function renderFillQuestion(q) {
     // 有些改写题把原句和改写句存在同一个 sentence 里，用换行隔开；HTML 会把换行吃成空格，两句挤成一句
     sentenceHtml += parts[i].replace(/\n/g, '<br>');
     if (i < parts.length - 1) {
-      sentenceHtml += `<input type="text" class="fill-input" data-fill-idx="${blankIdx}" placeholder="${hint}" autocomplete="off" autocapitalize="off" spellcheck="false">`;
+      sentenceHtml += fillInput(blankIdx, hint);
       blankIdx++;
     }
   }
+  // 题干里没有 ___（数据缺了句子）时也给一个输入框，不然没法作答、「检查答案」也点不动，孩子卡在这道题上
+  if (blankIdx === 0) sentenceHtml += ` ${fillInput(0, hint)}`;
 
   return `
     <div class="question-instruction">${instruction}</div>
@@ -595,7 +601,9 @@ function collectFillAnswer() {
     (a, b) => Number(a.dataset.fillIdx) - Number(b.dataset.fillIdx)
   );
   if (inputs.length === 1) return inputs[0].value;
-  return inputs.map(el => el.value.trim()).join(', ');
+  // 多个空用 ", " 连起来再逐空比对，所以先去掉孩子在某个空里自己打的逗号（比如照着句子写了 "However,"），
+  // 不然空数对不上，每个空都会被判错
+  return inputs.map(el => el.value.replace(/[,，]/g, ' ').replace(/\s+/g, ' ').trim()).join(', ');
 }
 
 function attachFillListeners(q) {
@@ -723,7 +731,7 @@ function showAnswerFeedback(question, userAnswer, isCorrect, result) {
         if (per && !ok) {
           const fix = document.createElement('span');
           fix.className = 'fill-fix';
-          fix.textContent = per[i].answers[0];
+          fix.textContent = displayForm(per[i].answers[0]);
           inp.after(fix);
         }
       });
@@ -742,13 +750,12 @@ const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;
 // 「第 1 空 has been confirmed ✗ 你填的是 is confirmed」——多空题不再把第二个空的答案说成「也算对」
 function blanksAnswerHtml(per) {
   const items = per.map((b, i) => {
-    const alt = b.answers.length > 1 ? `<span class="fb-blank__alt">也可以写 ${b.answers.slice(1).map(escHtml).join('、')}</span>` : '';
-    const mark = b.ok
-      ? '<span class="fb-blank__mark">✓ 填对了</span>'
-      : `<span class="fb-blank__mark">✗ 你填的是 ${b.user ? `<s>${escHtml(b.user)}</s>` : '（空着）'}</span>`;
+    const alt = b.answers.length > 1 ? `<span class="fb-blank__alt">也可以写 ${b.answers.slice(1).map((f) => escHtml(displayForm(f))).join('、')}</span>` : '';
+    const mine = b.user === null ? '' : b.user ? `你填的是 <s>${escHtml(b.user)}</s>` : '你空着没填';
+    const mark = b.ok ? '<span class="fb-blank__mark">✓ 填对了</span>' : `<span class="fb-blank__mark">✗ ${mine}</span>`;
     return `<li class="fb-blank ${b.ok ? 'fb-blank--ok' : 'fb-blank--bad'}">
       <span class="fb-blank__no">第 ${i + 1} 空</span>
-      <span class="fb-blank__ans">${escHtml(b.answers[0])}</span>${alt}${mark}
+      <span class="fb-blank__ans">${escHtml(displayForm(b.answers[0]))}</span>${alt}${mark}
     </li>`;
   }).join('');
   return `<div class="feedback-banner__correct-answer">正确答案<ol class="fb-blanks">${items}</ol></div>`;
