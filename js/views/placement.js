@@ -1,5 +1,6 @@
 import { store } from '../store.js';
 import { curriculum } from '../curriculum.js';
+import { track } from '../analytics.js';
 import { engine } from '../engine.js';
 import { sound } from '../sound.js';
 import { confetti } from '../celebrate.js';
@@ -202,6 +203,7 @@ function showResultsScreen() {
   }));
 
   store.completePlacement(results);
+  track('placement_done', { props: { c: results.filter((r) => r.correct).length, n: results.length } });
   // 摸底用的就是各单元 Lv.1 的第一道题，不记成"见过"的话，
   // 孩子几分钟后进 Lv.1 又会先碰到刚才那道。
   store.addPracticeShown(testState.questions.map((it) => it.question.id));

@@ -1,5 +1,6 @@
 import { store } from "./store.js";
 import { curriculum } from "./curriculum.js";
+import { fillBlankSets, gradeBlanks, foldText, expandContractions, expandLeading, fillKey, isZeroForm, displayForm, blankCount, fillSentence, invertedBlank } from "./fillAnswers.js";
 
 function shuffle(arr) {
   const a = [...arr];
@@ -23,11 +24,14 @@ function normalizeStr(s) {
 //   2. the blanks joined by a space     → "will visit"
 //   3. the blanks re-interleaved with   → "will you visit"
 //      the sentence's static text between blanks (parenthetical hints stripped)
-function matchFillAnswer(userAnswer, acceptable, sentence) {
-  const norm = (s) => normalizeStr(s);
+function matchFillAnswer(userAnswer, acceptable, sentence, fold = true) {
+  // 弯引号（iPhone 智能标点）和缩写 / 全写（wouldn't / would not）不影响判分
+  // 倒装位置（反意疑问句等）isn't 和 is not 不能互换，fold=false 时不折叠缩写
+  const norm = (s) => normalizeStr(fold ? expandContractions(foldText(s).toLowerCase()) : foldText(s));
   const normComma = (s) => norm(s).replace(/\s*,\s*/g, ', ');
 
-  const blanks = String(userAnswer).split(/\s*,\s*/).map((b) => b.trim());
+  const blanks = String(userAnswer).split(/\s*,\s*/).map((b) => (fold ? expandLeading(b) : b.trim()));
+  if (fold) userAnswer = blanks.join(', ');
 
   // Per-blank convention: AI-authored multi-blank fills often store one answer
   // per blank as separate array entries (e.g. blanks ["will become","was","is"]
@@ -345,8 +349,42 @@ export const engine = {
       return candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : null;
     }
 
+    // 错题本存的是答错那一刻的题目副本。题库后来修过的话，复习时要用现在的版本，
+    // 不然修好的题在复习里照样判错。题目编号在不同课程间会重复（雅思 6/7 分都有 gen-1-1-1），
+    // 所以按句子在所有课程里找：句子一样就换成现行版本（比如补了 blankAnswers 的）；
+    // 句子在哪套课里都找不到，说明这道题已经改写或删掉——当前课程同编号的题和它很像（只是修了措辞）
+    // 就换成新的，否则复习时跳过它，不再出已经不存在的旧题。AI 变体（~v）不在题库里，原样保留。
+    const byText = new Map();
+    const activeById = new Map();
+    const activeId = curriculum.getActiveId();
+    for (const c of curriculum.listAll()) {
+      for (const unit of Object.values(curriculum.getUnitsOf(c.id) || {})) {
+        for (const level of Object.values(unit.levels || {})) {
+          for (const cq of level.questions || []) {
+            const k = questionTextKey(cq);
+            if (k && !byText.has(k)) byText.set(k, cq);
+            if (c.id === activeId) activeById.set(cq.id, cq);
+          }
+        }
+      }
+    }
+    const words = (q) => new Set(String(questionTextKey(q) || "").toLowerCase().match(/[a-z']+/g) || []);
+    const similar = (a, b) => {
+      const x = words(a), y = words(b);
+      const inter = [...x].filter((w) => y.has(w)).length;
+      const union = new Set([...x, ...y]).size;
+      return union > 0 && inter / union >= 0.7;
+    };
+    const latest = (q) => {
+      if (!q || /~v\d+$/.test(String(q.id))) return q;
+      const same = byText.get(questionTextKey(q));
+      if (same) return same;
+      const cq = activeById.get(q.id);
+      return cq && similar(cq, q) ? cq : null;
+    };
+
     for (let i = mistakes.length - 1; i >= 0 && questions.length < count; i--) {
-      const q = mistakes[i].question;
+      const q = latest(mistakes[i].question);
       if (!canAdd(q)) continue;
       if (shownIds.has(q.id) && q.subSkill) {
         const alt = findAlternative(q.subSkill);
@@ -444,6 +482,7 @@ export const engine = {
     let correct = false;
     let correctAnswer = "";
     let altAnswers = [];
+    let blanks = null;   // 多空填空题：每个空的 { answers, user, ok }
     const explanation = question.explanation || "";
     // For "error" (click-the-wrong-word) questions, the word that should
     // replace the mistake — surfaced so learners always see the right word.
@@ -462,7 +501,9 @@ export const engine = {
             .replace(/[.,!?;:'"，。！？；：''""]+/g, "")
             .replace(/\s+/g, " ")
             .trim();
-        correct = clean(userAnswer) === clean(question.correctSentence);
+        // 有些句子不止一种正确语序（状语放句首或句末），acceptableSentences 列出其余写法
+        correct = [question.correctSentence, ...(question.acceptableSentences || [])]
+          .some((s) => s && clean(userAnswer) === clean(s));
         correctAnswer = question.correctSentence;
         break;
       }
@@ -504,11 +545,33 @@ export const engine = {
         const acceptable = question.acceptableAnswers?.length
           ? question.acceptableAnswers
           : [question.correctAnswer || question.answer].filter(Boolean);
-        correct = matchFillAnswer(userAnswer, acceptable, question.sentence);
-        correctAnswer = acceptable[0] || "";
+        // 多空题逐空判：每个空都要对。原来拿「整串」去和每一条参考答案比，
+        // 一空一条的题只填对第一个空、后面留空，去掉末尾逗号后就和第一条对上了，被误判为全对。
+        const sentence = fillSentence(question);
+        const sets = fillBlankSets(question);
+        if (sets) {
+          blanks = gradeBlanks(sets, userAnswer, sentence);
+          correct = blanks.every((b) => b.ok);
+          correctAnswer = sets.map((forms) => displayForm(forms[0])).join(" … ");
+          break;
+        }
+        // 单空题留空：只有「不填」本身就是答案时才算对（省略关系代词、零冠词）
+        if (blankCount(sentence) <= 1 && fillKey(userAnswer) === "") {
+          correct = acceptable.some(isZeroForm);
+        } else {
+          const fold = !(blankCount(sentence) === 1 && invertedBlank(sentence, 0));
+          correct = matchFillAnswer(userAnswer, acceptable, sentence, fold);
+        }
+        correctAnswer = acceptable.length ? displayForm(acceptable[0]) : "";
         // 一道题常常不止一种改法（题目解析里写着"两者均可"）。只显示第一个，
-        // 学习者会以为自己那种写法是错的。把其余的也带出来。
-        if (acceptable.length > 1) altAnswers = acceptable.slice(1);
+        // 学习者会以为自己那种写法是错的。把其余的也带出来。只差空格、大小写、标点、缩写的不算另一种。
+        const seen = new Set([isZeroForm(acceptable[0] ?? "") ? "∅" : fillKey(acceptable[0] ?? "")]);
+        altAnswers = acceptable.slice(1).filter((a) => {
+          const k = isZeroForm(a) ? "∅" : fillKey(a);
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        }).map(displayForm);
         break;
       }
 
@@ -517,7 +580,7 @@ export const engine = {
         correctAnswer = "";
     }
 
-    return { correct, correctAnswer, altAnswers, explanation, correction };
+    return { correct, correctAnswer, altAnswers, blanks, explanation, correction };
   },
 
   calculateResults(session) {
@@ -560,6 +623,12 @@ export const engine = {
       if (!store.isUnitUnlocked(unitId)) continue;
 
       const unit = store.state.units[unitId];
+
+      // 新单元先读「发现」：先懂意思、自己找出规则，再去 Lv.1 练。已经练过 Lv.1 的就不拦了。
+      if (!unit.discoverCompleted && curriculum.getUnit(unitId)?.discover
+          && (unit.practiceLevels[1]?.bestStars ?? 0) < 1) {
+        return { type: "discover", unitId, level: null };
+      }
 
       // Check if mission is available but not done
       const lv3Done = store.isLevelPassed(unitId, 3);
