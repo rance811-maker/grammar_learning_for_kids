@@ -3,7 +3,7 @@ import { engine, questionTextKey } from '../engine.js';
 import { cloud } from '../cloud.js';
 import { curriculum } from '../curriculum.js';
 import { track } from '../analytics.js';
-import { displayForm } from '../fillAnswers.js';
+import { displayForm, fillSentence } from '../fillAnswers.js';
 import { sound } from '../sound.js';
 import { confetti } from '../celebrate.js';
 import { pregenerateVariants } from '../variantGenerator.js';
@@ -310,9 +310,9 @@ const fillInput = (idx, hint) =>
 
 function renderFillQuestion(q) {
   const { text: instruction, source } = splitSource(q.instruction || '填入正确的单词');
-  const sentence = q.sentence || '';
+  const sentence = fillSentence(q);
   const parts = sentence.split(/_+/);
-  const hint = q.hint || (source ? wordCountHint(q, parts.length - 1) : '');
+  const hint = q.hint || (source ? wordCountHint({ ...q, sentence }, parts.length - 1) : '');
 
   let sentenceHtml = '';
   let blankIdx = 0;
@@ -617,12 +617,15 @@ function attachFillListeners(q) {
     });
 
     let composing = false;
-    inputs.forEach(input => {
+    inputs.forEach((input, i) => {
       input.addEventListener('compositionstart', () => { composing = true; });
       input.addEventListener('compositionend', () => { composing = false; });
       input.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter' || feedbackVisible) return;
         if (composing || e.isComposing || e.keyCode === 229) return;
+        // 多空题：在前面的空按回车跳到下一个空，最后一个空按回车才交卷（多空题逐空判分后，
+        // 没填完就交卷会白白丢一颗心）
+        if (i < inputs.length - 1) { e.preventDefault(); inputs[i + 1].focus(); return; }
         submitAnswer(q, collectFillAnswer());
       });
     });
