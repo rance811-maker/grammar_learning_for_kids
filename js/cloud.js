@@ -124,6 +124,17 @@ export const cloud = {
   hasSession: () => Boolean(readSession() && readSession().access_token),
   currentUser: () => (readSession() ? readSession().user : null),
 
+  // 不发请求、不续期，只看手里的令牌是否还在有效期内（给统计埋点用：页面关闭前来不及续期）。
+  peekAccessToken() {
+    const s = readSession();
+    return s && s.access_token && Date.now() < s.expires_at - 60000 ? s.access_token : null;
+  },
+
+  // 调用数据库函数（Supabase RPC），用当前登录用户的身份。
+  rpc(name, args = {}) {
+    return restFetch(`/rpc/${name}`, { method: 'POST', body: args });
+  },
+
   // 注册。confirmed=true 表示已直接登录（项目关闭了邮箱确认）；
   // confirmed=false 表示需要去邮箱点确认链接后才能登录。
   async signUp(email, password, displayName) {

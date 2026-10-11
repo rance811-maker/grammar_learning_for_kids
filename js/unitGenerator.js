@@ -1,5 +1,6 @@
 import { curriculum } from './curriculum.js';
 import { store } from './store.js';
+import { fillAnswerText } from './fillAnswers.js';
 
 const PROVIDERS = {
   gemini: { keyStorageKey: 'gq-ai-key-gemini' },
@@ -61,17 +62,20 @@ SCOPE: WRITTEN grammar accuracy only (writing/reading) — no listening/speaking
 Question formats:
 - choice: { "type":"choice", "instruction":"(Chinese)", "sentence":"She ___ to school.", "options":["go","goes","going","went"], "correctIndex":1, "explanation":"(Chinese)", "subSkill":"skill_id" }
 - fill: { "type":"fill", "instruction":"(Chinese)", "sentence":"He (play) ___ now.", "acceptableAnswers":["is playing"], "explanation":"(Chinese)", "subSkill":"skill_id" }
-  - PREFER a SINGLE blank (one ___). If the sentence truly needs multiple blanks, put ONE answer per blank in "acceptableAnswers", in the SAME order as the blanks — e.g. sentence "It (be) ___ cold in 1900 but (be) ___ warm now." → "acceptableAnswers":["was","is"]. The number of entries MUST equal the number of ___ blanks. Do NOT put the whole phrase or the static words in the answers.
+  - PREFER a SINGLE blank (one ___). If the sentence truly needs multiple blanks, put ONE answer per blank in "acceptableAnswers", in the SAME order as the blanks — e.g. sentence "It (be) ___ cold in 1900 but (be) ___ warm now." → "acceptableAnswers":["was","is"]. The number of entries MUST equal the number of ___ blanks. Do NOT put the whole phrase or the static words in the answers. If any blank has more than one correct form (e.g. British/American), ALSO add "blankAnswers": one array per blank, in order, listing every accepted form — e.g. "blankAnswers":[["had brought"],["would not have got","would not have gotten"]] — and keep "acceptableAnswers" as the first form of each blank. NEVER add extra entries to "acceptableAnswers" of a multi-blank question.
 - reorder: { "type":"reorder", "instruction":"(Chinese)", "words":["she","is","reading"], "correctSentence":"She is reading.", "explanation":"(Chinese)", "subSkill":"skill_id" }
 - error: { "type":"error", "instruction":"(Chinese)", "words":["She","go","to","school"], "errorIndex":1, "correction":"goes", "explanation":"(Chinese)", "subSkill":"skill_id" }
 
 QUALITY RULES (critical — follow all):
 - Each question MUST contain a clear context clue that determines the answer; there should ideally be exactly ONE best answer.
-- If both British and American English are correct, include BOTH in "acceptableAnswers".
+- If both British and American English are correct, include BOTH in "acceptableAnswers" (single-blank questions; for multi-blank questions use "blankAnswers" as described above).
 - Explanations must explain the MEANING/why (e.g. "by 2031 = completed before a future point → future perfect"), not just point at a surface word.
 - Keep timelines, tenses and characters logically consistent across all questions.
 - For B1 and above, include a few key-word-transformation style items (rewrite a sentence keeping the meaning, testing the target structure) among the fill questions where natural.
 - Do NOT invent coverage percentages or claim official exam status anywhere in the content.
+- ENGLISH OPTIONS: all options and match items are in English (simple English for meaning checks); Chinese only in instruction, nudge and explanation.
+- NO LABELLING: never ask the learner to name or identify a structure ("What structure is this?", "Which sentence is an example of the X?", "这是什么结构"). Test whether they can UNDERSTAND and USE the form: choose the form that fits a stated meaning/time, complete or rewrite a sentence, fix a realistic learner error.
+- CONTEXT: set sentences in a situation that matches the learner's goal (for exam courses, e.g. IELTS: Writing Task 2 arguments, Task 1 data descriptions where the grammar naturally fits, Speaking answers). Write the instruction in Chinese as the MEANING or PURPOSE ("想说『万一将来…』"), not as the name of the structure, and do not print the answer in brackets.
 
 STRICT JSON: the whole output must be ONE valid JSON value. Return ONLY the JSON, no markdown code blocks, no other text. Inside every string, escape double quotes as \\" and never put a raw line break — keep each string on a single line (write the story as one continuous paragraph). Do not use smart/curly quotes ("" '') anywhere; use straight quotes only. No trailing commas. Do NOT use direct speech or any double quotation marks INSIDE a string value — write the story with reported speech instead (He said that... not He said, "...").`;
 
@@ -81,8 +85,12 @@ const UNIT_PROMPT_A = `${UNIT_CORE}
 Generate ONLY these parts for the given unit topic:
 1. "discover":
    - "story": { "title": string, "text": string (150-250 word English story demonstrating the grammar, ONE single-line paragraph), "highlights": [key grammar words] }
-   - "questions": array of 3 objects { "question": string, "options": [4 strings], "correctIndex": number, "explanation": string (Chinese) }
-   - "tip": string — a real mini-lesson (contrast the unit's target structures and list 1-2 common errors), not a one-liner.
+   - "questions": array of 3-5 objects { "question": string, "options": [3-4 strings], "correctIndex": number, "nudge": string (Chinese hint shown after a wrong first try, pointing back to the story), "explanation": string (Chinese) }
+     GUIDED DISCOVERY, MEANING FIRST: each question quotes a sentence from the story and asks about its MEANING or TIME (Did it happen? Is it true now? Which happened first? What does the writer want?), never "what structure/tense is this" or "which sentence is an example of X" — learners must not be asked to NAME structures. The Chinese explanation then reveals ONE piece of the rule in plain words; after all questions the learner has built the rule. Vary the position of the correct option; do not make the correct option the longest. Ask the question and write every option in SIMPLE ENGLISH (e.g. "Did they build it?" → "Yes, they did." / "No, they didn't." / "The text doesn't say.") — never Chinese options and never "which Chinese sentence is closest" translation questions; Chinese only in nudge and explanation.
+   - "tip": string — a SHORT summary card read AFTER the questions, under ~250 Chinese characters plus examples, using this plain-text layout (each part on its own line, blank line between sections, no markdown **):
+     【一句话规则】 one or two lines in plain Chinese
+     【例句】 2-3 lines each starting with ✔ (taken from the story)
+     【常见错误】 2-3 lines each starting with ✘: wrong sentence → fix (why, in a few Chinese words)
 2. "levels": object with keys "1","2","3", each an array of 8 practice questions, progressively harder:
    - Level 1: Mostly "choice" (easy recognition)
    - Level 2: "choice" + "fill"
@@ -445,7 +453,7 @@ export async function generateSyllabus(goal, material = '') {
 // 取一道题的「预期答案」，供校验用。
 function answerOf(q) {
   if (q.type === 'choice' || q.type === 'scenario') return (q.options || [])[q.correctIndex] ?? '';
-  if (q.type === 'fill') return (q.acceptableAnswers && q.acceptableAnswers.length ? q.acceptableAnswers : [q.answer || q.correctAnswer]).filter(Boolean).join(' / ');
+  if (q.type === 'fill') return fillAnswerText(q);
   if (q.type === 'reorder') return q.correctSentence || '';
   if (q.type === 'error') return q.correction || '';
   return '(见题目)';

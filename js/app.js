@@ -17,9 +17,10 @@ import * as about from './views/about.js';
 import * as install from './views/install.js';
 import { curriculum } from './curriculum.js';
 import { initPwa, mountInstallHint } from './pwa.js';
+import { initAnalytics, trackView } from './analytics.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260621f';
+const BUILD_VERSION = '20260621k';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -103,6 +104,7 @@ function router() {
     view.mount(...params);
   }
   if (route === '') mountInstallHint(app.querySelector('.content > .view') || app.querySelector('.content'));
+  trackView(route, params);
 
   mountNav();
   mountBackButton();
@@ -436,6 +438,7 @@ async function consumeAuthCallback() {
 // Initialize
 store.init();
 initPwa();
+initAnalytics();
 window.addEventListener('hashchange', router);
 
 consumeAuthCallback().then(() => {

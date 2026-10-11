@@ -1,6 +1,9 @@
 import { store } from '../store.js';
 import { engine, questionTextKey } from '../engine.js';
 import { cloud } from '../cloud.js';
+import { curriculum } from '../curriculum.js';
+import { track } from '../analytics.js';
+import { displayForm, fillSentence } from '../fillAnswers.js';
 import { sound } from '../sound.js';
 import { confetti } from '../celebrate.js';
 import { pregenerateVariants } from '../variantGenerator.js';
@@ -220,11 +223,13 @@ function renderChoiceQuestion(q) {
     `<button class="choice-btn" data-type="choice" data-index="${i}">${opt}</button>`
   ).join('');
 
+  // 选项是整句话时两列挤得一行只剩几个词，改成单列
+  const long = (q.options || []).some((o) => optionWidth(o) > 38);
   return `
     <div class="question-instruction">${instruction}</div>
     ${sourceCard(source)}
     ${displaySentence ? `<div class="question-sentence">${displaySentence}</div>` : ''}
-    <div class="choices-grid mt-md">${optionsHtml}</div>`;
+    <div class="choices-grid mt-md${long ? ' choices-grid--single' : ''}">${optionsHtml}</div>`;
 }
 
 function renderReorderQuestion(q) {
@@ -302,11 +307,17 @@ function renderMatchQuestion(q) {
     </div>`;
 }
 
+// 选项的显示宽度：中文一个字按两个英文字符算
+const optionWidth = (o) => { const t = String(o).replace(/<[^>]*>/g, ''); return t.length + (t.match(/[\u3000-\u9fff\uff00-\uffef]/g) || []).length; };
+
+const fillInput = (idx, hint) =>
+  `<input type="text" class="fill-input" data-fill-idx="${idx}" placeholder="${hint}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">`;
+
 function renderFillQuestion(q) {
   const { text: instruction, source } = splitSource(q.instruction || '填入正确的单词');
-  const sentence = q.sentence || '';
+  const sentence = fillSentence(q);
   const parts = sentence.split(/_+/);
-  const hint = q.hint || (source ? wordCountHint(q, parts.length - 1) : '');
+  const hint = q.hint || (source ? wordCountHint({ ...q, sentence }, parts.length - 1) : '');
 
   let sentenceHtml = '';
   let blankIdx = 0;
@@ -314,10 +325,12 @@ function renderFillQuestion(q) {
     // 有些改写题把原句和改写句存在同一个 sentence 里，用换行隔开；HTML 会把换行吃成空格，两句挤成一句
     sentenceHtml += parts[i].replace(/\n/g, '<br>');
     if (i < parts.length - 1) {
-      sentenceHtml += `<input type="text" class="fill-input" data-fill-idx="${blankIdx}" placeholder="${hint}" autocomplete="off" autocapitalize="off" spellcheck="false">`;
+      sentenceHtml += fillInput(blankIdx, hint);
       blankIdx++;
     }
   }
+  // 题干里没有 ___（数据缺了句子）时也给一个输入框，不然没法作答、「检查答案」也点不动，孩子卡在这道题上
+  if (blankIdx === 0) sentenceHtml += ` ${fillInput(0, hint)}`;
 
   return `
     <div class="question-instruction">${instruction}</div>
@@ -593,7 +606,9 @@ function collectFillAnswer() {
     (a, b) => Number(a.dataset.fillIdx) - Number(b.dataset.fillIdx)
   );
   if (inputs.length === 1) return inputs[0].value;
-  return inputs.map(el => el.value.trim()).join(', ');
+  // 多个空用 ", " 连起来再逐空比对，所以先去掉孩子在某个空里自己打的逗号（比如照着句子写了 "However,"），
+  // 不然空数对不上，每个空都会被判错
+  return inputs.map(el => el.value.replace(/[,，]/g, ' ').replace(/\s+/g, ' ').trim()).join(', ');
 }
 
 function attachFillListeners(q) {
@@ -607,12 +622,15 @@ function attachFillListeners(q) {
     });
 
     let composing = false;
-    inputs.forEach(input => {
+    inputs.forEach((input, i) => {
       input.addEventListener('compositionstart', () => { composing = true; });
       input.addEventListener('compositionend', () => { composing = false; });
       input.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter' || feedbackVisible) return;
         if (composing || e.isComposing || e.keyCode === 229) return;
+        // 多空题：在前面的空按回车跳到下一个空，最后一个空按回车才交卷（多空题逐空判分后，
+        // 没填完就交卷会白白丢一颗心）
+        if (i < inputs.length - 1) { e.preventDefault(); inputs[i + 1].focus(); return; }
         submitAnswer(q, collectFillAnswer());
       });
     });
@@ -711,13 +729,44 @@ function showAnswerFeedback(question, userAnswer, isCorrect, result) {
       break;
     }
     case 'fill': {
-      document.querySelectorAll('.fill-input').forEach(inp => {
+      // 多空题答错时逐空标对错，填错的空后面紧跟着写出正确答案，一眼看出是哪个空错了
+      const inputs = [...document.querySelectorAll('.fill-input')];
+      const per = perBlank(result, isCorrect, inputs.length);
+      inputs.forEach((inp, i) => {
         inp.disabled = true;
-        inp.classList.add(isCorrect ? 'fill-input--correct' : 'fill-input--wrong');
+        const ok = per ? per[i].ok : isCorrect;
+        inp.classList.add(ok ? 'fill-input--correct' : 'fill-input--wrong');
+        if (per && !ok) {
+          const fix = document.createElement('span');
+          fix.className = 'fill-fix';
+          fix.textContent = displayForm(per[i].answers[0]);
+          inp.after(fix);
+        }
       });
       break;
     }
   }
+}
+
+// 多空填空题答错时的逐空结果；单空题、整句作答的题、或者答对了，返回 null
+function perBlank(result, isCorrect, inputCount) {
+  return !isCorrect && result.blanks && result.blanks.length === inputCount && inputCount > 1 ? result.blanks : null;
+}
+
+const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// 「第 1 空 has been confirmed ✗ 你填的是 is confirmed」——多空题不再把第二个空的答案说成「也算对」
+function blanksAnswerHtml(per) {
+  const items = per.map((b, i) => {
+    const alt = b.answers.length > 1 ? `<span class="fb-blank__alt">也可以写 ${b.answers.slice(1).map((f) => escHtml(displayForm(f))).join('、')}</span>` : '';
+    const mine = b.user === null ? '' : b.user ? `你填的是 <s>${escHtml(b.user)}</s>` : '你空着没填';
+    const mark = b.ok ? '<span class="fb-blank__mark">✓ 填对了</span>' : `<span class="fb-blank__mark">✗ ${mine}</span>`;
+    return `<li class="fb-blank ${b.ok ? 'fb-blank--ok' : 'fb-blank--bad'}">
+      <span class="fb-blank__no">第 ${i + 1} 空</span>
+      <span class="fb-blank__ans">${escHtml(displayForm(b.answers[0]))}</span>${alt}${mark}
+    </li>`;
+  }).join('');
+  return `<div class="feedback-banner__correct-answer">正确答案<ol class="fb-blanks">${items}</ol></div>`;
 }
 
 const CORRECT_PHRASES = ['回答正确！', '答对了！', '没错！', '厉害！', '完全正确！', '漂亮！', 'Excellent!', 'Perfect!', 'Well done!'];
@@ -753,12 +802,18 @@ function showFeedback(isCorrect, question, userAnswer, result) {
   const altHtml = !isCorrect && result.altAnswers?.length
     ? `<div class="feedback-banner__alt">这样写也算对：${result.altAnswers.join('；')}</div>`
     : '';
-  const correctAnswerHtml = !isCorrect && result.correctAnswer && question.type !== 'error'
-    ? `<div class="feedback-banner__correct-answer">正确答案：${result.correctAnswer}</div>${altHtml}`
-    : '';
+  const per = question.type === 'fill' ? perBlank(result, isCorrect, document.querySelectorAll('.fill-input').length) : null;
+  const correctAnswerHtml = per
+    ? blanksAnswerHtml(per)
+    : !isCorrect && result.correctAnswer && question.type !== 'error'
+      ? `<div class="feedback-banner__correct-answer">正确答案：${result.correctAnswer}</div>${altHtml}`
+      : '';
 
-  const explanationHtml = !isCorrect && result.explanation
-    ? `<div class="feedback-banner__explanation">${result.explanation}</div>`
+  // 答错直接给解析；答对也可以点「为什么？」看——猜对的人也该知道为什么对
+  const explanationHtml = result.explanation
+    ? (isCorrect
+      ? `<button class="feedback-banner__why" id="whyBtn" type="button">为什么？</button><div class="feedback-banner__explanation" id="whyText" hidden>${result.explanation}</div>`
+      : `<div class="feedback-banner__explanation">${result.explanation}</div>`)
     : '';
 
   // Correct → brief toast that auto-advances (no need to reach for a button).
@@ -782,7 +837,21 @@ function showFeedback(isCorrect, question, userAnswer, result) {
 
   if (isCorrect) {
     clearAdvanceTimer();
-    advanceTimer = setTimeout(advanceToNext, AUTO_ADVANCE_MS);
+    advanceTimer = setTimeout(advanceToNext, result.explanation ? AUTO_ADVANCE_MS + 1200 : AUTO_ADVANCE_MS);
+    // 点开解析就停下自动跳题，等看完自己点「继续」
+    document.getElementById('whyBtn')?.addEventListener('click', (e) => {
+      clearAdvanceTimer();
+      e.currentTarget.remove();
+      const t = document.getElementById('whyText');
+      if (t) t.hidden = false;
+      const btn = document.createElement('button');
+      btn.className = 'btn-primary';
+      btn.id = 'continueBtn';
+      btn.textContent = '继续';
+      btn.style.cssText = 'background:rgba(255,255,255,0.25);box-shadow:0 4px 0 rgba(0,0,0,0.15);';
+      btn.addEventListener('click', advanceToNext);
+      feedbackArea.querySelector('.feedback-banner')?.append(btn);
+    });
   } else {
     const continueBtn = document.getElementById('continueBtn');
     if (continueBtn) {
@@ -851,6 +920,11 @@ function showResults() {
       accuracy: results.accuracy,
       maxCombo: results.comboMax,
     });
+    track('practice_done', { props: {
+      u: session.unitId, l: session.level,
+      c: session.answers.filter(a => a.correct).length, t: session.answers.length,
+      cur: curriculum.isBuiltIn() ? curriculum.getActiveId() : 'custom',
+    } });
   }
 
   const accuracyPct = Math.round(results.accuracy * 100);
@@ -858,7 +932,7 @@ function showResults() {
   let titleText, subtitleText, starsHtml;
   if (isBoss) {
     starsHtml = `<div style="font-size:3.5rem;">${bossPassed ? '🎓' : '💪'}</div>`;
-    titleText = bossPassed ? 'PET 模拟通过！' : '再接再厉！';
+    titleText = bossPassed ? `${curriculum.examLabel()} 模拟通过！` : '再接再厉！';
     subtitleText = bossPassed
       ? `综合正确率 ${accuracyPct}% · 已达标(≥70%)`
       : `综合正确率 ${accuracyPct}% · 距达标还差一点`;

@@ -1,4 +1,5 @@
 import { cloud, cloudEnabled } from "./cloud.js";
+import { track } from "./analytics.js";
 import { isBuiltinId, BUILTIN_COURSES } from "./data/builtinCourses.js";
 
 const BUILTIN_IDS = BUILTIN_COURSES.map((c) => c.id);
@@ -281,6 +282,7 @@ export const store = {
   // 返回 { needsConfirm }: true 表示需要去邮箱点确认链接后才能登录。
   async register(name, email, password) {
     const res = await cloud.signUp(email, password, name.trim());
+    track("signup");
     if (!res.confirmed) {
       return { needsConfirm: true };
     }
@@ -296,6 +298,7 @@ export const store = {
     try { localStorage.removeItem('gq-dirty'); } catch { /* ignore */ }
     await cloud.signIn(email, password);
     this._refreshAccount();
+    track("login");
     const remote = await cloud.loadState();
     if (remote) {
       this.state = remote;
@@ -814,6 +817,7 @@ export const store = {
       // 再次答错：刷新日期并挪到末尾。60 条上限从头淘汰，
       // 不挪位的话最常错的老题反而最先被挤掉。
       const [item] = this.state.mistakes.splice(idx, 1);
+      item.question = question;   // 换成最新的题目副本，题库修过的数据（如 blankAnswers）才能带进错题本
       item.date = toDateString(new Date());
       if (typeof unitId === 'number') item.unitId = unitId;
       if (level) item.level = level;
@@ -1021,7 +1025,7 @@ export const store = {
       this.earnBadge({
         id: 'boss_pet_clear',
         unitId: 0,
-        name: 'PET 模拟通关',
+        name: `${{ __pet__: 'PET', 'preset-ielts6': '雅思 6 分', 'preset-ielts7': '雅思 7 分' }[this.state.activeCurriculumId || '__pet__'] || '综合'} 模拟通关`,
         icon: '🎓',
       });
     }

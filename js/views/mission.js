@@ -145,6 +145,7 @@ function handleSubmit(unitId, mission) {
         <div class="mission-complete-card__title">🎉 你的作品</div>
         <div class="mission-complete-card__article">${fullArticle}</div>
       </div>
+      ${referenceHtml(scaffolds)}
       <div id="writingReview" class="mt-md"></div>
       <div class="mt-md">
         <button class="btn-primary" id="missionSaveBtn">保存到作品集 📁</button>
@@ -185,6 +186,17 @@ function handleSubmit(unitId, mission) {
   // Hide original submit button
   const actionsArea = document.getElementById('missionActions');
   if (actionsArea) actionsArea.style.display = 'none';
+}
+
+// 每个写作框都配了参考句（scaffolds.example），原来从没显示过。写完之后给出来对照。
+function referenceHtml(scaffolds) {
+  const ex = scaffolds.map((s) => s.example).filter(Boolean);
+  if (!ex.length) return '';
+  return `
+    <details class="card mt-md mission-ref">
+      <summary style="font-weight:700;cursor:pointer;">📝 看看参考句（写完再对照）</summary>
+      ${ex.map((t) => `<div class="mission-ref__line">${esc(t)}</div>`).join('')}
+    </details>`;
 }
 
 // ---------------------------------------------------------------
@@ -229,14 +241,17 @@ async function runWritingReview(unitId, mission, scaffolds, userTexts) {
   }));
 
   const unit = curriculum.getUnit(unitId);
-  const currId = store.state.activeCurriculumId;
-  const cefr = store.state.curricula?.[currId]?.profile?.cefr || '';
+  const currId = curriculum.getActiveId();
+  // 内置课程（PET / 雅思）原来拿不到 CEFR，批改不知道学生的水平；雅思课按成人雅思口径批改
+  const cefr = curriculum.getCefrOf(currId);
+  const exam = /^preset-ielts/.test(currId) ? 'ielts' : '';
 
   try {
     const res = await reviewWriting(lines, {
       grammarType: mission.grammarType || '',
       unitTitle: unit?.title || '',
       cefr,
+      exam,
     });
     renderWritingReview(host, res, lines);
   } catch (e) {
@@ -254,6 +269,13 @@ async function runWritingReview(unitId, mission, scaffolds, userTexts) {
   }
 }
 
+// 「7 分写法」：句子写对了但还是 6 分的平铺直叙时，给一句更紧凑、更有变化的写法
+function upgradeHtml(l) {
+  return l.upgrade
+    ? `<div class="mission-upgrade"><span class="mission-upgrade__tag">⬆ 7 分写法</span>${esc(l.upgrade)}</div>`
+    : '';
+}
+
 function renderWritingReview(host, res, lines) {
   const stars = '★'.repeat(Math.max(0, Math.min(5, res.score))) +
                 '☆'.repeat(Math.max(0, 5 - Math.min(5, res.score)));
@@ -265,6 +287,7 @@ function renderWritingReview(host, res, lines) {
       return `
         <div style="padding:8px 0;border-top:1px solid var(--color-border,#eee);">
           <div style="font-size:var(--text-sm);"><span style="color:var(--color-success,#2E6F52);">✅</span> ${esc(written)}</div>
+          ${upgradeHtml(l)}
         </div>`;
     }
     return `
@@ -274,6 +297,7 @@ function renderWritingReview(host, res, lines) {
         </div>
         ${l.fixed ? `<div style="font-size:var(--text-sm);font-weight:600;margin-top:3px;">→ ${esc(l.fixed)}</div>` : ''}
         ${l.issue ? `<div style="font-size:var(--text-xs,0.8rem);color:var(--color-text-light);margin-top:3px;line-height:1.6;">${esc(l.issue)}</div>` : ''}
+        ${upgradeHtml(l)}
       </div>`;
   }).join('');
 

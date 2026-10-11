@@ -7,6 +7,8 @@
 //    iPhone 没有这个事件，只能照着引导页手动加。
 // 3. 学习地图顶部的一张小提示卡：手机上、不是从桌面图标打开的、没点过「不再提示」才出现。
 
+import { track } from './analytics.js';
+
 const HINT_OFF_KEY = 'gq-install-hint-off';
 let deferredPrompt = null;
 
@@ -52,6 +54,7 @@ export function initPwa() {
     window.dispatchEvent(new Event('gq-install-ready'));
   });
   window.addEventListener('appinstalled', () => {
+    track('install');
     deferredPrompt = null;
     setHintOff();
     document.querySelector('.install-hint')?.remove();

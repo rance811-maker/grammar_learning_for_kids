@@ -63,6 +63,15 @@ export function render() {
         </p>
       </div>
 
+      <div class="about-section about-section--plain">
+        <h2>我们记录哪些数据</h2>
+        <p>
+          为了知道网站好不好用，我们会匿名记录访问和练习情况：打开了哪些页面、停留多久、
+          用的是手机还是电脑、完成了哪一关和对了几题。不记录姓名、答题内容和 IP 地址。
+          登录后，学习进度会保存在你的账号里，方便换设备继续练。
+        </p>
+      </div>
+
       <div class="about-actions">
         <a class="btn btn--primary btn--large" href="#placement">让孩子先做 3 分钟摸底</a>
         <a class="btn btn--secondary" href="#parent">进入家长专区</a>

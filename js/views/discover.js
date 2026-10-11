@@ -1,5 +1,9 @@
 import { store } from '../store.js';
 import { curriculum } from '../curriculum.js';
+import { renderTip } from '../tipFormat.js';
+
+// 选项的显示宽度：中文一个字按两个英文字符算
+const optionWidth = (o) => { const t = String(o).replace(/<[^>]*>/g, ''); return t.length + (t.match(/[\u3000-\u9fff\uff00-\uffef]/g) || []).length; };
 
 export function render(unitId) {
   unitId = Number(unitId);
@@ -36,11 +40,13 @@ export function render(unitId) {
       `<button class="choice-btn discover-option" data-q="${idx}" data-opt="${oi}">${opt}</button>`
     ).join('');
 
+    const long = (q.options || []).some((o) => optionWidth(o) > 38);
     questionsHtml += `
       <div class="card mb-md discover-question" data-q="${idx}">
         <div class="question-instruction">问题 ${idx + 1}</div>
         <div class="question-prompt" style="font-size:var(--text-base);margin-bottom:var(--space-md);">${q.question}</div>
-        <div class="choices-grid">${optionsHtml}</div>
+        <div class="choices-grid${long ? ' choices-grid--single' : ''}">${optionsHtml}</div>
+        <div class="discover-nudge" data-q="${idx}" hidden></div>
         <div class="discover-explanation" data-q="${idx}" style="display:none;margin-top:var(--space-md);padding:var(--space-md);background:rgba(88,204,2,0.08);border-radius:var(--radius-md);font-size:var(--text-sm);line-height:1.6;color:var(--color-primary-dark);">
           ${q.explanation || ''}
         </div>
@@ -64,10 +70,10 @@ export function render(unitId) {
         </div>` : ''}
 
         ${tip ? `
-        <div class="card mb-lg" style="border-left:4px solid var(--color-warning);background:rgba(255,200,0,0.06);">
-          <div style="font-weight:700;margin-bottom:var(--space-sm);">💡 语法小贴士</div>
-          <div style="font-size:var(--text-sm);line-height:1.8;color:var(--color-text-light);">${tip}</div>
-        </div>` : ''}
+        <details class="card mb-lg tip-card" id="discoverTip"${questions.length ? '' : ' open'}>
+          <summary class="tip-card__label">💡 语法小贴士${questions.length ? '<span class="tip-card__wait">（做完上面的题再看，印象更深）</span>' : ''}</summary>
+          <div class="tip-body">${renderTip(tip)}</div>
+        </details>` : ''}
 
         <button class="btn-primary discover-complete-btn" id="discoverCompleteBtn">
           ${store.state.units[unitId]?.discoverCompleted ? '返回关卡' : '完成阅读 ✅'}
@@ -80,18 +86,36 @@ export function mount(unitId) {
   unitId = Number(unitId);
   const answeredQuestions = new Set();
 
-  // Handle question option clicks
+  // 先懂意思、再看规则：答错时给一句提示（nudge）让孩子回原文再找一找、可以重选；
+  // 没有 nudge 的老题保持原样（点一次就揭晓）。所有题做完后自动展开小贴士做总结。
+  const total = document.querySelectorAll('.discover-question').length;
+  const openTipIfDone = () => {
+    if (answeredQuestions.size < total) return;
+    const tipEl = document.getElementById('discoverTip');
+    if (tipEl && !tipEl.open) { tipEl.open = true; tipEl.querySelector('.tip-card__wait')?.remove(); }
+  };
+
   document.querySelectorAll('.discover-option').forEach(btn => {
     btn.addEventListener('click', () => {
       const qIdx = btn.dataset.q;
       const optIdx = Number(btn.dataset.opt);
 
       if (answeredQuestions.has(qIdx)) return;
-      answeredQuestions.add(qIdx);
 
       const unitData = curriculum.getUnit(unitId);
       const question = unitData.discover.questions[Number(qIdx)];
       const correctIdx = question.correctIndex ?? 0;
+
+      const nudgeEl = document.querySelector(`.discover-nudge[data-q="${qIdx}"]`);
+      if (optIdx !== correctIdx && question.nudge && !btn.dataset.tried) {
+        btn.dataset.tried = '1';
+        btn.disabled = true;
+        btn.classList.add('choice-btn--wrong');
+        if (nudgeEl) { nudgeEl.innerHTML = `🤔 ${question.nudge}`; nudgeEl.hidden = false; }
+        return;
+      }
+      answeredQuestions.add(qIdx);
+      if (nudgeEl) nudgeEl.hidden = true;
 
       // Mark correct/wrong
       const siblings = document.querySelectorAll(`.discover-option[data-q="${qIdx}"]`);
@@ -111,6 +135,7 @@ export function mount(unitId) {
       if (explanation) {
         explanation.style.display = 'block';
       }
+      openTipIfDone();
     });
   });
 

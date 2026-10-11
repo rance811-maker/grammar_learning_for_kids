@@ -163,7 +163,9 @@ export function render() {
     if (currentSession) {
       const sessionLabel = currentSession.type === '综合测试'
         ? '综合测试'
-        : `Unit ${currentSession.unitId} · Lv.${currentSession.level}`;
+        : needsDiscover(currentSession)
+          ? `Unit ${currentSession.unitId} · 先读故事`
+          : `Unit ${currentSession.unitId} · Lv.${currentSession.level}`;
       sessionBtnHtml = `
         <button class="btn btn--primary btn--large" id="todayPracticeBtn"
                 style="width:100%;margin-top:var(--space-md);font-size:1rem;padding:var(--space-md);">
@@ -203,7 +205,7 @@ export function render() {
       <div class="card mb-md boss-card" id="bossCard">
         <div class="boss-card__icon">${cleared ? '🎓' : '👹'}</div>
         <div class="boss-card__info">
-          <div class="boss-card__title">PET 模拟挑战 ${cleared ? '✅' : ''}</div>
+          <div class="boss-card__title">${curriculum.examLabel()} 模拟挑战 ${cleared ? '✅' : ''}</div>
           <div class="boss-card__desc">
             ${cleared
               ? `已通关！最佳正确率 ${bestPct}%，可再次挑战刷新纪录`
@@ -221,7 +223,9 @@ export function render() {
     if (rec) {
       const recLabel = rec.type === 'mission'
         ? `Unit ${rec.unitId} 写作任务`
-        : `Unit ${rec.unitId} · Lv.${rec.level}`;
+        : rec.type === 'discover'
+          ? `Unit ${rec.unitId} · 先读故事`
+          : `Unit ${rec.unitId} · Lv.${rec.level}`;
       quickStartHtml = `
         <div class="card mb-md" style="text-align:center;padding:var(--space-md);">
           <button class="btn btn--primary btn--large" id="quickStartBtn"
@@ -321,6 +325,8 @@ export function mount() {
         // Unit content not generated yet — send to the unit page (which has the
         // "generate content" button) instead of an empty practice session.
         location.hash = `unit/${session.unitId}`;
+      } else if (needsDiscover(session)) {
+        location.hash = `discover/${session.unitId}`;
       } else if (!store.state.units[session.unitId]?.practiceLevels?.[session.level]?.unlocked) {
         // 计划指向的关卡还锁着（比如前一天 0 星没过）——去单元页，让孩子看到该先过哪一关
         location.hash = `unit/${session.unitId}`;
@@ -344,6 +350,8 @@ export function mount() {
       if (!rec) return;
       if (!curriculum.isUnitGenerated(rec.unitId)) {
         location.hash = `unit/${rec.unitId}`;
+      } else if (rec.type === 'discover') {
+        location.hash = `discover/${rec.unitId}`;
       } else if (rec.type === 'mission') {
         location.hash = `mission/${rec.unitId}`;
       } else {
@@ -352,6 +360,13 @@ export function mount() {
     });
   }
 
+}
+
+// 计划排到某单元的 Lv.1、而这个单元的「发现」还没读：先去读故事、自己找出规则
+function needsDiscover(session) {
+  if (!session || session.level !== 1) return false;
+  const u = store.state.units[session.unitId];
+  return !!(u && !u.discoverCompleted && curriculum.getUnit(session.unitId)?.discover?.story?.text);
 }
 
 function escapeHtml(s) {

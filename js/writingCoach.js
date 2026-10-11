@@ -32,6 +32,36 @@ Then overall:
 STRICT JSON, no markdown, no extra text. Escape quotes inside strings, never use a raw line break inside a string:
 {"lines":[{"index":0,"ok":false,"issue":"中文说明","fixed":"Corrected sentence."}],"overall":"中文整体评价","improve":["建议一"],"score":4}`;
 
+// 雅思课程：学生是备考雅思的青少年 / 成人，按 GRA（Grammatical Range and Accuracy）7 分口径批改，
+// 除了改错，还要给一句「7 分写法」——6 到 7 分靠的是把复杂句写准、写得有变化。
+const EXAM_PROMPT = `You are an experienced IELTS writing teacher. The student is a Chinese teenager or adult preparing for IELTS, aiming for band 7 in Grammatical Range and Accuracy.
+Band 7 GRA (official wording): "A variety of complex structures is used with some flexibility and accuracy. Grammar and punctuation are generally well controlled, and error-free sentences are frequent."
+The student completed a guided writing task: the app gave some fixed prompt words, and the student filled in the rest.
+
+For each line you get three parts: the fixed PROMPT words, what the STUDENT wrote, and a fixed ENDING.
+
+RULES:
+- Judge ONLY the student's own words. Keep their ideas, opinions and content.
+- Fix grammar, verb tense/form, articles, prepositions, word form, punctuation and agreement. Check that the target structure of the unit is used correctly (e.g. the time reference of each half of a conditional).
+- Check consistency across lines (timeline, referents).
+- "ok" means the student's part is accurate, natural written English. Do NOT mark something ok just to be nice.
+- upgrade: when the (corrected) sentence is accurate but plain (band 6 style), give ONE band-7 version that keeps the meaning and uses a more complex structure naturally (ideally the unit's target structure). If the sentence is already band-7 quality, give "".
+
+For EACH line return:
+- index: the line number given to you
+- ok: true / false
+- issue: 中文一句话，说清错在哪、为什么错（讲原理）。ok 为 true 时给空字符串。
+- fixed: 改正后的完整英文句子（提示词 + 改正后的学生部分 + 结尾）。ok 为 true 时照抄原句。
+- upgrade: 7 分写法（完整英文句子）或 ""。
+
+Then overall:
+- overall: 中文 2–3 句，按雅思 GRA 口径评价：语法多样性（用了哪些复杂结构）和准确性（错误多不多、影不影响理解）。先说做得好的，再说主要问题。
+- improve: 1–2 条中文建议，针对这次写作的具体问题，说明怎么练（❌"多练习" ✅"条件句两半各看各的时间：结果说 now 就用 would + 原形"）
+- score: 1–5 的整数（5 = 准确且结构多样，接近 7 分以上；3 = 意思清楚但有反复出现的语法错误，约 6 分）
+
+STRICT JSON, no markdown, no extra text. Escape quotes inside strings, never use a raw line break inside a string:
+{"lines":[{"index":0,"ok":false,"issue":"中文说明","fixed":"Corrected sentence.","upgrade":""}],"overall":"中文整体评价","improve":["建议一"],"score":4}`;
+
 export function hasWritingCoach() {
   return hasApiKey();
 }
@@ -58,7 +88,7 @@ export async function reviewWriting(lines, ctx = {}) {
     .filter(Boolean)
     .join('\n');
 
-  const data = await aiJson(PROMPT, userText, (d) => {
+  const data = await aiJson(ctx.exam === 'ielts' ? EXAM_PROMPT : PROMPT, userText, (d) => {
     if (!d || !Array.isArray(d.lines)) {
       const e = new Error('批改返回的格式有误，请重试');
       e.friendly = true;
@@ -75,6 +105,7 @@ export async function reviewWriting(lines, ctx = {}) {
         ok: found.ok !== false,
         issue: found.issue || '',
         fixed: found.fixed || '',
+        upgrade: found.upgrade || '',
       };
     }),
     overall: data.overall || '',

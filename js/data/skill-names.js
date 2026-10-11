@@ -192,6 +192,18 @@ export const SUB_SKILL_NAMES = {
   'key_word_transformation_paraphrase': '关键词句型转换',
   'error_correction_in_written_text': '书面语法改错',
   'integrated_grammar_accuracy_review': '语法准确性综合复习',
+  // IELTS 7 改版新增
+  'mixed_conditionals_present_to_past': '混合条件句：现在的情况影响过去的结果',
+  'real_vs_hypothetical_conditionals': '真实条件和假设条件的区别',
+  'present_perfect_vs_past_simple': '现在完成时和一般过去时：连到现在，还是已经结束',
+  'superlatives_in_data_description': '数据描述中的最高级',
+  'active_vs_passive_by_meaning': '主动还是被动：自己发生的变化不用被动',
+  'defining_vs_non_defining_relative_clauses': '限制性与非限制性从句：有没有逗号，意思不同',
+  'relative_pronoun_accuracy': '关系词用准：不漏 who / which，从句里不多加代词',
+  'participle_active_vs_passive': '分词用 doing 还是 done：主语自己做还是被做',
+  'verb_patterns_doing_or_to_do': '动词后接 doing 还是 to do（avoid doing / decide to do）',
+  'preposition_plus_doing': '介词后接 doing（包括 look forward to / be used to 里的 to）',
+  'countable_vs_uncountable_quantifiers': '可数与不可数：number / amount、fewer / less 怎么配',
 };
 
 // 自定义课程的语法点是 AI 现取的名字，表里不一定有。至少把下划线拆开、

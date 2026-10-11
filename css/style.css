@@ -3751,3 +3751,59 @@ ul, ol {
 .question-source__label { flex: none; font-size: var(--text-xs); font-weight: 800; color: var(--color-secondary);
   border: 1.5px solid currentColor; border-radius: 6px; padding: 0 6px; line-height: 1.6; }
 .question-source__text { font-size: var(--text-base); line-height: 1.7; color: var(--color-text); }
+
+/* 多空填空题答错：填错的空后面紧跟正确答案；反馈里逐空列出 */
+.fill-fix { display: inline-block; margin: 0 6px 0 4px; padding: 1px 10px; border-radius: 10px;
+  background: rgba(88, 204, 2, 0.14); color: var(--color-primary-dark); font-weight: 700; font-size: 0.92em; line-height: 1.6; }
+.fill-fix::before { content: "→ "; font-weight: 400; }
+.fb-blanks { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.fb-blank { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-weight: 400; }
+.fb-blank__no { font-size: 0.85em; opacity: 0.85; min-width: 3.4em; }
+.fb-blank__ans { font-weight: 800; }
+.fb-blank__alt { font-size: 0.85em; opacity: 0.9; }
+.fb-blank__mark { font-size: 0.85em; }
+.fb-blank--ok .fb-blank__ans { opacity: 0.85; }
+@media (prefers-color-scheme: dark) { .fill-fix { color: #8EE000; background: rgba(88, 204, 2, 0.2); } }
+
+/* 语法小贴士：排成「标题 + 要点 + 例句 + 易错」，分节多的折叠起来（js/tipFormat.js） */
+.tip-card { border-left: 4px solid var(--color-warning); background: rgba(255, 200, 0, 0.06); }
+.tip-card__label { font-weight: 700; margin-bottom: var(--space-sm); }
+.tip-body { font-size: var(--text-sm); line-height: 1.75; color: var(--color-text); display: flex; flex-direction: column; gap: 8px; }
+.tip-title { font-weight: 800; font-size: var(--text-base); }
+.tip-lead { margin: 0; color: var(--color-text-light); }
+.tip-sec { background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 8px 12px; }
+.tip-h { font-weight: 700; cursor: default; }
+details.tip-sec > summary.tip-h { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+details.tip-sec > summary.tip-h::-webkit-details-marker { display: none; }
+details.tip-sec > summary.tip-h::before { content: "▸"; color: var(--color-text-light); transition: transform 0.15s; }
+details.tip-sec[open] > summary.tip-h::before { transform: rotate(90deg); }
+.tip-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.tip-list li { position: relative; padding-left: 14px; color: var(--color-text-light); overflow-wrap: anywhere; }
+.tip-list li::before { content: "·"; position: absolute; left: 3px; font-weight: 800; }
+.tip-list li.tip-p { padding-left: 0; } .tip-list li.tip-p::before { content: none; }
+.tip-list li.tip-ex { color: var(--color-text); font-family: var(--font-sans); background: rgba(28, 176, 246, 0.07); border-radius: 6px; padding: 3px 8px 3px 24px; }
+.tip-list li.tip-ex::before { content: "例"; left: 6px; font-size: 0.8em; font-weight: 700; color: var(--color-secondary); top: 5px; }
+.tip-list li.tip-ex--ok::before { content: "✔"; color: var(--color-primary-dark); }
+.tip-list li.tip-ex--bad { background: rgba(255, 75, 75, 0.07); }
+.tip-list li.tip-ex--bad s { text-decoration-color: rgba(255, 75, 75, 0.7); color: var(--color-text-light); }
+.tip-fix { color: var(--color-primary-dark); font-weight: 600; }
+.tip-list li.tip-ex--bad::before { content: "✘"; color: var(--color-danger); }
+.tip-list li.tip-warn { background: rgba(255, 200, 0, 0.12); border-radius: 6px; padding: 3px 8px 3px 24px; color: var(--color-text); }
+.tip-list li.tip-warn::before { content: "⚠"; left: 6px; font-size: 0.85em; top: 3px; }
+
+/* 选项是整句时单列显示 */
+.choices-grid--single { grid-template-columns: 1fr; }
+.choices-grid--single .choice-btn { text-align: left; }
+/* 发现页：答错的提示，回原文再找一找 */
+.discover-nudge { margin-top: var(--space-sm); padding: 8px 12px; border-radius: var(--radius-md); background: rgba(255, 200, 0, 0.12); font-size: var(--text-sm); line-height: 1.7; }
+/* 小贴士在发现题做完前折叠 */
+details.tip-card > summary.tip-card__label { cursor: pointer; list-style: none; }
+details.tip-card > summary.tip-card__label::-webkit-details-marker { display: none; }
+details.tip-card:not([open]) > summary.tip-card__label { margin-bottom: 0; }
+.tip-card__wait { font-weight: 400; font-size: var(--text-xs); color: var(--color-text-light); margin-left: 6px; }
+/* 答对后「为什么？」 */
+.feedback-banner__why { margin-top: var(--space-sm); background: rgba(255, 255, 255, 0.22); color: inherit; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 999px; padding: 4px 14px; font: inherit; font-size: var(--text-sm); cursor: pointer; }
+/* 写作：7 分写法、参考句 */
+.mission-upgrade { margin-top: 4px; font-size: var(--text-sm); line-height: 1.6; background: rgba(28, 176, 246, 0.07); border-radius: 6px; padding: 4px 8px; }
+.mission-upgrade__tag { font-size: var(--text-xs); font-weight: 700; color: var(--color-secondary); margin-right: 6px; }
+.mission-ref__line { font-size: var(--text-sm); line-height: 1.7; padding: 6px 0; border-top: 1px dashed var(--color-border); }
