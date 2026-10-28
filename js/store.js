@@ -329,6 +329,15 @@ export const store = {
     return ok;
   },
 
+  // 只记在本机、不算「有新进度要上传」：哪些题出现过这类出题用的记录。
+  // 打开练习页就会写一次，要是也标成「未上传」，启动同步还没完成（或失败）时，
+  // 这一下会让本机的旧缓存被当成新进度推上去，盖掉别的设备上更新的进度。
+  // 这些记录会跟着下一次真正的保存一起上传。
+  _saveQuiet() {
+    if (this.isDemo()) return true;
+    return this._saveLocal();
+  },
+
   reset() {
     // "重置全部进度"只清进度，不删课程。AI 生成的课程是花钱做出来的内容，
     // 不是进度；变体、设置、起始日期同样保留。
@@ -599,6 +608,8 @@ export const store = {
         this._syncing = false;
       }
       if (remote) {
+        // 取存档期间排下的上传（手里是旧缓存）作废
+        if (this._pushTimer) { clearTimeout(this._pushTimer); this._pushTimer = null; }
         this.state = remote;
         this._migrate();
         this._adopt();
@@ -1208,7 +1219,7 @@ export const store = {
     this.state.reviewCleared = this.state.reviewCleared.filter(
       r => r.date && daysBetween(r.date, today) <= 7
     );
-    if (this.state.reviewCleared.length !== before) this.save();
+    if (this.state.reviewCleared.length !== before) this._saveQuiet();
   },
 
   // --- Review Shown (复习已出现过的题) ---
@@ -1228,7 +1239,7 @@ export const store = {
       this.state.reviewShown.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
       this.state.reviewShown = this.state.reviewShown.slice(-300);
     }
-    this.save();
+    this._saveQuiet();
   },
 
   getReviewShown() {
@@ -1244,7 +1255,7 @@ export const store = {
     const cutoff = toDateString(new Date(Date.now() - 30 * 86400000));
     const before = this.state.reviewShown.length;
     this.state.reviewShown = this.state.reviewShown.filter(r => r.date >= cutoff);
-    if (this.state.reviewShown.length !== before) this.save();
+    if (this.state.reviewShown.length !== before) this._saveQuiet();
   },
 
   // --- Practice Shown (普通练习出现过的题) ---
@@ -1271,7 +1282,7 @@ export const store = {
       this.state.practiceShown.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
       this.state.practiceShown = this.state.practiceShown.slice(-500);
     }
-    this.save();
+    this._saveQuiet();
   },
 
   // 返回 Map: qid -> { date, n }。date 越早表示越久没见到。
@@ -1290,7 +1301,7 @@ export const store = {
     const cutoff = toDateString(new Date(Date.now() - 30 * 86400000));
     const before = this.state.practiceShown.length;
     this.state.practiceShown = this.state.practiceShown.filter(r => r.date >= cutoff);
-    if (this.state.practiceShown.length !== before) this.save();
+    if (this.state.practiceShown.length !== before) this._saveQuiet();
   },
 
   // --- Question Variants (同一知识点的不同问法) ---
