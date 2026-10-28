@@ -12,6 +12,8 @@ const OWNER_KEY = "gq-owner";
 const DIRTY_KEY = "gq-dirty";
 // 本机存档要被别的进度换掉、又没法确定已经在云端时，先留一份在这里，免得一点就没
 const BACKUP_KEY = "grammar-quest-backup";
+// 在这台设备注册、要先去邮箱点确认链接：记下注册邮箱，第一次登录时把这里没注册时做的练习带进账号
+const PENDING_KEY = "gq-pending-signup";
 
 function lsGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch { /* ignore */ } }
@@ -141,9 +143,16 @@ export const store = {
     return this.isDemo() && Boolean(lsGet(OWNER_KEY));
   },
 
-  /** 本机存档里有这个账号还没上传的改动。 */
+  /** 本机存档里有这个账号还没上传的改动（老版本的 "1"：设备不属于别的账号时也算）。 */
   _dirtyFor(uid) {
-    return Boolean(uid) && lsGet(DIRTY_KEY) === uid;
+    if (!uid) return false;
+    const d = lsGet(DIRTY_KEY);
+    const o = lsGet(OWNER_KEY);
+    return d === uid || (d === '1' && (!o || o === uid));
+  },
+
+  _markDirty() {
+    if (cloudEnabled() && this.account) lsSet(DIRTY_KEY, this.account.userId);
   },
 
   /** 本机存档要被换掉前留一份（只在里面真有进度时）。 */
@@ -165,6 +174,15 @@ export const store = {
     if (!saved) this._saveLocal();
     this._migrate();
     this._refreshAccount();
+    // 老版本登录着的设备没记过 gq-owner：启动时就带着会话，本机存档就是这个账号的缓存
+    if (this.account && !lsGet(OWNER_KEY)) {
+      const d = lsGet(DIRTY_KEY);
+      if (!d || d === '1' || d === this.account.userId) lsSet(OWNER_KEY, this.account.userId);
+    }
+    // 启动同步完成前不往云端传。页面刚打开时本机存档可能比云端旧（别的设备上练过），
+    // 这时候存的一下不能被当成「本机有新改动」，把旧存档推上去盖掉云端。
+    this._dirtyAtLoad = lsGet(DIRTY_KEY);
+    this._startupSync = this.isLoggedIn();
     return this.state;
   },
 
@@ -254,10 +272,11 @@ export const store = {
       return true;
     }
     const ok = this._saveLocal();
-    // 记下"这个账号有改动还没上传"；cloud.saveState 成功后清掉。
+    // 记下"这个账号有改动还没上传"；上传成功、且上传期间没有新改动时才清掉（见 _pushNow）。
     // 按缓存的账号记、不按会话：登录过期后做的练习也要记着，重新登录时先把它们传上去，
     // 而不是拿云端整包覆盖本地。
-    if (cloudEnabled() && this.account) lsSet(DIRTY_KEY, this.account.userId);
+    this._saveGen = (this._saveGen || 0) + 1;
+    this._markDirty();
     this._scheduleCloudPush();
     return ok;
   },
@@ -305,7 +324,7 @@ export const store = {
 
   // Debounced push so a burst of save() calls turns into a single upload.
   _scheduleCloudPush() {
-    if (!cloudEnabled() || !this.account) return;
+    if (!cloudEnabled() || !this.account || this._startupSync) return;
     if (this._pushTimer) clearTimeout(this._pushTimer);
     this._pushTimer = setTimeout(() => this._pushNow(), 1500);
   },
@@ -325,18 +344,20 @@ export const store = {
       this._pushTimer = null;
     }
     if (!cloudEnabled() || !this.account) return;
+    const uid = this.account.userId;
     // 别的标签页登录了另一个账号：这个标签页手里的进度不能写进人家的账号
     const u = cloud.currentUser();
-    if (u && u.id && u.id !== this.account.userId) return;
+    if (u && u.id && u.id !== uid) return;
 
     let lastErr = null;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
+        const gen = this._saveGen;
         await cloud.saveState(this._state);   // 只传本机/账号的真实存档，绝不传示例数据
-        if (this._cloudSaveFailed) {
-          this._cloudSaveFailed = false;
-          this._notifyCloudSave({ ok: true });
-        }
+        // 上传期间又存过（或又排了一次上传）：那些改动还没传上去，标记留着
+        const d = lsGet(DIRTY_KEY);
+        if (this._saveGen === gen && !this._pushTimer && (d === uid || d === '1')) lsDel(DIRTY_KEY);
+        this._resetSaveBanner();
         return;
       } catch (e) {
         lastErr = e;
@@ -348,9 +369,11 @@ export const store = {
     }
 
     console.warn('Cloud save failed:', lastErr?.message);
-    if (!this._cloudSaveFailed) {
-      this._cloudSaveFailed = true;
-      this._notifyCloudSave({ ok: false, expired: String(lastErr?.message).includes('NO_SESSION'), message: lastErr?.message || '' });
+    const expired = String(lastErr?.message).includes('NO_SESSION');
+    const kind = expired ? 'expired' : 'network';
+    if (this._cloudSaveFailed !== kind) {
+      this._cloudSaveFailed = kind;
+      this._notifyCloudSave({ ok: false, expired, message: lastErr?.message || '' });
     }
   },
 
@@ -359,6 +382,13 @@ export const store = {
     try {
       window.dispatchEvent(new CustomEvent('gq-cloud-save', { detail }));
     } catch { /* 非浏览器环境忽略 */ }
+  },
+
+  // 「没存到云端」的提示收起来（上传成功、退出、换了账号之后都不再适用）
+  _resetSaveBanner() {
+    if (!this._cloudSaveFailed) return;
+    this._cloudSaveFailed = false;
+    this._notifyCloudSave({ ok: true });
   },
 
   /** 是否有改动还没成功同步到云端。 */
@@ -372,17 +402,25 @@ export const store = {
     const res = await cloud.signUp(email, password, name.trim());
     track("signup");
     if (!res.confirmed) {
+      // 要先去邮箱确认。确认链接常在另一台设备（手机邮箱）里打开，这台设备上的旧进度
+      // 要等这里第一次登录时才带进去——记下是这台设备、用这个邮箱注册的。
+      if (this.hasLocalProgress()) lsSet(PENDING_KEY, email.trim().toLowerCase());
+      else lsDel(PENDING_KEY);
       return { needsConfirm: true };
     }
+    this._startupSync = false;
     this._refreshAccount();
     // 本机存档是别的账号的缓存（登录过期后没退出）：不能带进新账号，留个备份，新账号从头开始
-    if (lsGet(OWNER_KEY) && lsGet(OWNER_KEY) !== this.account?.userId) {
+    const owner = lsGet(OWNER_KEY);
+    if (owner && owner !== this.account?.userId) {
       this._backupLocal();
       this._state = createDefaultState();
     }
-    lsDel(DIRTY_KEY);
+    lsDel(PENDING_KEY);
     this._state.player.name = name.trim();
+    this._resetSaveBanner();
     this._adopt();
+    this._markDirty();     // 传失败的话下次启动接着传，不会被别的设备的存档盖掉
     await this._pushNow(); // seed the cloud with the guest's existing progress
     return { needsConfirm: false };
   },
@@ -390,7 +428,6 @@ export const store = {
   // Log in with email + password; the cloud copy becomes source of truth.
   async login(email, password) {
     await cloud.signIn(email, password);
-    const uid = cloud.currentUser()?.id || '';
     // 先把云端存档取到手，再认这个账号。取不到（网络断了等）就退回没登录，
     // 不然账号认了、手里却还是本机旧存档，下一次保存会把它当成账号进度覆盖到云端。
     let remote;
@@ -401,37 +438,68 @@ export const store = {
       this._refreshAccount();
       throw e;
     }
+    this._startupSync = false;
     this._refreshAccount();
     track("login");
+    await this._takeAccount(remote, email);
+    return this.account;
+  },
+
+  // 登录 / 找回密码后决定这台设备用哪份进度。remote 是云端存档（没有就是 null）。
+  async _takeAccount(remote, email = '') {
+    const uid = this.account?.userId || '';
     const owner = lsGet(OWNER_KEY);
+    const guest = this.hasLocalProgress();
+    const pending = lsGet(PENDING_KEY);
+    lsDel(PENDING_KEY);
+
     if (owner === uid && this._dirtyFor(uid)) {
       // 本机有这个账号登录过期后做的、还没上传的练习：以本机为准传上去
+      this._adopt();
+      this._markDirty();
       await this._pushNow();
-    } else if (remote) {
+      return;
+    }
+    // 在这台设备注册、去邮箱确认后第一次登录，账号里还没练过（可能只在别的设备点确认链接时
+    // 开过一下）：照注册时答应的，带上这台设备没注册时做的练习
+    const carry = guest && pending && email && pending === String(email).trim().toLowerCase()
+      && !(remote && Array.isArray(remote.history) && remote.history.length);
+    if (remote && !carry) {
       // 换成账号里的进度。本机存档要是没注册时做的练习、或别的账号没传上去的改动，先留一份备份
-      if (owner !== uid && (this.hasLocalProgress() || (owner && this._dirtyFor(owner)))) this._backupLocal();
+      if (owner !== uid && (guest || (owner && this._dirtyFor(owner)))) this._backupLocal();
       this.state = remote;
       this._migrate();
       lsDel(DIRTY_KEY);
-    } else {
-      // 账号在云端还没有存档：本机是没注册时的练习就带进去；是别的账号的缓存就从头开始
-      if (owner && owner !== uid) { this._backupLocal(); this._state = createDefaultState(); }
-      lsDel(DIRTY_KEY);
+      this._resetSaveBanner();
       this._adopt();
-      await this._pushNow();
+      return;
     }
+    // 账号在云端还没有存档（或要带上本机进度）：本机是没注册时的练习就带进去；是别的账号的缓存就从头开始
+    if (owner && owner !== uid) {
+      this._backupLocal();
+      this._state = createDefaultState();
+    }
+    lsDel(DIRTY_KEY);
+    this._resetSaveBanner();
     this._adopt();
-    return this.account;
+    this._markDirty();
+    await this._pushNow();
   },
 
   // Pull the latest cloud state. Returns true if local state changed.
   async syncFromCloud() {
+    const startup = this._startupSync;
+    this._startupSync = false;
     if (!this.isLoggedIn()) return false;
-    // 本机有还没成功上传的改动时，绝不能拿云端整包覆盖本地——
+    const uid = this.account?.userId;
+    // 本机有这个账号还没成功上传的改动时，绝不能拿云端整包覆盖本地——
     // 那会把断网时做完的进度悄悄抹掉。此时反过来把本地推上去。
-    const dirty = lsGet(DIRTY_KEY);
-    if (dirty && (dirty === this.account?.userId || dirty === '1')) {
-      if (this.account) lsSet(OWNER_KEY, this.account.userId);   // 有这个账号没上传的改动，本机存档就是它的
+    // 启动时看的是页面打开那一刻的标记：打开后、同步前存的那一下不算。
+    const d = startup ? this._dirtyAtLoad : lsGet(DIRTY_KEY);
+    const o = lsGet(OWNER_KEY);
+    if (uid && (d === uid || (d === '1' && (!o || o === uid)))) {
+      lsSet(OWNER_KEY, uid);
+      lsSet(DIRTY_KEY, uid);   // 老版本的 "1" 改记成账号 id，登录 / 退出时才认得出
       await this._pushNow();
       return false;
     }
@@ -441,6 +509,7 @@ export const store = {
         this.state = remote;
         this._migrate();
         this._adopt();
+        lsDel(DIRTY_KEY);
         return true;
       }
       // 账号在云端还没有存档（比如注册时要先去邮箱点确认链接，点完才第一次登录）：
@@ -448,15 +517,23 @@ export const store = {
       // （手机邮箱）里打开的，那里是空白存档，传上去会盖掉注册那台设备之后登录时要带进来的进度。
       if (this.account) {
         const guest = this.hasLocalProgress();
-        const owner = lsGet(OWNER_KEY);
         // 本机存档是另一个账号的缓存：不能算进这个新账号
-        if (owner && owner !== this.account.userId) { this._backupLocal(); this._state = createDefaultState(); }
+        if (o && o !== uid) { this._backupLocal(); this._state = createDefaultState(); }
         this._adopt();
-        if (guest) await this._pushNow();
+        if (guest) {
+          lsDel(PENDING_KEY);
+          this._markDirty();
+          await this._pushNow();
+        }
       }
     } catch (e) {
-      // Session gone/invalid -> drop back to not-logged-in (the page shows the sample data and asks to log in).
       if (String(e.message).includes("NO_SESSION")) {
+        // Session gone/invalid -> drop back to not-logged-in (the page shows the sample data and asks to log in).
+        this._refreshAccount();
+      } else if (this.account && o && o !== this.account.userId) {
+        // 云端存档没读到，本机存档又是另一个账号的缓存：和 login() 一样退回没登录，
+        // 不能让这个账号带着别人的进度继续保存、上传。
+        await cloud.signOut();
         this._refreshAccount();
       }
       console.warn("Cloud sync failed:", e.message);
@@ -468,6 +545,10 @@ export const store = {
   // 还有改动没传上去时先传；仍然传不上去就返回 { unsynced: true }，由界面问家长要不要硬退。
   async logout({ force = false } = {}) {
     if (this.account && (this._pushTimer || this._cloudSaveFailed || this._dirtyFor(this.account.userId))) {
+      // 没上传的标记是整台设备共用的，改动可能是另一个标签页做的：localStorage 里是各标签页最新写入的那份
+      if (lsGet(OWNER_KEY) === this.account.userId) {
+        try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) this._state = JSON.parse(raw); } catch { /* 用内存里的 */ }
+      }
       await this._pushNow();
       if (!force && (this._cloudSaveFailed || this._dirtyFor(this.account.userId))) return { unsynced: true };
       if (this._cloudSaveFailed || this._dirtyFor(this.account.userId)) this._backupLocal();
@@ -476,7 +557,7 @@ export const store = {
     lsDel(OWNER_KEY);
     await cloud.signOut();
     this._refreshAccount();
-    this._cloudSaveFailed = false;
+    this._resetSaveBanner();
     this.state = createDefaultState();
     this._saveLocal();
     return { unsynced: false };
@@ -491,26 +572,22 @@ export const store = {
   },
 
   // 用户点了恢复邮件链接后，设置新密码并登录。
+  // 和 login() 一样：网络步骤全部成功、拿到云端存档后才认这个账号；中途失败就撤掉会话。
   async applyNewPassword(recovery, newPassword) {
     cloud.applyRecoverySession(recovery);
-    await cloud.updatePassword(newPassword);
-    await cloud.fetchUser();
-    this._refreshAccount();
-    const uid = this.account?.userId || '';
-    const owner = lsGet(OWNER_KEY);
-    const remote = await cloud.loadState();
-    if (owner === uid && this._dirtyFor(uid)) {
-      await this._pushNow();
-    } else if (remote) {
-      if (owner !== uid && (this.hasLocalProgress() || (owner && this._dirtyFor(owner)))) this._backupLocal();
-      this.state = remote;
-      this._migrate();
-      lsDel(DIRTY_KEY);
-    } else if (owner && owner !== uid) {
-      this._backupLocal();
-      this._state = createDefaultState();
+    let remote;
+    try {
+      await cloud.updatePassword(newPassword);
+      await cloud.fetchUser();
+      remote = await cloud.loadState();
+    } catch (e) {
+      await cloud.signOut();
+      this._refreshAccount();
+      throw e;
     }
-    this._adopt();
+    this._startupSync = false;
+    this._refreshAccount();
+    await this._takeAccount(remote, this.account?.email || '');
     return this.account;
   },
 

@@ -468,7 +468,7 @@ async function loadAndRender(sub, param) {
       }
       return;
     }
-    showError(e.message);
+    showError(friendlyError(e));
   }
 }
 

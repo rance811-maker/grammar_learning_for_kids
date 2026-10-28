@@ -335,11 +335,14 @@ function mountCloudSaveBanner() {
       if (el) el.remove();
       return;
     }
-    if (el) return;                       // 同一轮失败不重复弹
+    const kind = e.detail && e.detail.expired ? 'expired' : 'network';
+    if (el && el.dataset.kind === kind) return;   // 同一轮失败不重复弹
+    if (el) el.remove();                          // 原因变了（断网 → 登录过期），换成新的说法
 
     el = document.createElement('div');
     el.id = 'cloudSaveBanner';
     el.className = 'cloud-banner';
+    el.dataset.kind = kind;
     el.innerHTML = e.detail && e.detail.expired
       ? `
       <span class="cloud-banner__text">
@@ -473,6 +476,9 @@ async function consumeAuthCallback() {
   }
 
   // 邮箱确认 / 魔法链接：直接登录并回到首页。
+  // 先把令牌从地址栏拿掉（在任何 await 之前）：另一个标签页的存储事件让这个页面重新加载时，
+  // 不会再拿同一个链接登录一遍，两个标签页互相触发、无限刷新。
+  history.replaceState(null, '', '#');
   try {
     cloud.applyRecoverySession({ access_token, refresh_token });
     await cloud.fetchUser();
@@ -491,6 +497,7 @@ window.addEventListener('storage', (e) => {
   if (e.key !== 'gq-session' && e.key !== null) return;
   const before = store.account && store.account.userId;
   const u = cloud.currentUser();
+  if (u && !u.id) return;   // 另一个标签页正在用确认链接登录，还没拿到账号信息
   const after = (u && u.id) || null;
   if ((before || null) !== after) location.reload();
 });
@@ -517,5 +524,7 @@ consumeAuthCallback().then(() => {
       if (r === 'practice' || r === 'placement') return;
       router();
     });
+  } else {
+    store._startupSync = false;
   }
 });
