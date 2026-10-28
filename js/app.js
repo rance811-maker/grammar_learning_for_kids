@@ -15,12 +15,13 @@ import * as syllabus from './views/syllabus.js';
 import * as feedback from './views/feedback.js';
 import * as about from './views/about.js';
 import * as install from './views/install.js';
+import * as gate from './views/gate.js';
 import { curriculum } from './curriculum.js';
 import { initPwa, mountInstallHint } from './pwa.js';
 import { initAnalytics, trackView } from './analytics.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260621k';
+const BUILD_VERSION = '20261027a';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -55,6 +56,12 @@ const routes = {
   'about': about,
   'install': install,
 };
+
+// 没登录时这些页面要先注册（看示例可以，用不行）。其余页面照常打开，显示示例数据。
+const GATED_ROUTES = new Set(['practice', 'discover', 'mission', 'placement', 'parent']);
+
+// 这些页面本身不展示学习数据，不挂「示例数据」横条
+const NO_DEMO_BANNER = new Set(['account', 'about', 'feedback', 'install']);
 
 const titles = {
   '': '学习地图',
@@ -97,14 +104,18 @@ function router() {
     return;
   }
 
-  const content = view.render(...params);
-  app.innerHTML = renderShell(route, content);
+  const gated = store.isDemo() && GATED_ROUTES.has(route);
+  if (gated) gate.rememberReturn(route, params);
+  const content = gated ? gate.render(route) : view.render(...params);
+  app.innerHTML = renderShell(route, content, gated);
 
-  if (view.mount) {
+  if (!gated && view.mount) {
     view.mount(...params);
   }
   if (route === '') mountInstallHint(app.querySelector('.content > .view') || app.querySelector('.content'));
-  trackView(route, params);
+  // 被拦下的记成 gate，不记成原页面：后台漏斗里「开始摸底」只该数真正进了摸底的人
+  if (gated) trackView('gate', [route, ...params]);
+  else trackView(route, params);
 
   mountNav();
   mountBackButton();
@@ -137,7 +148,7 @@ function activeNavRoute(route) {
   return ['review', 'portfolio', 'stats', 'parent', 'feedback'].includes(route) ? route : '';
 }
 
-function renderShell(route, content) {
+function renderShell(route, content, gated = false) {
   const topLevelRoutes = ['', 'review', 'portfolio', 'stats', 'account', 'parent', 'about', 'feedback'];
   const showBackBtn = !topLevelRoutes.includes(route);
   const title = titles[route] || 'Grammar Quest';
@@ -154,8 +165,24 @@ function renderShell(route, content) {
           <h1 class="topbar__title">${title}</h1>
           <span class="topbar__spacer"></span>
         </header>
-        <main class="content">${content}</main>
+        <main class="content">${store.isDemo() && !gated && !NO_DEMO_BANNER.has(route) ? renderDemoBanner() : ''}${content}</main>
       </div>
+    </div>`;
+}
+
+// 没登录时每一页顶上的说明：现在看到的进度、错题、作品都是编的示例。
+// 这台设备上以前（没注册时）做过练习的，告诉他记录还在，注册或登录就能接着学。
+function renderDemoBanner() {
+  const text = store.hasLocalProgress()
+    ? '<strong>这是示例数据</strong>，不是你的记录。你在这台设备上做过的练习还在，注册或登录后就能接着学。'
+    : '<strong>这是示例数据</strong>：一位同学学了 10 天的样子，不是你的记录。注册后先做摸底，生成你自己的学习计划。';
+  return `
+    <div class="demo-banner" role="note">
+      <span class="demo-banner__text">👀 ${text}</span>
+      <span class="demo-banner__actions">
+        <a class="btn btn--primary demo-banner__btn" href="#account/register">免费注册</a>
+        <a class="demo-banner__login" href="#account">登录</a>
+      </span>
     </div>`;
 }
 
@@ -206,7 +233,7 @@ function renderSiteWhatPop() {
       </p>
       <ul class="siteband__pop-list">
         <li>先做 12 道题摸底，学习计划按结果排，不是所有孩子都从第一单元开始</li>
-        <li>内置 PET、雅思 6 分、雅思 7 分三套课程，打开就能用</li>
+        <li>内置 PET、雅思 6 分、雅思 7 分三套课程，免费注册就能用</li>
         <li>写作由 AI 逐句批改，指出错在哪、为什么错</li>
       </ul>
       <a class="siteband__pop-more" href="#about">看完整介绍 ›</a>
@@ -242,7 +269,7 @@ function renderSidebar(route) {
     ? `<span class="sidebar__account-name"><span class="sidebar__account-icon">☁️</span><span class="sidebar__account-text"> ${escapeHtml(store.account.name)}</span></span>
        <span class="sidebar__account-role">当前家长账号登录中</span>`
     : `<span class="sidebar__account-name"><span class="sidebar__account-icon">👤</span><span class="sidebar__account-text"> 登录 / 注册</span></span>
-       <span class="sidebar__account-role">登录后可跨设备同步</span>`;
+       <span class="sidebar__account-role">注册后开始学习</span>`;
 
   const currTitle = curriculum.getActiveTitle();
   const currIsBuiltIn = curriculum.isBuiltIn();

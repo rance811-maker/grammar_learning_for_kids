@@ -1,6 +1,7 @@
 import { cloud, cloudEnabled } from "./cloud.js";
 import { track } from "./analytics.js";
 import { isBuiltinId, BUILTIN_COURSES } from "./data/builtinCourses.js";
+import { buildDemoState } from "./demoState.js";
 
 const BUILTIN_IDS = BUILTIN_COURSES.map((c) => c.id);
 
@@ -82,25 +83,50 @@ function daysBetween(dateStrA, dateStrB) {
 }
 
 export const store = {
-  state: null,
-  // 当前账号：{ name, email, userId } 表示已登录(云端)；null 表示访客(仅本机)。
+  // 本机存档（localStorage 里那份；登录后就是账号的进度）。界面一律读 store.state。
+  _state: null,
+  // 未登录时给人看的示例数据，只在内存里（见 demoState.js）。
+  _demoState: null,
+  // 当前账号：{ name, email, userId } 表示已登录(云端)；null 表示没登录。
   // 这是从云端会话派生的缓存，真正的会话(令牌)由 cloud.js 管理。
   account: null,
   _pushTimer: null,
 
+  // 网站要注册后才能用：没登录时 store.state 给的是示例数据，各页面照常渲染，
+  // 但写到的都是这份示例，不会落盘。本机真实存档（以前没注册时做过的练习）留在 _state，
+  // 注册 / 登录时带进账号。没配置云端（纯本机版）时不拦，直接用本机存档。
+  get state() {
+    if (!this.isDemo()) return this._state;
+    if (!this._demoState) this._demoState = buildDemoState(createDefaultState);
+    // 音效开关这类设置跟着本机走：没登录时关了声音，刷新后也还是关的
+    if (this._state) this._demoState.settings = this._state.settings;
+    return this._demoState;
+  },
+  set state(v) {
+    this._state = v;
+  },
+
+  /** 没登录、看的是示例数据。 */
+  isDemo() {
+    return cloudEnabled() && !this.account;
+  },
+
+  /** 这台设备上以前（没注册时）做过练习：示例横条要告诉他「你的记录还在」。 */
+  hasLocalProgress() {
+    const s = this._state;
+    return Boolean(s && ((s.history && s.history.length) || s.placementCompleted));
+  },
+
   init() {
+    let saved = null;
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        this.state = JSON.parse(saved);
-      }
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) saved = JSON.parse(raw);
     } catch {
       // corrupted data, fall through to default
     }
-    if (!this.state) {
-      this.state = createDefaultState();
-      this._saveLocal();
-    }
+    this._state = saved || createDefaultState();
+    if (!saved) this._saveLocal();
     this._migrate();
     this._refreshAccount();
     return this.state;
@@ -108,59 +134,60 @@ export const store = {
 
   // Migration for existing saved states (run after any load).
   _migrate() {
+    const st = this._state;
     // 首页欢迎语要算"第几天"。云端账号有注册时间可用；访客模式没有账号，
     // 就以本机第一次打开的日期兜底。老用户此前没记过，用最早一条学习记录
     // 反推，避免把用了很久的人显示成"第 1 天"。
     // 通关判定修正：以前 0 星（能量耗尽）也会把 completed 置 true。
     // 老存档里这类关卡改成"尝试过、未通过"，否则修好判定后它们仍然自相矛盾。
     let fixed = false;
-    for (const u of Object.values(this.state.units || {})) {
+    for (const u of Object.values(st.units || {})) {
       for (const lv of Object.values(u?.practiceLevels || {})) {
         if (!lv) continue;
         if (lv.completed && (lv.bestStars || 0) < 1) { lv.completed = false; lv.attempted = true; fixed = true; }
         else if (lv.completed && !lv.attempted) { lv.attempted = true; fixed = true; }
       }
     }
-    if (Array.isArray(this.state.history) && this.state.history.length > 500) {
-      this.state.history = this.state.history.slice(-500);
+    if (Array.isArray(st.history) && st.history.length > 500) {
+      st.history = st.history.slice(-500);
       fixed = true;
     }
     if (fixed) this._saveLocal();
 
-    if (!this.state.startedAt) {
-      const first = this.state.history?.[0]?.date;
-      this.state.startedAt = first || new Date().toISOString().slice(0, 10);
+    if (!st.startedAt) {
+      const first = st.history?.[0]?.date;
+      st.startedAt = first || new Date().toISOString().slice(0, 10);
     }
-    if (this.state.placementCompleted === undefined) {
-      this.state.placementCompleted = false;
+    if (st.placementCompleted === undefined) {
+      st.placementCompleted = false;
     }
-    if (this.state.learningPlan === undefined) {
-      this.state.learningPlan = null;
+    if (st.learningPlan === undefined) {
+      st.learningPlan = null;
     }
-    if (this.state.mistakes === undefined) {
-      this.state.mistakes = [];
+    if (st.mistakes === undefined) {
+      st.mistakes = [];
     }
-    if (this.state.bossCleared === undefined) {
-      this.state.bossCleared = false;
-      this.state.bossBestAccuracy = 0;
+    if (st.bossCleared === undefined) {
+      st.bossCleared = false;
+      st.bossBestAccuracy = 0;
     }
-    if (this.state.activeCurriculumId === undefined) {
-      this.state.activeCurriculumId = null;
+    if (st.activeCurriculumId === undefined) {
+      st.activeCurriculumId = null;
     }
-    if (this.state.reviewCleared === undefined) {
-      this.state.reviewCleared = [];
+    if (st.reviewCleared === undefined) {
+      st.reviewCleared = [];
     }
-    if (this.state.practiceShown === undefined) {
-      this.state.practiceShown = [];
+    if (st.practiceShown === undefined) {
+      st.practiceShown = [];
     }
-    if (this.state.variants === undefined) {
-      this.state.variants = {};
+    if (st.variants === undefined) {
+      st.variants = {};
     }
-    if (this.state.reviewShown === undefined) {
-      this.state.reviewShown = [];
+    if (st.reviewShown === undefined) {
+      st.reviewShown = [];
     }
-    if (this.state.curricula === undefined) {
-      this.state.curricula = {};
+    if (st.curricula === undefined) {
+      st.curricula = {};
     }
   },
 
@@ -169,7 +196,7 @@ export const store = {
   // 调用方无从知道，界面照样显示"已保存"。
   _saveLocal() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this._state));
       return true;
     } catch {
       console.warn("Failed to save state to localStorage");
@@ -189,7 +216,7 @@ export const store = {
   reset() {
     // "重置全部进度"只清进度，不删课程。AI 生成的课程是花钱做出来的内容，
     // 不是进度；变体、设置、起始日期同样保留。
-    const old = this.state || {};
+    const old = this._state || {};
     const next = createDefaultState();
     if (old.settings) next.settings = old.settings;
     if (old.startedAt) next.startedAt = old.startedAt;
@@ -245,7 +272,7 @@ export const store = {
     let lastErr = null;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        await cloud.saveState(this.state);
+        await cloud.saveState(this._state);   // 只传本机/账号的真实存档，绝不传示例数据
         if (this._cloudSaveFailed) {
           this._cloudSaveFailed = false;
           this._notifyCloudSave({ ok: true });
@@ -287,7 +314,7 @@ export const store = {
       return { needsConfirm: true };
     }
     this._refreshAccount();
-    this.state.player.name = name.trim();
+    this._state.player.name = name.trim();
     this._saveLocal();
     await this._pushNow(); // seed the cloud with the guest's existing progress
     return { needsConfirm: false };
@@ -307,7 +334,7 @@ export const store = {
       // First login on a fresh account -> seed it with local (guest) data.
       await this._pushNow();
     }
-    if (this.account) this.state.player.name = this.account.name;
+    if (this.account) this._state.player.name = this.account.name;
     this._saveLocal();
     return this.account;
   },
@@ -325,10 +352,13 @@ export const store = {
       if (remote) {
         this.state = remote;
         this._migrate();
-        if (this.account) this.state.player.name = this.account.name;
+        if (this.account) this._state.player.name = this.account.name;
         this._saveLocal();
         return true;
       }
+      // 账号在云端还没有存档（比如注册时要先去邮箱点确认链接，点完才第一次登录）：
+      // 把本机的进度传上去当作这个账号的起点，和直接注册时的做法一致。
+      if (this.account) await this._pushNow();
     } catch (e) {
       // Session gone/invalid -> drop back to guest mode.
       if (String(e.message).includes("NO_SESSION")) {
@@ -368,7 +398,7 @@ export const store = {
       this.state = remote;
       this._migrate();
     }
-    if (this.account) this.state.player.name = this.account.name;
+    if (this.account) this._state.player.name = this.account.name;
     this._saveLocal();
     return this.account;
   },

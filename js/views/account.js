@@ -1,5 +1,6 @@
 import { store } from '../store.js';
 import { cloudEnabled, friendlyError } from '../cloud.js';
+import { takeReturn } from './gate.js';
 
 export function render(sub) {
   // 云端未配置：只能本机使用。
@@ -54,20 +55,21 @@ export function render(sub) {
           <div class="account-status">☁️ 已登录 · 自动同步中</div>
           ${email ? `<div class="account-hint">邮箱：${escapeHtml(email)}</div>` : ''}
           <button class="btn btn--secondary" id="logoutBtn" style="margin-top:var(--space-md);">退出登录</button>
-          <p class="account-hint">退出后这台设备会回到"访客模式"。</p>
+          <p class="account-hint">退出后这台设备上只能看示例，重新登录就能接着学。</p>
         </div>
       </div>`;
   }
 
-  // 未登录：访客 + 登录/注册/忘记密码。
+  // 未登录：登录/注册/忘记密码。#account/register 直接打开注册。
+  const local = store.hasLocalProgress();
   return `
     <div class="view view-account">
       <div class="account-card">
         <div class="account-card__icon">🚀</div>
-        <div class="account-card__title">访客模式</div>
+        <div class="account-card__title">注册后开始学习</div>
         <p class="account-card__desc">
-          现在你正在以访客身份学习，随时可以玩，进度保存在这台设备上。
-          想在别的设备上也能接着学？登录一个账号吧！
+          免费注册，只要一个家长邮箱。学习进度自动存到云端，手机、平板、电脑登录同一个账号都能接着学。
+          ${local ? '<br>这台设备上以前做过的练习还在，注册后会一起带进新账号。' : ''}
         </p>
       </div>
 
@@ -106,7 +108,7 @@ export function mount(sub) {
 
   if (sub === 'reset') return mountReset();
   if (store.isLoggedIn() && store.account) return mountLoggedIn();
-  mountAuthForm();
+  mountAuthForm(sub === 'register' ? 'register' : 'login');
 }
 
 function mountReset() {
@@ -154,7 +156,7 @@ function mountLoggedIn() {
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
-      if (confirm('确定要退出登录吗？这台设备会回到访客模式。')) {
+      if (confirm('确定要退出登录吗？退出后这台设备上只能看示例，重新登录就能接着学。')) {
         await store.logout();
         location.hash = '';
         window.dispatchEvent(new HashChangeEvent('hashchange'));
@@ -163,7 +165,7 @@ function mountLoggedIn() {
   }
 }
 
-function mountAuthForm() {
+function mountAuthForm(initialMode) {
   const tabs = document.querySelectorAll('.account-tab');
   const submitBtn = document.getElementById('accSubmit');
   const hint = document.getElementById('accHint');
@@ -189,11 +191,12 @@ function mountAuthForm() {
     submitBtn.textContent = mode === 'login' ? '登录' : '注册并保存进度';
     hint.textContent = mode === 'login'
       ? '登录后，这台设备会切换成你账号里保存的进度。'
-      : '注册后，当前这台设备上的学习进度会一起带进新账号。';
+      : (store.hasLocalProgress() ? '注册后，这台设备上以前做过的练习会一起带进新账号。' : '注册后先做 12 道题摸底，生成你自己的学习计划。');
     showMsg('');
   }
 
   tabs.forEach(t => t.addEventListener('click', () => setMode(t.dataset.tab)));
+  if (initialMode === 'register') setMode('register');
 
   async function submit() {
     const name = (nameInput.value || '').trim();
@@ -219,7 +222,9 @@ function mountAuthForm() {
         await store.login(email, pass);
       }
       showMsg('成功！正在进入…', 'ok');
-      location.hash = '';
+      // 回到注册前想去的页面（家长专区、摸底）；新账号回首页会自动进摸底
+      const back = takeReturn();
+      location.hash = back;
       window.dispatchEvent(new HashChangeEvent('hashchange'));
     } catch (e) {
       showMsg(friendlyError(e), 'error');
