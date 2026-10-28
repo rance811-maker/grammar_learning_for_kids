@@ -1362,7 +1362,7 @@ function mountSetup() {
       zone.innerHTML = renderDashboard();
       mountDashboard();
     } catch (e) {
-      msg.textContent = '保存失败：' + e.message;
+      msg.textContent = '保存失败：' + friendlyError(e);
       msg.classList.add('parent-msg--error');
       btn.disabled = false;
       btn.textContent = '确认设置';

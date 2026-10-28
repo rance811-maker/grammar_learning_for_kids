@@ -2,7 +2,7 @@
 //
 // 为什么需要：网站本体是纯前端单页应用，页面源码里只有一个空的 <div id="app">，
 // 内容全靠 JavaScript 画出来。百度爬虫基本不执行 JavaScript，看到的是一张白纸；
-// Google 会执行，但新访客一进来就被带去摸底测试，能收录的内容很薄。
+// Google 会执行，但没登录的访客只能看示例数据，能收录的内容很薄。
 // 这几页是纯 HTML，不依赖脚本，内容直接取自课程数据，和应用里看到的一致。
 //
 // 课程内容有改动时重新运行一次，再把生成的文件一起提交：
@@ -148,7 +148,7 @@ function page(course, all) {
     <ul class="facts">
       <li>CEFR ${esc(course.cefr)}</li><li>12 个单元</li><li>${qn} 道练习题</li><li>免费使用</li><li>电脑 · 手机都能用</li>
     </ul>
-    <a class="cta" href="../">免费开始：先让孩子做 3 分钟摸底</a>
+    <a class="cta" href="../#placement">免费注册，先让孩子做 3 分钟摸底</a>
 
     <section class="steps">
       <h2>每个单元怎么练</h2>

@@ -28,7 +28,8 @@ const CHEERS = [
 /** 从起始日期算到今天是第几天（含起始当天，所以最小是 1）。 */
 function daysSince(dateStr) {
   if (!dateStr) return 1;
-  const start = new Date(dateStr);
+  // 只有日期的字符串按本地零点算（new Date('2026-10-18') 是 UTC 零点，西半球会多算一天）
+  const start = new Date(/^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? `${dateStr}T00:00:00` : dateStr);
   if (Number.isNaN(start.getTime())) return 1;
   const d0 = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
   const now = new Date();

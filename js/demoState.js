@@ -36,15 +36,16 @@ const SAMPLE_ESSAYS = {
 };
 
 // 练习记录：[几天前, 单元, 关, 星, 答对, 共几题]。最近 6 天天天有练习（连续 6 天），7 天前断过一次。
+// 星数按真实规则：全对 3 星，错 1–2 题 2 星，错到第 3 题这一轮结束、0 星。
 const SESSIONS = [
   [-9, 1, 1, 3, 8, 8],
-  [-8, 1, 2, 3, 7, 8],
+  [-8, 1, 2, 3, 8, 8],
   [-7, 1, 3, 2, 6, 8],
   [-5, 1, 4, 3, 8, 8],
   [-5, 1, 5, 2, 6, 8],
-  [-4, 2, 1, 3, 7, 8],
+  [-4, 2, 1, 3, 8, 8],
   [-3, 2, 2, 2, 6, 8],
-  [-2, 2, 3, 1, 5, 8],
+  [-2, 2, 3, 0, 2, 5],
   [-1, 2, 4, 0, 3, 6],
   [-1, 2, 3, 2, 6, 8],
   [0, 3, 1, 2, 6, 8],
@@ -93,7 +94,7 @@ function buildProgress(courseId, createDefaultState) {
     for (let lv = 1; lv <= (u === 3 ? 1 : 5); lv++) {
       for (const q of levels[lv]?.questions || []) {
         if (!q.subSkill || mastery[q.subSkill]) continue;
-        const attempts = 6 + (k % 5) * 2;
+        const attempts = 4 + (k % 4);
         const rate = [0.92, 0.83, 0.75, 0.67, 0.58, 0.5][(k + u) % 6] - (u - 1) * 0.04;
         const correct = Math.max(1, Math.round(attempts * rate));
         mastery[q.subSkill] = {
@@ -110,7 +111,7 @@ function buildProgress(courseId, createDefaultState) {
   const picks = [[1, 3], [2, 2], [2, 3], [2, 4], [3, 1]];
   picks.forEach(([u, lv], i) => {
     const qs = allUnits[u]?.levels?.[lv]?.questions || [];
-    const q = qs.find((x) => x.type === 'choice' || x.type === 'fill') || qs[0];
+    const q = qs.find((x) => (x.type === 'choice' || x.type === 'fill') && /_/.test(x.sentence || '')) || qs[0];
     if (q) mistakes.push({ question: q, unitId: u, level: lv, date: dayOffset(-(picks.length - 1 - i)) });
   });
 
