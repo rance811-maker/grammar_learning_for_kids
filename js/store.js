@@ -23,6 +23,50 @@ function hasProgress(p) {
   return Boolean(p && ((p.history && p.history.length) || p.placementCompleted));
 }
 
+// 把本机没注册时的进度并进账号已有的进度（同一套课程时）。用于：在这台设备注册、
+// 去别的设备点了确认链接并练过几次，再回这台设备登录——两边的练习都要留下。
+// 课程不同就不并（返回 null），由调用方以账号为准、本机留备份。
+function mergeProgress(remote, local) {
+  if ((remote.activeCurriculumId || null) !== (local.activeCurriculumId || null)) return null;
+  const out = JSON.parse(JSON.stringify(remote));
+  const byDate = (a, b) => String(a.date || '').localeCompare(String(b.date || ''));
+  out.history = [...(local.history || []), ...(out.history || [])].sort(byDate).slice(-500);
+  out.player = out.player || {};
+  out.player.totalScore = (out.player.totalScore || 0) + (local.player?.totalScore || 0);
+  for (const [id, lu] of Object.entries(local.units || {})) {
+    const ru = out.units?.[id];
+    if (!ru) { (out.units = out.units || {})[id] = lu; continue; }
+    for (const k of ['unlocked', 'discoverCompleted', 'missionCompleted', 'badgeEarned']) ru[k] = Boolean(ru[k] || lu[k]);
+    if (!ru.missionContent && lu.missionContent) ru.missionContent = lu.missionContent;
+    for (const [lv, ll] of Object.entries(lu.practiceLevels || {})) {
+      const rl = ru.practiceLevels?.[lv];
+      if (!rl) { (ru.practiceLevels = ru.practiceLevels || {})[lv] = ll; continue; }
+      for (const k of ['unlocked', 'completed', 'attempted']) rl[k] = Boolean(rl[k] || ll[k]);
+      rl.bestStars = Math.max(rl.bestStars || 0, ll.bestStars || 0);
+    }
+  }
+  out.mastery = out.mastery || {};
+  for (const [k, lm] of Object.entries(local.mastery || {})) {
+    const rm = out.mastery[k];
+    if (!rm) { out.mastery[k] = lm; continue; }
+    rm.attempts = (rm.attempts || 0) + (lm.attempts || 0);
+    rm.correct = (rm.correct || 0) + (lm.correct || 0);
+    rm.errorCount = (rm.errorCount || 0) + (lm.errorCount || 0);
+    rm.mastery = rm.attempts ? rm.correct / rm.attempts : 0;
+    if (String(lm.lastSeen || '') > String(rm.lastSeen || '')) rm.lastSeen = lm.lastSeen;
+    rm.reviewInterval = Math.min(rm.reviewInterval || 1, lm.reviewInterval || 1);
+  }
+  const union = (a, b, key) => { const seen = new Set((a || []).map(key)); return [...(a || []), ...(b || []).filter((x) => !seen.has(key(x)))]; };
+  out.badges = union(out.badges, local.badges, (b) => b.id);
+  out.portfolio = union(out.portfolio, local.portfolio, (p) => `${p.unitId}|${p.date}|${String(p.content || '').slice(0, 40)}`);
+  out.mistakes = union(out.mistakes, local.mistakes, (m) => m.question?.id).slice(-60);
+  out.placementCompleted = Boolean(out.placementCompleted || local.placementCompleted);
+  if (!out.learningPlan && local.learningPlan) out.learningPlan = local.learningPlan;
+  out.bossCleared = Boolean(out.bossCleared || local.bossCleared);
+  out.bossBestAccuracy = Math.max(out.bossBestAccuracy || 0, local.bossBestAccuracy || 0);
+  return out;
+}
+
 const RANK_THRESHOLDS = [
   { rank: "master", min: 20000 },
   { rank: "diamond", min: 10000 },
@@ -152,7 +196,11 @@ export const store = {
   },
 
   _markDirty() {
-    if (cloudEnabled() && this.account) lsSet(DIRTY_KEY, this.account.userId);
+    if (!cloudEnabled() || !this.account) return;
+    // 本机存档是另一个账号的缓存（还没认到这个账号名下）：它的改动不算这个账号的
+    const o = lsGet(OWNER_KEY);
+    if (o && o !== this.account.userId) return;
+    lsSet(DIRTY_KEY, this.account.userId);
   },
 
   /** 本机存档要被换掉前留一份（只在里面真有进度时）。 */
@@ -309,10 +357,13 @@ export const store = {
 
   // Refresh the cached account info from the cloud session.
   _refreshAccount() {
+    const prev = this.account ? this.account.userId : null;
     const u = cloudEnabled() ? cloud.currentUser() : null;
     this.account = u && u.id
       ? { name: u.display_name || u.email, email: u.email, userId: u.id, createdAt: u.created_at || '' }
       : null;
+    // 换了账号（含退出）：还在重试的旧上传全部作废，见 _pushNow
+    if ((this.account ? this.account.userId : null) !== prev) this._acctEpoch = (this._acctEpoch || 0) + 1;
   },
 
   // 本机存档从现在起是这个账号的（登录 / 注册 / 同步后调用）
@@ -324,7 +375,7 @@ export const store = {
 
   // Debounced push so a burst of save() calls turns into a single upload.
   _scheduleCloudPush() {
-    if (!cloudEnabled() || !this.account || this._startupSync) return;
+    if (!cloudEnabled() || !this.account || this._startupSync || this._syncing) return;
     if (this._pushTimer) clearTimeout(this._pushTimer);
     this._pushTimer = setTimeout(() => this._pushNow(), 1500);
   },
@@ -343,20 +394,37 @@ export const store = {
       clearTimeout(this._pushTimer);
       this._pushTimer = null;
     }
-    if (!cloudEnabled() || !this.account) return;
+    if (!cloud.cloudEnabled() || !this.account) return;
     const uid = this.account.userId;
     // 别的标签页登录了另一个账号：这个标签页手里的进度不能写进人家的账号
     const u = cloud.currentUser();
     if (u && u.id && u.id !== uid) return;
+    // 本机存档还记在另一个账号名下（同步还没认下来）：绝不能当成这个账号的进度传上去
+    const owner = lsGet(OWNER_KEY);
+    if (owner && owner !== uid) return;
+    // 正在从云端取存档：等取完再说（取回来可能整份换掉），没上传的标记留着
+    if (this._syncing) return;
 
+    // 上传在重试的间隙里，家长可能已经退出、甚至换了别的账号登录：这时手里的存档和会话都不是
+    // 当初那个账号的了，继续传会把它写进新账号。每次动手前都确认账号没变，变了就悄悄停下。
+    const epoch = this._acctEpoch;
+    const stale = () => {
+      if (epoch !== this._acctEpoch || !this.account || this.account.userId !== uid) return true;
+      const cu = cloud.currentUser();
+      return Boolean(cu && cu.id && cu.id !== uid);
+    };
     let lastErr = null;
     for (let attempt = 0; attempt < 3; attempt++) {
+      if (stale()) return;
       try {
         const gen = this._saveGen;
+        const snap = JSON.stringify(this._state);
         await cloud.saveState(this._state);   // 只传本机/账号的真实存档，绝不传示例数据
-        // 上传期间又存过（或又排了一次上传）：那些改动还没传上去，标记留着
+        if (stale()) return;
+        // 上传期间又存过（这个标签页、或同一账号的另一个标签页）：那些改动还没传上去，标记留着。
+        // 本机 localStorage 里的那份和刚传上去的一字不差，才算真的都传完了。
         const d = lsGet(DIRTY_KEY);
-        if (this._saveGen === gen && !this._pushTimer && (d === uid || d === '1')) lsDel(DIRTY_KEY);
+        if (this._saveGen === gen && !this._pushTimer && (d === uid || d === '1') && lsGet(STORAGE_KEY) === snap) lsDel(DIRTY_KEY);
         this._resetSaveBanner();
         return;
       } catch (e) {
@@ -368,6 +436,7 @@ export const store = {
       }
     }
 
+    if (stale()) return;
     console.warn('Cloud save failed:', lastErr?.message);
     const expired = String(lastErr?.message).includes('NO_SESSION');
     const kind = expired ? 'expired' : 'network';
@@ -460,10 +529,27 @@ export const store = {
       await this._pushNow();
       return;
     }
-    // 在这台设备注册、去邮箱确认后第一次登录，账号里还没练过（可能只在别的设备点确认链接时
-    // 开过一下）：照注册时答应的，带上这台设备没注册时做的练习
-    const carry = guest && pending && email && pending === String(email).trim().toLowerCase()
-      && !(remote && Array.isArray(remote.history) && remote.history.length);
+    // 在这台设备注册、去邮箱确认后第一次登录：照注册时答应的，带上这台设备没注册时做的练习。
+    // 账号里还没练过（可能只在别的设备点确认链接时开过一下）就直接用本机的；
+    // 别的设备上已经练过了，就把两边并起来。
+    const fromHere = guest && pending && email && pending === String(email).trim().toLowerCase();
+    const remoteUsed = Boolean(remote && Array.isArray(remote.history) && remote.history.length);
+    if (fromHere && remoteUsed) {
+      const merged = mergeProgress(remote, this._state);
+      if (merged) {
+        this._backupLocal();
+        this.state = merged;
+        this._migrate();
+        this._state.player.rank = this.getRank();
+        lsDel(DIRTY_KEY);
+        this._resetSaveBanner();
+        this._adopt();
+        this._markDirty();
+        await this._pushNow();
+        return;
+      }
+    }
+    const carry = fromHere && !remoteUsed;
     if (remote && !carry) {
       // 换成账号里的进度。本机存档要是没注册时做的练习、或别的账号没传上去的改动，先留一份备份
       if (owner !== uid && (guest || (owner && this._dirtyFor(owner)))) this._backupLocal();
@@ -497,14 +583,21 @@ export const store = {
     // 启动时看的是页面打开那一刻的标记：打开后、同步前存的那一下不算。
     const d = startup ? this._dirtyAtLoad : lsGet(DIRTY_KEY);
     const o = lsGet(OWNER_KEY);
-    if (uid && (d === uid || (d === '1' && (!o || o === uid)))) {
+    if (uid && (!o || o === uid) && (d === uid || d === '1')) {
       lsSet(OWNER_KEY, uid);
       lsSet(DIRTY_KEY, uid);   // 老版本的 "1" 改记成账号 id，登录 / 退出时才认得出
       await this._pushNow();
       return false;
     }
     try {
-      const remote = await cloud.loadState();
+      // 取存档期间别往云端传：这时候手里的可能是旧缓存、甚至另一个账号的
+      let remote;
+      this._syncing = true;
+      try {
+        remote = await cloud.loadState();
+      } finally {
+        this._syncing = false;
+      }
       if (remote) {
         this.state = remote;
         this._migrate();
@@ -574,17 +667,19 @@ export const store = {
   // 用户点了恢复邮件链接后，设置新密码并登录。
   // 和 login() 一样：网络步骤全部成功、拿到云端存档后才认这个账号；中途失败就撤掉会话。
   async applyNewPassword(recovery, newPassword) {
-    cloud.applyRecoverySession(recovery);
+    cloud.applyRecoverySession(recovery, { pending: true });
     let remote;
     try {
       await cloud.updatePassword(newPassword);
       await cloud.fetchUser();
       remote = await cloud.loadState();
     } catch (e) {
-      await cloud.signOut();
+      await cloud.signOut();   // 会话还只在内存里：作废链接里的令牌，不碰 localStorage
+      cloud.dropPendingSession();
       this._refreshAccount();
       throw e;
     }
+    cloud.commitSession();
     this._startupSync = false;
     this._refreshAccount();
     await this._takeAccount(remote, this.account?.email || '');

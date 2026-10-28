@@ -480,11 +480,14 @@ async function consumeAuthCallback() {
   // 不会再拿同一个链接登录一遍，两个标签页互相触发、无限刷新。
   history.replaceState(null, '', '#');
   try {
-    cloud.applyRecoverySession({ access_token, refresh_token });
+    // 会话先放内存，拿到账号信息后一次写进 localStorage：别的标签页只会看到一个完整的登录
+    cloud.applyRecoverySession({ access_token, refresh_token }, { pending: true });
     await cloud.fetchUser();
+    cloud.commitSession();
     store._refreshAccount();
     await store.syncFromCloud();
   } catch (e) {
+    cloud.dropPendingSession();
     console.warn('Auth callback failed:', e.message);
   }
   history.replaceState(null, '', '#');

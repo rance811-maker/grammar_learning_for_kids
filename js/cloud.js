@@ -26,7 +26,12 @@ export function friendlyError(err) {
 }
 
 // --- 会话存取（localStorage） ---
+// 邮件链接（找回密码、注册确认）带来的会话先只放在内存里，确认账号信息和云端存档都取到了
+// 才写进 localStorage（commitSession）。中途刷新、关页面，不会留下一个半截的登录。
+let pendingSession = null;
+
 function readSession() {
+  if (pendingSession) return pendingSession;
   try {
     return JSON.parse(localStorage.getItem(SESSION_KEY));
   } catch {
@@ -34,6 +39,7 @@ function readSession() {
   }
 }
 function writeSession(s) {
+  if (pendingSession) { pendingSession = s; return; }
   try {
     if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s));
     else localStorage.removeItem(SESSION_KEY);
@@ -174,14 +180,27 @@ export const cloud = {
     return authFetch(`/recover${q}`, { body: { email } });
   },
 
-  // 用户点了邮件里的恢复链接后，把链接里的 token 作为当前会话。
-  applyRecoverySession({ access_token, refresh_token }) {
-    writeSession({
+  // 用户点了邮件里的链接后，把链接里的 token 作为当前会话。pending=true 时只放在内存里，
+  // 等 commitSession() 再落盘。
+  applyRecoverySession({ access_token, refresh_token }, { pending = false } = {}) {
+    const s = {
       access_token,
       refresh_token: refresh_token || '',
       expires_at: Date.now() + 3600 * 1000,
       user: { id: '', email: '', display_name: '', created_at: '' },
-    });
+    };
+    if (pending) { pendingSession = s; return; }
+    writeSession(s);
+  },
+
+  commitSession() {
+    const s = pendingSession;
+    pendingSession = null;
+    if (s) writeSession(s);
+  },
+
+  dropPendingSession() {
+    pendingSession = null;
   },
 
   // 修改当前登录用户的密码（用于找回流程的"设置新密码"）。
