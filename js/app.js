@@ -21,7 +21,7 @@ import { initPwa, mountInstallHint } from './pwa.js';
 import { initAnalytics, trackView } from './analytics.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20261027a';
+const BUILD_VERSION = '20261029a';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -284,7 +284,7 @@ function renderSidebar(route) {
     ? `<span class="sidebar__account-name"><span class="sidebar__account-icon">☁️</span><span class="sidebar__account-text"> ${escapeHtml(store.account.name)}</span></span>
        <span class="sidebar__account-role">当前家长账号登录中</span>`
     : `<span class="sidebar__account-name"><span class="sidebar__account-icon">👤</span><span class="sidebar__account-text"> ${store.sessionExpired() ? '重新登录' : '登录 / 注册'}</span></span>
-       <span class="sidebar__account-role">${store.sessionExpired() ? '登录已过期' : '注册后开始学习'}</span>`;
+       ${store.sessionExpired() ? '<span class="sidebar__account-role">登录已过期</span>' : ''}`;
 
   const currTitle = curriculum.getActiveTitle();
   const currIsBuiltIn = curriculum.isBuiltIn();
