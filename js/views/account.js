@@ -1,5 +1,6 @@
 import { store } from '../store.js';
 import { cloudEnabled, friendlyError } from '../cloud.js';
+import { takeReturn } from './gate.js';
 
 export function render(sub) {
   // 云端未配置：只能本机使用。
@@ -54,20 +55,23 @@ export function render(sub) {
           <div class="account-status">☁️ 已登录 · 自动同步中</div>
           ${email ? `<div class="account-hint">邮箱：${escapeHtml(email)}</div>` : ''}
           <button class="btn btn--secondary" id="logoutBtn" style="margin-top:var(--space-md);">退出登录</button>
-          <p class="account-hint">退出后这台设备会回到"访客模式"。</p>
+          <p class="account-hint">退出后这台设备上只能看示例，重新登录就能接着学。</p>
         </div>
       </div>`;
   }
 
-  // 未登录：访客 + 登录/注册/忘记密码。
+  // 未登录：登录/注册/忘记密码。#account/register 直接打开注册。
+  const local = store.hasLocalProgress();
   return `
     <div class="view view-account">
       <div class="account-card">
-        <div class="account-card__icon">🚀</div>
-        <div class="account-card__title">访客模式</div>
+        <div class="account-card__icon">${store.sessionExpired() ? '🔑' : '🚀'}</div>
+        <div class="account-card__title">${store.sessionExpired() ? '登录已过期，请重新登录' : '注册后开始学习'}</div>
         <p class="account-card__desc">
-          现在你正在以访客身份学习，随时可以玩，进度保存在这台设备上。
-          想在别的设备上也能接着学？登录一个账号吧！
+          ${store.sessionExpired()
+            ? '重新登录就能接着学。这台设备上还没上传的记录，登录后会一起同步到云端。'
+            : `免费注册，只要一个家长邮箱。学习进度自动存到云端，手机、平板、电脑登录同一个账号都能接着学。
+          ${local ? '<br>这台设备上以前做过的练习还在，注册后会一起带进新账号。' : ''}`}
         </p>
       </div>
 
@@ -94,9 +98,7 @@ export function render(sub) {
 
         <button class="btn btn--primary account-submit" id="accSubmit">登录</button>
         <button class="account-link" id="forgotLink" type="button">忘记密码？</button>
-        <p class="account-hint" id="accHint">
-          登录后，这台设备会切换成你账号里保存的进度。
-        </p>
+        <p class="account-hint" id="accHint">${loginHint()}</p>
       </div>
     </div>`;
 }
@@ -106,7 +108,7 @@ export function mount(sub) {
 
   if (sub === 'reset') return mountReset();
   if (store.isLoggedIn() && store.account) return mountLoggedIn();
-  mountAuthForm();
+  mountAuthForm(sub === 'register' ? 'register' : 'login');
 }
 
 function mountReset() {
@@ -154,16 +156,32 @@ function mountLoggedIn() {
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
-      if (confirm('确定要退出登录吗？这台设备会回到访客模式。')) {
-        await store.logout();
-        location.hash = '';
-        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      if (!confirm('确定要退出登录吗？退出后这台设备上只能看示例，重新登录就能接着学。')) return;
+      logoutBtn.disabled = true;
+      let res = await store.logout();
+      if (res.unsynced) {
+        // 还有练习没传上云端（断网或登录过期）：退出后这台设备上的这些记录就看不到了
+        if (!confirm('还有学习记录没能存到云端（网络不通或登录已过期）。现在退出，这些记录会从这台设备上移走（留有备份，但换设备看不到）。\n\n建议先联网、或重新登录一次再退出。仍然要退出吗？')) {
+          logoutBtn.disabled = false;
+          return;
+        }
+        res = await store.logout({ force: true });
       }
+      location.hash = '';
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
     });
   }
 }
 
-function mountAuthForm() {
+// 登录提示：这台设备上有没注册时做的练习，要说清楚登录已有账号会换成账号里的进度
+function loginHint() {
+  return store.hasLocalProgress()
+    ? '登录已有账号后，这台设备会换成账号里的进度；以前没注册时做的练习不会并进去（想保留，请注册新账号）。'
+    : '登录后，这台设备会切换成你账号里保存的进度。';
+}
+const registerLabel = () => (store.hasLocalProgress() ? '注册并带上本机进度' : '注册');
+
+function mountAuthForm(initialMode) {
   const tabs = document.querySelectorAll('.account-tab');
   const submitBtn = document.getElementById('accSubmit');
   const hint = document.getElementById('accHint');
@@ -186,14 +204,15 @@ function mountAuthForm() {
     mode = next;
     tabs.forEach(t => t.classList.toggle('account-tab--active', t.dataset.tab === mode));
     nameField.style.display = mode === 'register' ? '' : 'none';
-    submitBtn.textContent = mode === 'login' ? '登录' : '注册并保存进度';
+    submitBtn.textContent = mode === 'login' ? '登录' : registerLabel();
     hint.textContent = mode === 'login'
-      ? '登录后，这台设备会切换成你账号里保存的进度。'
-      : '注册后，当前这台设备上的学习进度会一起带进新账号。';
+      ? loginHint()
+      : (store.hasLocalProgress() ? '注册后，这台设备上以前做过的练习会一起带进新账号。' : '注册后先做 12 道题摸底，生成你自己的学习计划。');
     showMsg('');
   }
 
   tabs.forEach(t => t.addEventListener('click', () => setMode(t.dataset.tab)));
+  if (initialMode === 'register') setMode('register');
 
   async function submit() {
     const name = (nameInput.value || '').trim();
@@ -212,19 +231,23 @@ function mountAuthForm() {
         if (res.needsConfirm) {
           showMsg('注册成功！我们给 ' + email + ' 发了一封确认邮件，请点开邮件里的链接，然后回来登录。', 'ok');
           submitBtn.disabled = false;
-          submitBtn.textContent = '注册并保存进度';
+          submitBtn.textContent = registerLabel();
           return;
         }
       } else {
         await store.login(email, pass);
       }
       showMsg('成功！正在进入…', 'ok');
-      location.hash = '';
+      // 回到注册前想去的页面（家长专区、摸底）；新账号回首页会自动进摸底
+      let back = takeReturn();
+      // 已经做过摸底的账号不再送进摸底（重做会重排学习计划）
+      if (back.split('/')[0] === 'placement' && !store.isPlacementNeeded()) back = '';
+      location.hash = back;
       window.dispatchEvent(new HashChangeEvent('hashchange'));
     } catch (e) {
       showMsg(friendlyError(e), 'error');
       submitBtn.disabled = false;
-      submitBtn.textContent = mode === 'login' ? '登录' : '注册并保存进度';
+      submitBtn.textContent = mode === 'login' ? '登录' : registerLabel();
     }
   }
 

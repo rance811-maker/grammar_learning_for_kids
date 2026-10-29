@@ -10,7 +10,7 @@ const SITE = '<span class="inst-url">www.grammar-quest.net</span>';
 
 // iPhone 上桌面图标和 Safari 各存各的数据（系统规定，网站改不了），不说清楚家长会以为进度丢了
 const IOS_STORAGE_NOTE = `
-  <p class="inst-warn"><strong>先登录再添加。</strong>苹果设备上，桌面图标和 Safari 各存各的学习记录。先在「账号」里登录家长账号，从桌面图标打开后再登录一次，进度就接上了；没登录的话，桌面图标里会从摸底测试重新开始。</p>`;
+  <p class="inst-warn"><strong>先登录再添加。</strong>苹果设备上，桌面图标和 Safari 各存各的学习记录。先在「账号」里登录家长账号，从桌面图标打开后再登录一次，进度就接上了；没登录的话，桌面图标里只能看示例数据，登录后才能接着学。</p>`;
 
 const GUIDES = {
   inapp: {

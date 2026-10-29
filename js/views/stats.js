@@ -102,7 +102,7 @@ export function render() {
 
     weakHtml = `
       <div class="weakness-section">
-        <div class="weakness-section__title">⚠️ 我的弱点</div>
+        <div class="weakness-section__title">⚠️ ${store.isDemo() ? 'TA 的弱点' : '我的弱点'}</div>
         ${weakItems}
       </div>`;
   }

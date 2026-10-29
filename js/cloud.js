@@ -20,12 +20,18 @@ export function friendlyError(err) {
   if (raw.includes('unable to validate email') || raw.includes('invalid email') || raw.includes('invalid format')) return '邮箱格式不太对，检查一下～';
   if (raw.includes('email not confirmed')) return '邮箱还没确认，请先去邮箱点确认链接～';
   if (raw.includes('for security purposes') || raw.includes('rate limit') || raw.includes('too many')) return '操作太频繁啦，等一小会儿再试～';
-  if (raw.includes('failed to fetch') || raw.includes('networkerror')) return '网络连接不上，检查一下网络再试试～';
+  if (raw.includes('failed to fetch') || raw.includes('networkerror') || raw === 'network') return '网络连接不上，检查一下网络再试试～';
+  if (raw.includes('no_session')) return '登录已过期，请重新登录～';
   return '出了点小问题，请稍后再试';
 }
 
 // --- 会话存取（localStorage） ---
+// 邮件链接（找回密码、注册确认）带来的会话先只放在内存里，确认账号信息和云端存档都取到了
+// 才写进 localStorage（commitSession）。中途刷新、关页面，不会留下一个半截的登录。
+let pendingSession = null;
+
 function readSession() {
+  if (pendingSession) return pendingSession;
   try {
     return JSON.parse(localStorage.getItem(SESSION_KEY));
   } catch {
@@ -33,6 +39,7 @@ function readSession() {
   }
 }
 function writeSession(s) {
+  if (pendingSession) { pendingSession = s; return; }
   try {
     if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s));
     else localStorage.removeItem(SESSION_KEY);
@@ -70,7 +77,9 @@ async function authFetch(path, { method = 'POST', body, token } = {}) {
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   if (!res.ok) {
     const msg = (data && (data.msg || data.error_description || data.error || data.message)) || text || `HTTP ${res.status}`;
-    throw new Error(msg);
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
   }
   return data;
 }
@@ -85,13 +94,16 @@ async function validAccessToken() {
   let r;
   try {
     r = await authFetch('/token?grant_type=refresh_token', { body: { refresh_token: s.refresh_token } });
-  } catch {
-    // 续期失败：token 被轮换掉、已过期、或在别处登录导致这份失效。
+  } catch (e) {
+    // 断网、连不上 supabase.co、服务器 5xx / 限流：令牌并没有被拒，留着会话，等网络好了再续。
+    // 以前这里一律清会话——现在网站要登录才能用，一次网络抖动就会把人踢出去。
+    if (!e || !e.status || e.status >= 500 || e.status === 429) throw new Error('NETWORK');
+    // 续期被拒：token 被轮换掉、已过期、或在别处登录导致这份失效。
     //
     // 关键是必须把这份坏 session 清掉。留着它的话，之后每一次请求都会以
     // 同样的方式失败（界面上是一句 "Invalid Refresh Token" 加一个重试按钮，
     // 而重试永远不可能成功），用户除了自己去清 localStorage 别无出路。
-    // 清掉之后退回访客模式，由上层提示重新登录——数据在云端，登录即可取回。
+    // 清掉之后由上层提示重新登录——数据在云端，登录即可取回。
     writeSession(null);
     throw new Error('NO_SESSION');
   }
@@ -168,14 +180,27 @@ export const cloud = {
     return authFetch(`/recover${q}`, { body: { email } });
   },
 
-  // 用户点了邮件里的恢复链接后，把链接里的 token 作为当前会话。
-  applyRecoverySession({ access_token, refresh_token }) {
-    writeSession({
+  // 用户点了邮件里的链接后，把链接里的 token 作为当前会话。pending=true 时只放在内存里，
+  // 等 commitSession() 再落盘。
+  applyRecoverySession({ access_token, refresh_token }, { pending = false } = {}) {
+    const s = {
       access_token,
       refresh_token: refresh_token || '',
       expires_at: Date.now() + 3600 * 1000,
       user: { id: '', email: '', display_name: '', created_at: '' },
-    });
+    };
+    if (pending) { pendingSession = s; return; }
+    writeSession(s);
+  },
+
+  commitSession() {
+    const s = pendingSession;
+    pendingSession = null;
+    if (s) writeSession(s);
+  },
+
+  dropPendingSession() {
+    pendingSession = null;
   },
 
   // 修改当前登录用户的密码（用于找回流程的"设置新密码"）。
@@ -219,14 +244,14 @@ export const cloud = {
   // 保存学习数据（upsert 到 gq_profiles）。
   async saveState(state) {
     const u = readSession() && readSession().user;
-    if (!u || !u.id) return;
+    // 会话没了不能悄悄当成「存好了」：抛出去，上层会提示、并记着这些改动还没上传
+    if (!u || !u.id) throw new Error('NO_SESSION');
     await restFetch('/gq_profiles', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: [{ id: u.id, state, updated_at: new Date().toISOString() }],
     });
-    // 上传成功，本机不再有"未上传的改动"（标记由 store.save 写入）
-    try { localStorage.removeItem('gq-dirty'); } catch { /* ignore */ }
+    // 「本机有没上传的改动」标记由 store 在确认上传期间没有新改动后再清（见 store._pushNow）
   },
 
   async loadParentPin() {
@@ -238,7 +263,7 @@ export const cloud = {
 
   async saveParentPin(hash) {
     const u = readSession() && readSession().user;
-    if (!u || !u.id) return;
+    if (!u || !u.id) throw new Error('NO_SESSION');
     await restFetch('/gq_profiles', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },

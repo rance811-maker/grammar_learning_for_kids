@@ -15,12 +15,13 @@ import * as syllabus from './views/syllabus.js';
 import * as feedback from './views/feedback.js';
 import * as about from './views/about.js';
 import * as install from './views/install.js';
+import * as gate from './views/gate.js';
 import { curriculum } from './curriculum.js';
 import { initPwa, mountInstallHint } from './pwa.js';
 import { initAnalytics, trackView } from './analytics.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20260621k';
+const BUILD_VERSION = '20261029a';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -56,6 +57,12 @@ const routes = {
   'install': install,
 };
 
+// 没登录时这些页面要先注册（看示例可以，用不行）。其余页面照常打开，显示示例数据。
+const GATED_ROUTES = new Set(['practice', 'discover', 'mission', 'placement', 'parent']);
+
+// 这些页面本身不展示学习数据，不挂「示例数据」横条
+const NO_DEMO_BANNER = new Set(['account', 'about', 'feedback', 'install']);
+
 const titles = {
   '': '学习地图',
   'unit': '关卡详情',
@@ -80,6 +87,9 @@ function router() {
   const route = parts[0] || '';
   const params = parts.slice(1);
 
+  // 会话在别处没了（另一个标签页退出、续期被拒）：缓存的账号也作废，下面按没登录处理
+  if (store.account && cloud.cloudEnabled() && !cloud.hasSession()) store._refreshAccount();
+
   if (route === '' && store.isPlacementNeeded()) {
     location.hash = 'placement';
     return;
@@ -97,14 +107,20 @@ function router() {
     return;
   }
 
-  const content = view.render(...params);
-  app.innerHTML = renderShell(route, content);
+  const gated = store.isDemo() && GATED_ROUTES.has(route);
+  // 登录后要回去的页面只在「引导页 → 登录页」这一路上有效；中途去看别的页面就作废
+  if (gated) gate.rememberReturn(route, params);
+  else if (route !== 'account') gate.clearReturn();
+  const content = gated ? gate.render(route) : view.render(...params);
+  app.innerHTML = renderShell(route, content, gated);
 
-  if (view.mount) {
+  if (!gated && view.mount) {
     view.mount(...params);
   }
   if (route === '') mountInstallHint(app.querySelector('.content > .view') || app.querySelector('.content'));
-  trackView(route, params);
+  // 被拦下的记成 gate，不记成原页面：后台漏斗里「开始摸底」只该数真正进了摸底的人
+  if (gated) trackView('gate', [route, ...params]);
+  else trackView(route, params);
 
   mountNav();
   mountBackButton();
@@ -137,7 +153,7 @@ function activeNavRoute(route) {
   return ['review', 'portfolio', 'stats', 'parent', 'feedback'].includes(route) ? route : '';
 }
 
-function renderShell(route, content) {
+function renderShell(route, content, gated = false) {
   const topLevelRoutes = ['', 'review', 'portfolio', 'stats', 'account', 'parent', 'about', 'feedback'];
   const showBackBtn = !topLevelRoutes.includes(route);
   const title = titles[route] || 'Grammar Quest';
@@ -154,8 +170,33 @@ function renderShell(route, content) {
           <h1 class="topbar__title">${title}</h1>
           <span class="topbar__spacer"></span>
         </header>
-        <main class="content">${content}</main>
+        <main class="content">${store.isDemo() && !gated && !NO_DEMO_BANNER.has(route) ? renderDemoBanner() : ''}${content}</main>
       </div>
+    </div>`;
+}
+
+// 没登录时每一页顶上的说明：现在看到的进度、错题、作品都是编的示例。
+// 这台设备上以前（没注册时）做过练习的，告诉他记录还在，注册或登录就能接着学。
+function renderDemoBanner() {
+  if (store.sessionExpired()) {
+    return `
+    <div class="demo-banner" role="note">
+      <span class="demo-banner__text">🔑 <strong>登录已过期</strong>，现在显示的是示例数据。重新登录就能接着学，这台设备上还没上传的记录会一起同步。</span>
+      <span class="demo-banner__actions">
+        <a class="btn btn--primary demo-banner__btn" href="#account">重新登录</a>
+      </span>
+    </div>`;
+  }
+  const text = store.hasLocalProgress()
+    ? '<strong>这是示例数据</strong>，不是你的记录。你在这台设备上做过的练习还在：注册新账号会一起带进去（登录已有账号则换成账号里的进度）。'
+    : '<strong>这是示例数据</strong>：一位同学学了 10 天的样子，不是你的记录。注册后先做摸底，生成你自己的学习计划。';
+  return `
+    <div class="demo-banner" role="note">
+      <span class="demo-banner__text">👀 ${text}</span>
+      <span class="demo-banner__actions">
+        <a class="btn btn--primary demo-banner__btn" href="#account/register">免费注册</a>
+        <a class="demo-banner__login" href="#account">登录</a>
+      </span>
     </div>`;
 }
 
@@ -206,7 +247,7 @@ function renderSiteWhatPop() {
       </p>
       <ul class="siteband__pop-list">
         <li>先做 12 道题摸底，学习计划按结果排，不是所有孩子都从第一单元开始</li>
-        <li>内置 PET、雅思 6 分、雅思 7 分三套课程，打开就能用</li>
+        <li>内置 PET、雅思 6 分、雅思 7 分三套课程，免费注册就能用</li>
         <li>写作由 AI 逐句批改，指出错在哪、为什么错</li>
       </ul>
       <a class="siteband__pop-more" href="#about">看完整介绍 ›</a>
@@ -236,13 +277,14 @@ function renderSidebar(route) {
   const rank = RANKS[p.rank] || RANKS.bronze;
   // 图标和文字分开包：手机上导航条是一行图标，账号块只留图标，
   // 否则名字加一行小字会把它挤出屏幕，只露半个字。
-  const loggedIn = store.isLoggedIn();
+  const loggedIn = store.isLoggedIn() && !store.isDemo();
+  const demo = store.isDemo();
   const accountLabel = loggedIn ? `账号：${store.account.name}` : '登录 / 注册';
   const accountLine = loggedIn
     ? `<span class="sidebar__account-name"><span class="sidebar__account-icon">☁️</span><span class="sidebar__account-text"> ${escapeHtml(store.account.name)}</span></span>
        <span class="sidebar__account-role">当前家长账号登录中</span>`
-    : `<span class="sidebar__account-name"><span class="sidebar__account-icon">👤</span><span class="sidebar__account-text"> 登录 / 注册</span></span>
-       <span class="sidebar__account-role">登录后可跨设备同步</span>`;
+    : `<span class="sidebar__account-name"><span class="sidebar__account-icon">👤</span><span class="sidebar__account-text"> ${store.sessionExpired() ? '重新登录' : '登录 / 注册'}</span></span>
+       ${store.sessionExpired() ? '<span class="sidebar__account-role">登录已过期</span>' : ''}`;
 
   const currTitle = curriculum.getActiveTitle();
   const currIsBuiltIn = curriculum.isBuiltIn();
@@ -260,11 +302,11 @@ function renderSidebar(route) {
         <div class="sidebar__account-panel">
           <button class="sidebar__account" data-route="account"
                   aria-label="${escapeHtml(accountLabel)}" title="${escapeHtml(accountLabel)}">${accountLine}</button>
-          <div class="sidebar__stats">
+          ${demo ? '' : `<div class="sidebar__stats">
             <span class="sidebar__stat sidebar__stat--rank">${rank.icon} ${rank.name}</span>
             <span class="sidebar__stat sidebar__stat--score">⭐ ${p.totalScore} 积分</span>
             <span class="sidebar__stat sidebar__stat--streak">🔥 连续 ${p.currentStreak} 天</span>
-          </div>
+          </div>`}
         </div>
       </div>
     </aside>`;
@@ -293,12 +335,22 @@ function mountCloudSaveBanner() {
       if (el) el.remove();
       return;
     }
-    if (el) return;                       // 同一轮失败不重复弹
+    const kind = e.detail && e.detail.expired ? 'expired' : 'network';
+    if (el && el.dataset.kind === kind) return;   // 同一轮失败不重复弹
+    if (el) el.remove();                          // 原因变了（断网 → 登录过期），换成新的说法
 
     el = document.createElement('div');
     el.id = 'cloudSaveBanner';
     el.className = 'cloud-banner';
-    el.innerHTML = `
+    el.dataset.kind = kind;
+    el.innerHTML = e.detail && e.detail.expired
+      ? `
+      <span class="cloud-banner__text">
+        ⚠️ 登录已过期，最新的学习记录还没存到云端。
+        <strong>数据还在这台设备上，没有丢</strong>，<a href="#account">重新登录</a>后会自动上传。
+      </span>
+      <button class="cloud-banner__close" aria-label="关闭">✕</button>`
+      : `
       <span class="cloud-banner__text">
         ⚠️ 学习记录没能存到云端（已自动重试 3 次）。
         <strong>数据还在这台设备上，没有丢</strong>，但现在换设备登录会看不到最新进度。
@@ -424,16 +476,34 @@ async function consumeAuthCallback() {
   }
 
   // 邮箱确认 / 魔法链接：直接登录并回到首页。
+  // 先把令牌从地址栏拿掉（在任何 await 之前）：另一个标签页的存储事件让这个页面重新加载时，
+  // 不会再拿同一个链接登录一遍，两个标签页互相触发、无限刷新。
+  history.replaceState(null, '', '#');
   try {
-    cloud.applyRecoverySession({ access_token, refresh_token });
+    // 会话先放内存，拿到账号信息后一次写进 localStorage：别的标签页只会看到一个完整的登录
+    cloud.applyRecoverySession({ access_token, refresh_token }, { pending: true });
     await cloud.fetchUser();
+    cloud.commitSession();
     store._refreshAccount();
     await store.syncFromCloud();
   } catch (e) {
+    cloud.dropPendingSession();
     console.warn('Auth callback failed:', e.message);
   }
   history.replaceState(null, '', '#');
 }
+
+// 另一个标签页登录 / 退出 / 换了账号：这个标签页整页重新加载。
+// 不能就地重读本机存档——那一刻另一个标签页多半还没把账号进度写进来，读到的是旧存档，
+// 接着一保存就会把它当成账号进度传上去。重新加载走正常的启动同步，以云端为准。
+window.addEventListener('storage', (e) => {
+  if (e.key !== 'gq-session' && e.key !== null) return;
+  const before = store.account && store.account.userId;
+  const u = cloud.currentUser();
+  if (u && !u.id) return;   // 另一个标签页正在用确认链接登录，还没拿到账号信息
+  const after = (u && u.id) || null;
+  if ((before || null) !== after) location.reload();
+});
 
 // Initialize
 store.init();
@@ -448,11 +518,16 @@ consumeAuthCallback().then(() => {
   // once it arrives (the local cached copy was already shown above).
   if (store.isLoggedIn()) {
     store.syncFromCloud().then(changed => {
+      // 续期被拒、被踢回没登录：页面是按登录状态渲染的，可 store.state 已经改指示例数据，
+      // 再让孩子做下去，结果全写进内存里的示例、一刷新就没。马上重跑路由，换成登录引导。
+      if (store.isDemo()) { router(); return; }
       if (!changed) return;
       // 正在答题/摸底时不要重跑路由：那会新建一场会话，孩子眼前的题突然换掉。
       const r = (location.hash.slice(1) || '').split('/')[0];
       if (r === 'practice' || r === 'placement') return;
       router();
     });
+  } else {
+    store._startupSync = false;
   }
 });

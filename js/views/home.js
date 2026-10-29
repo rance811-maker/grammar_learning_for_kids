@@ -28,7 +28,8 @@ const CHEERS = [
 /** 从起始日期算到今天是第几天（含起始当天，所以最小是 1）。 */
 function daysSince(dateStr) {
   if (!dateStr) return 1;
-  const start = new Date(dateStr);
+  // 只有日期的字符串按本地零点算（new Date('2026-10-18') 是 UTC 零点，西半球会多算一天）
+  const start = new Date(/^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? `${dateStr}T00:00:00` : dateStr);
   if (Number.isNaN(start.getTime())) return 1;
   const d0 = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
   const now = new Date();
@@ -48,16 +49,20 @@ function renderHeader(player) {
   const day = daysSince(store.account?.createdAt || store.state.startedAt);
   const cheer = CHEERS[day % CHEERS.length];
 
-  const greet = name ? `亲爱的 ${escapeHtml(name)}，` : '亲爱的同学，';
-  const sinceLine = name
-    ? `这是你注册 Grammar Quest 并学习的第 <strong>${day}</strong> 天。`
-    : `这是你使用 Grammar Quest 的第 <strong>${day}</strong> 天。`;
+  // 没登录时首页是示例数据，别对着看的人说「这是你学习的第 10 天」
+  const demo = store.isDemo();
+  const greet = demo ? '示例同学的学习地图' : name ? `亲爱的 ${escapeHtml(name)}，` : '亲爱的同学，';
+  const sinceLine = demo
+    ? `这是 TA 学习的第 <strong>${day}</strong> 天。注册后，这里会换成你自己的进度。`
+    : name
+      ? `这是你注册 Grammar Quest 并学习的第 <strong>${day}</strong> 天。`
+      : `这是你使用 Grammar Quest 的第 <strong>${day}</strong> 天。`;
 
   return `
     <div class="home-header">
       <div class="home-header__hello">
         <div class="home-header__greet">${greet}</div>
-        <div class="home-header__sub">${sinceLine}${cheer}</div>
+        <div class="home-header__sub">${sinceLine}${demo ? '' : cheer}</div>
       </div>
       <a class="status-strip" href="#stats" title="查看完整进度">
         <span class="status-strip__item">${rank.icon} ${rank.name}</span>

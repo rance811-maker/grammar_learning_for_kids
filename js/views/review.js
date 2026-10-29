@@ -62,7 +62,7 @@ export function render() {
 
     weakHtml = `
       <div class="weakness-section mb-lg">
-        <div class="weakness-section__title">⚠️ 我的薄弱点</div>
+        <div class="weakness-section__title">⚠️ ${store.isDemo() ? 'TA 的薄弱点' : '我的薄弱点'}</div>
         ${items}
       </div>`;
   }
@@ -75,11 +75,11 @@ export function render() {
         <div style="font-size:2.5rem;margin-bottom:var(--space-sm);">🎯</div>
         <div style="font-weight:700;font-size:1.1rem;margin-bottom:var(--space-xs);">专项复习</div>
         <div style="font-size:var(--text-sm);color:var(--color-text-light);margin-bottom:var(--space-md);">
-          系统会优先挑出你的错题和薄弱语法点，集中突破。
+          ${store.isDemo() ? '系统会优先挑出示例同学的错题和薄弱语法点，集中突破。注册后复习的是你自己的。' : '系统会优先挑出你的错题和薄弱语法点，集中突破。'}
         </div>
         <button class="btn btn--primary btn--large" id="startReviewBtn"
                 style="width:100%;font-size:1rem;padding:var(--space-md);">
-          开始复习我的薄弱点
+          ${store.isDemo() ? '注册后复习你的薄弱点' : '开始复习我的薄弱点'}
         </button>
       </div>`
     : `
