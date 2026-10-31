@@ -147,6 +147,34 @@ export const cloud = {
     return restFetch(`/rpc/${name}`, { method: 'POST', body: args });
   },
 
+  // 调用云函数（Supabase Edge Function），用当前登录用户的身份。
+  // 失败时抛出的错误带 status 和 code（云函数返回的 error 字段），调用方按它们给提示。
+  async invokeFunction(name, body, { timeoutMs = 90000 } = {}) {
+    const token = await validAccessToken();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let res;
+    try {
+      res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      const e = new Error((data && data.error) || `HTTP ${res.status}`);
+      e.status = res.status;
+      e.code = (data && data.error) || '';
+      e.data = data;
+      throw e;
+    }
+    return data;
+  },
+
   // 注册。confirmed=true 表示已直接登录（项目关闭了邮箱确认）；
   // confirmed=false 表示需要去邮箱点确认链接后才能登录。
   async signUp(email, password, displayName) {

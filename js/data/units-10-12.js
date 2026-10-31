@@ -148,7 +148,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把左右两边正确配对",
+          instruction: "左边是句子开头，右边是后半句。右边有的用 to，有的用 -ing。把它们连成正确的句子。",
           left: [
             "I enjoy",
             "I want",
@@ -176,7 +176,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把动词和它后面正确的形式配对",
+          instruction: "左边每个词后面，该接 -ing 还是 to？从右边选一个接上去。",
           left: ["enjoy", "hope", "be good at", "plan"],
           right: ["dancing", "to win", "singing", "to travel"],
           correctPairs: [[0, 0], [1, 1], [2, 2], [3, 3]],
@@ -683,7 +683,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把直接引语和正确的转述配对",
+          instruction: "左边是他的原话，右边是别人转告时的说法。把说同一件事的两句连起来。",
           left: [
             "'I am happy.'",
             "'I will help you.'",
@@ -711,7 +711,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把时间/地点词的直接和转述形式配对",
+          instruction: "左边的词出现在原话里。转告别人时，这些词要换掉。每个词换成右边哪一个？连起来。",
           left: ["now", "today", "here", "tomorrow"],
           right: ["there", "the next day", "then", "that day"],
           correctPairs: [[0, 2], [1, 3], [2, 0], [3, 1]],
@@ -729,7 +729,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把 say 和 tell 的正确用法配对",
+          instruction: "左边是句子开头，右边是后半句。注意 told 和 said 后面接的不一样。把它们连成正确的句子。",
           left: ["He told", "She said", "They told", "I said"],
           right: ["that it was late.", "us a secret.", "me the answer.", "that I was sorry."],
           correctPairs: [[0, 2], [1, 0], [2, 1], [3, 3]],
@@ -1236,7 +1236,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把名词和正确的数量词配对",
+          instruction: "左边是四个名词，右边是 much 和 many。每个名词前面该用哪个？把它们连起来，右边的词可以连好几个。",
           left: ["apples", "water", "books", "sugar"],
           right: [
             "much<br><small style='opacity:.65'>许多 · 不可数名词</small>",
@@ -1257,7 +1257,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把句子开头和正确的数量词配对",
+          instruction: "左边是句子开头，右边是后半句。想想 any、some、many、much 后面能接什么，把它们连成正确的句子。",
           left: [
             "Do you have any...",
             "I have some...",
@@ -1285,7 +1285,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把句子和正确的冠词配对",
+          instruction: "左边每句都缺一个词（___）。把每句连到右边能填进空格的那一项。",
           left: [
             "I saw ___ elephant.",
             "___ sun is very hot today.",
