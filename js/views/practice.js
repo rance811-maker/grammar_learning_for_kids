@@ -6,6 +6,7 @@ import { track } from '../analytics.js';
 import { displayForm, fillSentence } from '../fillAnswers.js';
 import { sound } from '../sound.js';
 import { confetti } from '../celebrate.js';
+import { scrollToStart } from '../scrollToStart.js';
 import { pregenerateVariants } from '../variantGenerator.js';
 import { skillName, skillEnglish, hasChineseName } from '../data/skill-names.js';
 
@@ -161,6 +162,8 @@ function renderCurrentQuestion() {
   area.innerHTML = renderQuestion(q);
   updateProgress();
   attachQuestionListeners(q);
+  // 上一题看反馈时页面多半滚到了下面：新题从开头显示
+  scrollToStart(area);
 }
 
 function renderQuestion(q) {
@@ -1028,6 +1031,7 @@ function showResults() {
           <button class="btn-secondary" id="resultRetry">重试</button>
         </div>
       </div>`;
+    scrollToStart(area);
   }
 
   // Hide feedback area
