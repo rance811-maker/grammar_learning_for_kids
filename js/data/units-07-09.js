@@ -167,7 +167,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "左边是四个 if 句子，右边是它们的类型。右边有名字相同的，要看下面的小字来分；右边每一项只连一句。",
+          instruction: "左边是四个 if 句子，右边是句子类型。右边有的名字一样，看下面的小字就能分清。右边每项只连一句。",
           left: [
             "If I see Tom, I will say hi.",
             "If I had a car, I would drive.",
@@ -753,7 +753,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "左边是四个句子，右边是它们的时态。右边有名字相同的，要看下面的小字来分；右边每一项只连一句。",
+          instruction: "左边是四个句子，右边是时态。右边有的名字一样，看下面的小字就能分清。右边每项只连一句。",
           left: [
             "The cake is eaten quickly.",
             "The cake was eaten yesterday.",
@@ -1237,7 +1237,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "左边是句子开头（以 who / which / where / whose 结尾），右边是剩下的部分。把它们连成完整的句子。",
+          instruction: "左边是句子开头，右边是后半句。按意思把它们连成完整的句子。",
           left: [
             "The man who",
             "The cake which",
@@ -1265,7 +1265,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把关系词和它的用法配对",
+          instruction: "左边是 who、which、where、whose。每个词用来指什么？连到右边的说明。",
           left: ["who", "which", "where", "whose"],
           right: [
             "for people",

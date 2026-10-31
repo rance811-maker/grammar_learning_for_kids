@@ -178,7 +178,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "左边是四个表示时间的词，右边是两种时态。把每个词连到常和它一起用的时态，一种时态可以连好几个。",
+          instruction: "左边是四个时间词，右边是两种时态。每个词常和哪种时态一起用？连起来。一种时态可以连好几个词。",
           left: ["every day", "right now", "at the moment", "usually"],
           right: [
             "Present Simple<br><small style='opacity:.65'>一般现在时</small>",
@@ -1221,7 +1221,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "左边的句子两两只差动词（have visited / visited，has lived / lived）。给每句连上右边能接上的后半句。",
+          instruction: "左边是前半句，右边是后半句。左边有两对很像的句子，每对只有动词不一样。看清动词，再给每句连上后半句。",
           left: [
             "I have visited Japan",
             "I visited Japan",

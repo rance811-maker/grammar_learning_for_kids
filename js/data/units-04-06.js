@@ -709,7 +709,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "左边的句子讲现在，右边讲过去。把每句和它改成过去后的说法连起来。",
+          instruction: "左边四句讲的是现在。如果改成讲过去，该怎么说？把每句连到右边对应的句子。",
           left: ["I can swim.", "She must leave.", "You can't come.", "We can play."],
           right: ["I could swim.", "She had to leave.", "You couldn't come.", "We could play."],
           correctPairs: [[0, 0], [1, 1], [2, 2], [3, 3]],
@@ -1183,7 +1183,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "左边四句都在讲将来，但想表达的不一样。把每句连到右边对应的说明上。",
+          instruction: "左边四句都在说以后的事，但说话人的意思不一样。看看每句是右边哪一种，连起来。",
           left: [
             "I'm meeting Tom at 6.",
             "I think it will snow.",

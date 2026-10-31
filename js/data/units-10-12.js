@@ -148,7 +148,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "左边是句子开头，右边是后半句，有的以 to 开头，有的是 -ing 形式。把它们连成正确的句子。",
+          instruction: "左边是句子开头，右边是后半句。右边有的用 to，有的用 -ing。把它们连成正确的句子。",
           left: [
             "I enjoy",
             "I want",
@@ -176,7 +176,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "右边的词要接在左边的词后面。想想每个词后面该跟 -ing 还是 to 开头的词，再连起来。",
+          instruction: "左边每个词后面，该接 -ing 还是 to？从右边选一个接上去。",
           left: ["enjoy", "hope", "be good at", "plan"],
           right: ["dancing", "to win", "singing", "to travel"],
           correctPairs: [[0, 0], [1, 1], [2, 2], [3, 3]],
@@ -683,7 +683,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把直接引语和正确的转述配对",
+          instruction: "左边是他的原话，右边是别人转告时的说法。把说同一件事的两句连起来。",
           left: [
             "'I am happy.'",
             "'I will help you.'",
@@ -711,7 +711,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "左边是原话里表示时间、地点的词，右边是转述时换成的说法。把对应的两个连起来。",
+          instruction: "左边的词出现在原话里。转告别人时，这些词要换掉。每个词换成右边哪一个？连起来。",
           left: ["now", "today", "here", "tomorrow"],
           right: ["there", "the next day", "then", "that day"],
           correctPairs: [[0, 2], [1, 3], [2, 0], [3, 1]],
@@ -729,7 +729,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "左边是句子开头，有的用 told，有的用 said；右边是后半句。把它们连成正确的句子。",
+          instruction: "左边是句子开头，右边是后半句。注意 told 和 said 后面接的不一样。把它们连成正确的句子。",
           left: ["He told", "She said", "They told", "I said"],
           right: ["that it was late.", "us a secret.", "me the answer.", "that I was sorry."],
           correctPairs: [[0, 2], [1, 0], [2, 1], [3, 3]],
@@ -1257,7 +1257,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "左边是带 any、some、many、much 的句子开头，右边是后半句。把它们连成正确的句子。",
+          instruction: "左边是句子开头，右边是后半句。想想 any、some、many、much 后面能接什么，把它们连成正确的句子。",
           left: [
             "Do you have any...",
             "I have some...",
