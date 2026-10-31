@@ -150,7 +150,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把左右两边正确配对",
+          instruction: "左边是句子开头，右边是后半句。留意右边动词的形式，把它们连成正确的句子。",
           left: [
             "She always...",
             "Listen! Someone...",
@@ -178,7 +178,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把时间标志词和对应的时态配对",
+          instruction: "左边是四个表示时间的词，右边是两种时态。把每个词连到常和它一起用的时态，一种时态可以连好几个。",
           left: ["every day", "right now", "at the moment", "usually"],
           right: [
             "Present Simple<br><small style='opacity:.65'>一般现在时</small>",
@@ -675,7 +675,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把左右两边正确配对",
+          instruction: "左边是句子开头，右边是后半句。按意思把它们连成完整的句子。",
           left: [
             "While she was sleeping,",
             "He ate breakfast and",
@@ -1221,7 +1221,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把左右两边正确配对",
+          instruction: "左边的句子两两只差动词（have visited / visited，has lived / lived）。给每句连上右边能接上的后半句。",
           left: [
             "I have visited Japan",
             "I visited Japan",

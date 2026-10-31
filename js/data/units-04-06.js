@@ -709,7 +709,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把现在的句子和它的过去式配对",
+          instruction: "左边的句子讲现在，右边讲过去。把每句和它改成过去后的说法连起来。",
           left: ["I can swim.", "She must leave.", "You can't come.", "We can play."],
           right: ["I could swim.", "She had to leave.", "You couldn't come.", "We could play."],
           correctPairs: [[0, 0], [1, 1], [2, 2], [3, 3]],
@@ -1183,7 +1183,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把句子和它表达的将来意义配对",
+          instruction: "左边四句都在讲将来，但想表达的不一样。把每句连到右边对应的说明上。",
           left: [
             "I'm meeting Tom at 6.",
             "I think it will snow.",
@@ -1239,7 +1239,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把情景和最合适的将来表达配对",
+          instruction: "左边是四个情景，右边是四句话。在每个情景里你会说哪一句？把它们连起来。",
           left: [
             "It's raining and you have no umbrella.",
             "You and friends agreed to meet at 7.",
