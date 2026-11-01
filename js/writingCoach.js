@@ -71,12 +71,25 @@ export function hasWritingCoach() {
   return hasApiKey() || (cloud.cloudEnabled() && cloud.hasSession());
 }
 
+// 免费批改的额度用完了。'daily_limit' 是按天计时期的旧错误码，留着兼容
+export function isQuotaError(e) {
+  return !!e && (e.code === 'limit_reached' || e.code === 'daily_limit');
+}
+
+// 额度按月还是按天，由云函数在 period 里说明（旧版云函数不带 period，是按天）
+export function quotaWords(period) {
+  return period === 'month'
+    ? { this: '本月', every: '每月', reset: '下个月 1 号恢复', defaultLimit: 5 }
+    : { this: '今天', every: '每天', reset: '明天再来', defaultLimit: 3 };
+}
+
 // 云函数的错误 → 给孩子 / 家长看的话（标成 friendly，friendlyAiError 原样透传）
 function cloudError(e) {
-  const friendly = (msg) => { const x = new Error(msg); x.friendly = true; x.code = e.code; return x; };
-  if (e.code === 'daily_limit') {
-    const n = (e.data && e.data.limit) || 3;
-    return friendly(`今天 ${n} 篇免费批改已经用完了，明天再来。家长也可以在「家长专区 → 学习设置 → AI 服务」配自己的 key，不限次数。`);
+  const friendly = (msg) => { const x = new Error(msg); x.friendly = true; x.code = e.code; x.data = e.data; return x; };
+  if (isQuotaError(e)) {
+    const p = quotaWords(e.data && e.data.period);
+    const n = (e.data && e.data.limit) || p.defaultLimit;
+    return friendly(`${p.this}的 ${n} 篇免费批改已经用完了，${p.reset}。家长也可以在「家长专区 → 学习设置 → AI 服务」配自己的 key，不限次数。`);
   }
   if (e.status === 401 || String(e.message).includes('NO_SESSION')) return friendly('登录已过期，请重新登录后再批改');
   if (e.code === 'not_configured') return friendly('批改服务暂时没开通，过一会儿再试');
@@ -103,7 +116,7 @@ export async function reviewWriting(lines, ctx = {}) {
     } catch (e) {
       throw cloudError(e);
     }
-    return { ...normalize(data, lines), remaining: data.remaining, limit: data.limit };
+    return { ...normalize(data, lines), remaining: data.remaining, limit: data.limit, period: data.period };
   }
 
   const body = lines

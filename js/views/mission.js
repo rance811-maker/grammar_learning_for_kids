@@ -1,6 +1,6 @@
 import { store } from '../store.js';
 import { curriculum } from '../curriculum.js';
-import { hasWritingCoach, reviewWriting, friendlyAiError } from '../writingCoach.js';
+import { hasWritingCoach, reviewWriting, friendlyAiError, isQuotaError, quotaWords } from '../writingCoach.js';
 
 let submitted = false;
 
@@ -257,11 +257,11 @@ async function runWritingReview(unitId, mission, scaffolds, userTexts) {
   } catch (e) {
     host.innerHTML = `
       <div class="card" style="border-left:3px solid var(--color-danger,#C1553A);">
-        <div style="font-weight:700;margin-bottom:4px;">${e && e.code === 'daily_limit' ? '今天的免费批改用完了' : '批改没跑成功'}</div>
+        <div style="font-weight:700;margin-bottom:4px;">${isQuotaError(e) ? `${quotaWords(e.data && e.data.period).this}的免费批改用完了` : '批改没跑成功'}</div>
         <div style="font-size:var(--text-sm);color:var(--color-text-light);">
           ${esc(friendlyAiError(e))}
         </div>
-        ${e && e.code === 'daily_limit' ? '' : '<button class="btn-secondary mt-sm" id="reviewRetryBtn">重试批改</button>'}
+        ${isQuotaError(e) ? '' : '<button class="btn-secondary mt-sm" id="reviewRetryBtn">重试批改</button>'}
       </div>`;
     document.getElementById('reviewRetryBtn')?.addEventListener('click', () => {
       runWritingReview(unitId, mission, scaffolds, userTexts);
@@ -324,11 +324,13 @@ function renderWritingReview(host, res, lines) {
     </div>`;
 }
 
-// 用网站的免费批改时，告诉孩子今天还剩几篇（家长自己配了 key 时没有这个限制，不显示）
+// 用网站的免费批改时，告诉孩子本月还剩几篇（家长自己配了 key 时没有这个限制，不显示）
 function quotaNote(res) {
   if (typeof res.remaining !== 'number') return '';
+  const p = quotaWords(res.period);
+  const n = res.limit || p.defaultLimit;
   const text = res.remaining > 0
-    ? `今天还可以免费批改 ${res.remaining} 篇（每天 ${res.limit || 3} 篇）`
-    : `今天的 ${res.limit || 3} 篇免费批改已用完，明天再来`;
+    ? `${p.this}还可以免费批改 ${res.remaining} 篇（${p.every} ${n} 篇）`
+    : `${p.this}的 ${n} 篇免费批改已用完，${p.reset}`;
   return `<div style="font-size:var(--text-xs,0.8rem);color:var(--color-text-light);margin-top:10px;text-align:right;">${text}</div>`;
 }

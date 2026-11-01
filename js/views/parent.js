@@ -271,7 +271,7 @@ function renderSettingsSection() {
       <div class="settings-group">
         <div class="settings-group__title">🔑 AI 服务（选填）</div>
         <div class="settings-group__desc">
-          三套内置课程、全部练习和作文批改都不需要它：作文的逐句批改网站免费提供，每个账号每天 3 篇。
+          三套内置课程、全部练习和作文批改都不需要它：作文的逐句批改网站免费提供，每个账号每月 5 篇。
           配了自己的 key，作文批改不限次数，还能<b>自己定制新课程</b>。
           key 只存在这台设备的浏览器里，不会上传服务器。
         </div>
