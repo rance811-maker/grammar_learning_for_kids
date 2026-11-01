@@ -1650,6 +1650,24 @@ ul, ol {
   flex-shrink: 0;
 }
 
+/* 口语实战场入口卡。常驻在地图上，所以要轻：和页面上别的卡同一个材质（白底、轻阴影、
+   无边框），一行标题一行说明。第一版用了蓝底加粗边框、四行说明，手机上一页叠了
+   好几张卡，它又压一块，显得很堆。 */
+.oral-entry.card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);   /* 窄屏上说明只有一行的空间，左右省下来给字 */
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.oral-entry:hover { background: var(--color-bg); }
+.oral-entry__icon { font-size: 1.5rem; line-height: 1; flex-shrink: 0; }
+.oral-entry__info { flex: 1; min-width: 0; }
+.oral-entry__title { font-weight: 700; font-size: var(--text-base); line-height: 1.4; }
+.oral-entry__desc { font-size: var(--text-sm); color: var(--color-text-light); line-height: 1.5; margin-top: 2px; }
+.oral-entry__chevron { font-size: 1.3rem; color: var(--color-muted); flex-shrink: 0; }
+
 /* Badge collection grid */
 .badge-collection {
   margin-bottom: var(--space-lg);

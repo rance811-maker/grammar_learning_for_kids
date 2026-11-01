@@ -221,6 +221,18 @@ export function render() {
       </div>`;
   }
 
+  // 口语实战场入口：和 BOSS 卡一样是「验收」——关卡里做对的，开口说时还会不会错。
+  // 放在地图上，是让两半互相指路：地图练、实战场验、复习中心补。
+  const oralHtml = `
+      <a class="card mb-md oral-entry" href="#oral">
+        <div class="oral-entry__icon">🎙️</div>
+        <div class="oral-entry__info">
+          <div class="oral-entry__title">口语实战场</div>
+          <div class="oral-entry__desc">说一段英语，看哪些语法还会错</div>
+        </div>
+        <div class="oral-entry__chevron">›</div>
+      </a>`;
+
   // Quick start button (when no plan or plan completed)
   let quickStartHtml = '';
   if (!plan || plan.certificateEarned) {
@@ -276,6 +288,7 @@ export function render() {
       ${planHtml}
       ${quickStartHtml}
       ${bossHtml}
+      ${oralHtml}
 
       <div class="card mb-md" style="text-align:center;">
         <div style="font-size:var(--text-sm);color:var(--color-text-light);margin-bottom:var(--space-sm);">
