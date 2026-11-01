@@ -15,7 +15,7 @@ import {
   users, sessions, jobs, sessKey, jobKey, loadUser, usedNow,
   parseJsonArray, parseJsonObject, chunk, blocks, MAX_REWRITE_BLOCKS,
   addUsage, costOf, callClaude, month, totalsAdd,
-} from "./shared.mjs";
+} from "./lib/shared.mjs";
 
 async function setJob(sub, id, patch) {
   const st = jobs();

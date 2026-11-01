@@ -99,15 +99,16 @@ const words = t => t.split(/\s+/).filter(Boolean).length;
    这种上传方式（预先打好 zip 传上来）不会注入 NETLIFY_BLOBS_CONTEXT，所以手动给
    siteID + token。注意：运行时自带的 NETLIFY_FUNCTIONS_TOKEN 对 Blobs 接口是 401，
    必须用一个正式的 Netlify 个人访问令牌（环境变量 NETLIFY_API_TOKEN）。 */
-const blobOpts = name => ({
-  name,
-  // SG_SITE_ID 指向老的 spoken-grammar 站：函数现在跑在 grammar-quest-pet 上，
-  // 但所有用户和批改记录还存在老站名下的 Blobs 库里。不显式指过去，
-  // Netlify 注入的 SITE_ID 会把我们带到一个空库，看起来就像"数据全没了"。
-  siteID: process.env.SG_SITE_ID || process.env.SITE_ID,
-  token: process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_FUNCTIONS_TOKEN,
-  consistency: "strong",
-});
+const blobOpts = name => {
+  // 默认用本站自己的库：跟着仓库正常部署的函数，运行时会被自动注入访问凭据，
+  // 一个 token 都不用配。（独立版时期手动传 siteID + 个人令牌，是因为那时函数
+  // 是打成 zip 传上去的，那种方式不注入凭据。）
+  // 配了 SG_SITE_ID 才改成读别的站的库——留着这条路是为了哪天要回头接老数据。
+  const siteID = process.env.SG_SITE_ID;
+  return siteID
+    ? { name, siteID, token: process.env.NETLIFY_API_TOKEN, consistency: "strong" }
+    : { name, consistency: "strong" };
+};
 const users = () => getStore(blobOpts("users"));
 const sessions = () => getStore(blobOpts("sessions"));
 

@@ -24,7 +24,7 @@ import {
   json, month, users, sessions, jobs, sessKey, jobKey,
   loadUser, usedNow, quotaView, chunk,
   isPaid, isOwner, freeUsed, planView, totalsGet, overBudget, tombKey,
-} from "./shared.mjs";
+} from "./lib/shared.mjs";
 
 // 用完免费额度：不是报错，是引导去开通。402 让前端知道该显示开通页。
 const upgradeMsg = () =>
