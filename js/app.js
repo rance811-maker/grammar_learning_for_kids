@@ -9,6 +9,7 @@ import * as portfolio from './views/portfolio.js';
 import * as stats from './views/stats.js';
 import * as placement from './views/placement.js';
 import * as review from './views/review.js';
+import * as oral from './views/oral.js';
 import * as account from './views/account.js';
 import * as parent from './views/parent.js';
 import * as syllabus from './views/syllabus.js';
@@ -21,7 +22,7 @@ import { initPwa, mountInstallHint } from './pwa.js';
 import { initAnalytics, trackView } from './analytics.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20261031a';
+const BUILD_VERSION = '20261101a';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -49,6 +50,7 @@ const routes = {
   'stats': stats,
   'placement': placement,
   'review': review,
+  'oral': oral,
   'account': account,
   'parent': parent,
   'syllabus': syllabus,
@@ -58,7 +60,8 @@ const routes = {
 };
 
 // 没登录时这些页面要先注册（看示例可以，用不行）。其余页面照常打开，显示示例数据。
-const GATED_ROUTES = new Set(['practice', 'discover', 'mission', 'placement', 'parent']);
+// 口语实战场没有示例数据可看：批改要花真钱（转写 + AI），而且结果按账号存在服务端。
+const GATED_ROUTES = new Set(['practice', 'discover', 'mission', 'placement', 'parent', 'oral']);
 
 // 这些页面本身不展示学习数据，不挂「示例数据」横条
 const NO_DEMO_BANNER = new Set(['account', 'about', 'feedback', 'install']);
@@ -73,6 +76,7 @@ const titles = {
   'stats': '我的',
   'placement': '摸底测试',
   'review': '复习中心',
+  'oral': '口语实战场',
   'account': '账号与同步',
   'parent': '家长专区',
   'syllabus': '语法提纲',
@@ -129,6 +133,8 @@ function router() {
 
 const NAV_ITEMS = [
   { route: '', icon: '🗺️', label: '学习地图' },
+  // 学 → 实战 → 补漏：地图上闯关是演练，这里拿真实开口说的话来验
+  { route: 'oral', icon: '🎙️', label: '口语实战场' },
   { route: 'review', icon: '🎯', label: '复习中心' },
   { route: 'portfolio', icon: '📁', label: '我的作品集' },
   { route: 'stats', icon: '📊', label: '我的进度' },
@@ -150,11 +156,11 @@ function activeNavRoute(route) {
     // The review-mode practice session belongs under the 复习中心 tab.
     return location.hash.startsWith('#practice/review') ? 'review' : '';
   }
-  return ['review', 'portfolio', 'stats', 'parent', 'feedback'].includes(route) ? route : '';
+  return ['oral', 'review', 'portfolio', 'stats', 'parent', 'feedback'].includes(route) ? route : '';
 }
 
 function renderShell(route, content, gated = false) {
-  const topLevelRoutes = ['', 'review', 'portfolio', 'stats', 'account', 'parent', 'about', 'feedback'];
+  const topLevelRoutes = ['', 'oral', 'review', 'portfolio', 'stats', 'account', 'parent', 'about', 'feedback'];
   const showBackBtn = !topLevelRoutes.includes(route);
   const title = titles[route] || 'Grammar Quest';
 

@@ -142,6 +142,11 @@ export const cloud = {
     return s && s.access_token && Date.now() < s.expires_at - 60000 ? s.access_token : null;
   },
 
+  // 取一个有效的令牌（快过期会先续期）。给口语实战场调自己的后端用——
+  // 那边的后端不在 Supabase 上，拿这个令牌去问 Supabase「这是谁」来认人。
+  // 续不上时抛 NO_SESSION（要重新登录）或 NETWORK（网络问题，会话还留着）。
+  accessToken: validAccessToken,
+
   // 调用数据库函数（Supabase RPC），用当前登录用户的身份。
   rpc(name, args = {}) {
     return restFetch(`/rpc/${name}`, { method: 'POST', body: args });

@@ -25,6 +25,9 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  // 口语实战场的后端接口（额度、批改进度）不能拿存档兜底：断网时喂一个旧的
+  // 「任务进行中 / 已完成」，比直接报网络错误更误导人
+  if (url.pathname.startsWith('/.netlify/')) return;
   e.respondWith(networkFirst(req, url));
 });
 

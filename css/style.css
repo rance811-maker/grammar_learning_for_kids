@@ -3152,7 +3152,7 @@ ul, ol {
   /* 六个图标均分整行：5 个导航 + 账号。原来每格固定 60px 加间距一共 418px，
      390 宽的手机放不下，360 宽的更放不下。均分后每格随屏宽伸缩。 */
   .sidebar { gap: 0; padding-left: var(--space-xs); padding-right: var(--space-xs); }
-  .sidebar__nav { flex: 6 1 0; min-width: 0; gap: 0; }   /* 6 个导航 + 1 个账号，七格均分 */
+  .sidebar__nav { flex: 7 1 0; min-width: 0; gap: 0; }   /* 7 个导航 + 1 个账号，八格均分 */
   .sidebar__item {
     flex: 1 1 0;
     min-width: 0;
