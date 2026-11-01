@@ -18,7 +18,7 @@
  */
 
 import {
-  ASR_MODEL, LLM_MODEL, REWRITE_MODEL, CATS,
+  ASR_MODEL, LLM_MODEL, REWRITE_MODEL, CATS, blobAuto,
   QUOTA_RECORDINGS, QUOTA_MINUTES, QUOTA_REWRITES, MAX_ONE_MINUTES, MAX_CHUNKS,
   FREE_TOTAL, FREE_ONE_MINUTES, MONTHLY_BUDGET_USD, CONTACT,
   json, month, users, sessions, jobs, sessKey, jobKey,
@@ -330,6 +330,10 @@ async function adminUsage() {
    用来在没有账号的情况下确认存储和 key 是不是通的。 */
 async function selftest() {
   const out = { blobs: "?", asr_key: !!process.env.DEEPGRAM_API_KEY,
+                // Blobs 走的哪条路。"自动"=平台注入了凭据；"手动"=靠 NETLIFY_API_TOKEN。
+                // 不报这个，Blobs 出错时分不清是没注入还是令牌不对。
+                blobs_mode: blobAuto() ? "自动（平台注入）"
+                  : (process.env.NETLIFY_API_TOKEN ? "手动（个人令牌）" : "两条路都没有"),
                 llm_key: !!process.env.ANTHROPIC_API_KEY,
                 model: LLM_MODEL, rewrite_model: REWRITE_MODEL,
                 invite_code_set: !!process.env.SG_INVITE_CODE,

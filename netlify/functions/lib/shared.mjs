@@ -99,16 +99,24 @@ const words = t => t.split(/\s+/).filter(Boolean).length;
    这种上传方式（预先打好 zip 传上来）不会注入 NETLIFY_BLOBS_CONTEXT，所以手动给
    siteID + token。注意：运行时自带的 NETLIFY_FUNCTIONS_TOKEN 对 Blobs 接口是 401，
    必须用一个正式的 Netlify 个人访问令牌（环境变量 NETLIFY_API_TOKEN）。 */
-const blobOpts = name => {
-  // 默认用本站自己的库：跟着仓库正常部署的函数，运行时会被自动注入访问凭据，
-  // 一个 token 都不用配。（独立版时期手动传 siteID + 个人令牌，是因为那时函数
-  // 是打成 zip 传上去的，那种方式不注入凭据。）
-  // 配了 SG_SITE_ID 才改成读别的站的库——留着这条路是为了哪天要回头接老数据。
-  const siteID = process.env.SG_SITE_ID;
-  return siteID
-    ? { name, siteID, token: process.env.NETLIFY_API_TOKEN, consistency: "strong" }
-    : { name, consistency: "strong" };
-};
+/* Blobs 连哪个库，两条路：
+   1. 自动——运行时注入了 NETLIFY_BLOBS_CONTEXT，什么都不用配。实测我们这套函数
+      拿不到：Netlify 是靠识别「你依赖了 @netlify/blobs」来决定注不注入的，而这个
+      依赖是当初 curl 下来塞进 vendor/ 的（本机 npm 连不上外网），相对路径 import
+      构建期识别不到，于是不注入。
+   2. 手动——显式给站点 id + 一个 Netlify 个人访问令牌（NETLIFY_API_TOKEN）。
+      注意运行时自带的 NETLIFY_FUNCTIONS_TOKEN 对 Blobs 接口是 401，顶替不了。
+   默认用本站自己的库（SITE_ID）。配了 SG_SITE_ID 就改成读那个站的库，
+   留着这条路是为了哪天想回头接老站的数据。*/
+const blobAuto = () => Boolean(process.env.NETLIFY_BLOBS_CONTEXT);
+const blobOpts = name => blobAuto()
+  ? { name, consistency: "strong" }
+  : {
+      name,
+      siteID: process.env.SG_SITE_ID || process.env.SITE_ID,
+      token: process.env.NETLIFY_API_TOKEN,
+      consistency: "strong",
+    };
 const users = () => getStore(blobOpts("users"));
 const sessions = () => getStore(blobOpts("sessions"));
 
@@ -277,7 +285,7 @@ export {
   QUOTA_RECORDINGS, QUOTA_MINUTES, QUOTA_REWRITES, MAX_WORDS_PER_CHUNK,
   MAX_ONE_MINUTES, MAX_CHUNKS,
   ANALYZE_SYSTEM, REWRITE_SYSTEM,
-  json, month, words, blobOpts, users, sessions, jobs, sessKey, jobKey,
+  json, month, words, blobAuto, blobOpts, users, sessions, jobs, sessKey, jobKey,
   loadUser, usedNow, quotaView, parseJsonArray, parseJsonObject, chunk,
   addUsage, costOf, callClaude, blocks, MAX_REWRITE_BLOCKS,
   FREE_TOTAL, FREE_ONE_MINUTES, MONTHLY_BUDGET_USD, CONTACT,
