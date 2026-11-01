@@ -409,7 +409,7 @@ export const unitsBatch = [
         },
         {
           type: "scenario",
-          instruction: "选择最合适的回答",
+          instruction: "选出最适合填进空格的内容",
           context: "You are at the zoo with your family. You see something exciting.",
           dialogue: [
             { speaker: "You", text: "Wow! Look at the monkeys! They ___!" }
@@ -425,7 +425,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格阅读）",
+          instruction: "读这则通知，选择正确的答案",
           sentence: "Read the notice: 'The library closes at 5 pm on weekdays. It ___ at 3 pm on Saturdays.'",
           options: ["is closing", "close", "closes", "closing"],
           correct: 2,
@@ -1016,7 +1016,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
+          instruction: "选择正确的答案",
           sentence: "Last Saturday, I ___ shopping. While I ___ for the bus, I met my old friend Tom.",
           options: [
             "go / wait",
@@ -1512,7 +1512,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
+          instruction: "读这封邮件，选择正确的答案",
           sentence: "Read the email: 'Hi Tom! I ___ (just/get) a new puppy! I ___ (want) a dog since I was little. We ___ (buy) him from a pet shop last Saturday.'",
           options: [
             "have just got / have wanted / bought",
@@ -1567,7 +1567,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
+          instruction: "选择最合适的回答",
           sentence: "Which is the best response? 'You look happy!' — '___'",
           options: [
             "Yes! I just passed my maths exam!",

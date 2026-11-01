@@ -420,7 +420,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格阅读）",
+          instruction: "读这条消息，里面有两个空。选出两个空都填对的那一组",
           sentence: "Read the message: 'Hi Sam! I've finished ___ my project. Now I plan ___ a film tonight. Want to come?'",
           options: [
             "doing / to watch",
@@ -450,7 +450,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
+          instruction: "哪个句子是正确的？",
           sentence: "Which sentence is correct for a PET email about your hobbies?",
           options: [
             "Reading is my favourite hobby and I love to collecting books.",
@@ -480,7 +480,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
+          instruction: "句子里有两个空，选出两个空都填对的那一组",
           sentence: "Complete the sentence for your story: 'My sister hopes ___ a famous singer, and she practises ___ every day.'",
           options: [
             "becoming / to sing",
@@ -785,7 +785,7 @@ export const unitsBatch = [
         },
         {
           type: "fill",
-          instruction: "用 if 把疑问句转述，填入正确的词",
+          instruction: "把直接引语改成间接引语，填入正确的词",
           sentence: "Direct: 'Do you like ice cream?' Reported: He asked me ___ I liked ice cream.",
           answer: "if",
           acceptableAnswers: ["if", "whether"],
@@ -802,7 +802,7 @@ export const unitsBatch = [
         },
         {
           type: "fill",
-          instruction: "把时间词改成转述形式填空",
+          instruction: "转述时 tomorrow 要换个说法。空格里只填一个词，和后面的 next day 连起来就是新说法",
           sentence: "Direct: 'I will call you tomorrow.' Reported: She said she would call me ___ next day.",
           answer: "the",
           acceptableAnswers: ["the"],
@@ -890,7 +890,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "哪个句子是正确的？",
+          instruction: "哪个句子是正确的转述？",
           sentence: "Direct: 'I will help you.' 选出正确的转述：",
           options: [
             "He said he will help me.",
@@ -964,7 +964,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格阅读）",
+          instruction: "读 Sam 写的话和后面的转述句。转述句里有两个空，选出两个空都填对的那一组",
           sentence: "Read the note: Sam wrote 'I love this book. I will lend it to you tomorrow.' Reported: Sam said he ___ that book and he ___ lend it to me the next day.",
           options: [
             "loves / will",
@@ -994,7 +994,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
+          instruction: "哪个句子是正确的转述？",
           sentence: "Which sentence correctly reports the question 'Where do you live?'",
           options: [
             "He asked me where do I live.",
@@ -1024,7 +1024,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
+          instruction: "句子里有两个空，选出两个空都填对的那一组",
           sentence: "Complete the report: My friend asked me ___ I wanted to join the chess club, and I said I ___ love to.",
           options: [
             "that / will",
@@ -1354,7 +1354,7 @@ export const unitsBatch = [
         },
         {
           type: "fill",
-          instruction: "用 the 或 (no article) 填空（不填就写 x）",
+          instruction: "空格里要不要用 the？要用就填 the，不用就填 x",
           sentence: "We play ___ football in the park after school.",
           answer: "x",
           acceptableAnswers: ["x", "no article", "none", "-"],
@@ -1516,7 +1516,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格阅读）",
+          instruction: "读这段菜谱，里面有三个空。选出三个空都填对的那一组",
           sentence: "Read the recipe: 'You need ___ flour, two eggs and ___ butter. Mix them in ___ bowl.'",
           options: [
             "some / a little / a",
@@ -1546,7 +1546,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
+          instruction: "哪个句子是正确的？",
           sentence: "Which sentence is correct for a shopping list note?",
           options: [
             "We need an bananas and the bottle of water.",
@@ -1576,7 +1576,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
+          instruction: "读这封邮件，里面有三个空。选出三个空都填对的那一组",
           sentence: "Complete the email: 'There is ___ fruit in the fridge but there aren't ___ vegetables. Can you buy ___ tomatoes?'",
           options: [
             "many / much / some",

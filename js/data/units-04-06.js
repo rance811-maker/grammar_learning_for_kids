@@ -747,7 +747,7 @@ export const unitsBatch = [
         },
         {
           type: "fill",
-          instruction: "用 have to 的正确形式填空",
+          instruction: "空格后面已经有 to 了，在空格里填 have 的正确形式",
           sentence: "My brother ___ to wear glasses to read. (use 'have' in correct form)",
           answer: "has",
           acceptableAnswers: ["has"],
@@ -898,7 +898,7 @@ export const unitsBatch = [
         },
         {
           type: "scenario",
-          instruction: "选择最合适的回答",
+          instruction: "你会怎么说？选出最合适的一句",
           context: "You are at a friend's house and you want to use the bathroom.",
           dialogue: [
             { speaker: "You", text: "..." }

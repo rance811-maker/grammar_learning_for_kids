@@ -440,7 +440,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "I ___ you if I had your phone number, but I don't have it.",
           options: ["will call", "would call", "call", "called"],
           correct: 1,
@@ -465,7 +465,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "If you ___ this email today, you will get a free gift tomorrow.",
           options: ["answered", "would answer", "answer", "will answer"],
           correct: 2,
@@ -490,7 +490,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "We won't win the match ___ everyone plays their best.",
           options: ["if", "unless", "when", "because"],
           correct: 1,
@@ -989,7 +989,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "The results of the competition ___ tomorrow.",
           options: ["announce", "are announced", "will be announced", "announced"],
           correct: 2,
@@ -1014,7 +1014,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "Millions of emails ___ every single day around the world.",
           options: ["is sent", "are sent", "send", "sends"],
           correct: 1,
@@ -1039,7 +1039,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "___ your bike repaired at that shop?",
           options: ["Did", "Does", "Was", "Do"],
           correct: 2,
@@ -1528,7 +1528,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "I met a girl ___ mother is a famous actress.",
           options: ["who", "which", "whose", "where"],
           correct: 2,
@@ -1553,7 +1553,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "The hotel ___ we stayed last summer had a huge pool.",
           options: ["which", "who", "where", "whose"],
           correct: 2,
@@ -1578,7 +1578,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "The musician ___ played the violin was only ten years old.",
           options: ["which", "who", "where", "whose"],
           correct: 1,
