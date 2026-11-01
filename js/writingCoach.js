@@ -1,4 +1,5 @@
 import { hasApiKey, friendlyAiError, aiJson } from './unitGenerator.js';
+import { cloud } from './cloud.js';
 
 // 写作批改：孩子提交写作任务后，由 AI 逐句批改并给整体评价。
 //
@@ -7,6 +8,10 @@ import { hasApiKey, friendlyAiError, aiJson } from './unitGenerator.js';
 // AI 生成的课程里 grammarType 几乎不可能命中这 7 个，于是全部落到
 // default 分支直接返回"正确"——孩子写完什么反馈都拿不到。
 
+// 两条路：
+// - 家长在家长专区配了自己的 key：浏览器直接调 AI，不限次数（下面两段提示词）
+// - 没配：走网站的云函数 gq-review-writing，用网站的 key，每个账号每天限几篇。
+//   云函数里有同一套提示词（supabase/functions/gq-review-writing/review.ts），改这里时记得同步那边。
 const PROMPT = `You are a kind but precise English writing coach for a Chinese child (about 10-12 years old).
 The child completed a guided writing task: the app gave some fixed prompt words, and the child filled in the rest.
 
@@ -63,7 +68,23 @@ STRICT JSON, no markdown, no extra text. Escape quotes inside strings, never use
 {"lines":[{"index":0,"ok":false,"issue":"中文说明","fixed":"Corrected sentence.","upgrade":""}],"overall":"中文整体评价","improve":["建议一"],"score":4}`;
 
 export function hasWritingCoach() {
-  return hasApiKey();
+  return hasApiKey() || (cloud.cloudEnabled() && cloud.hasSession());
+}
+
+// 云函数的错误 → 给孩子 / 家长看的话（标成 friendly，friendlyAiError 原样透传）
+function cloudError(e) {
+  const friendly = (msg) => { const x = new Error(msg); x.friendly = true; x.code = e.code; return x; };
+  if (e.code === 'daily_limit') {
+    const n = (e.data && e.data.limit) || 3;
+    return friendly(`今天 ${n} 篇免费批改已经用完了，明天再来。家长也可以在「家长专区 → 学习设置 → AI 服务」配自己的 key，不限次数。`);
+  }
+  if (e.status === 401 || String(e.message).includes('NO_SESSION')) return friendly('登录已过期，请重新登录后再批改');
+  if (e.code === 'not_configured') return friendly('批改服务暂时没开通，过一会儿再试');
+  if (e.code === 'ai_busy') return friendly('批改的人有点多，等一会儿再试');
+  if (e.code === 'too_long') return friendly('写得太长了，批改一次最多 600 个字符一行，删短一点再交');
+  if (e.code === 'empty') return friendly('还没写内容哦，写完再交');
+  if (e.status >= 400) return friendly('批改没跑成功，请重试');
+  return e;   // 网络问题等，交给 friendlyAiError
 }
 
 /**
@@ -71,6 +92,20 @@ export function hasWritingCoach() {
  * @param {object} ctx { grammarType, unitTitle, cefr }
  */
 export async function reviewWriting(lines, ctx = {}) {
+  if (!hasApiKey()) {
+    // 走网站的云函数：只传写作内容和单元信息，提示词在服务端拼
+    let data;
+    try {
+      data = await cloud.invokeFunction('gq-review-writing', {
+        lines: lines.map((l) => ({ prefix: l.prefix || '', text: l.text || '', suffix: l.suffix || '' })),
+        ctx: { unitTitle: ctx.unitTitle || '', grammarType: ctx.grammarType || '', cefr: ctx.cefr || '', exam: ctx.exam || '' },
+      });
+    } catch (e) {
+      throw cloudError(e);
+    }
+    return { ...normalize(data, lines), remaining: data.remaining, limit: data.limit };
+  }
+
   const body = lines
     .map((l, i) =>
       `[${i}] 提示词:"${l.prefix || '(无)'}"　孩子写的:"${l.text}"　结尾:"${l.suffix || '(无)'}"`
@@ -96,7 +131,11 @@ export async function reviewWriting(lines, ctx = {}) {
     }
   });
 
-  // 补齐可能缺失的字段，避免渲染时到处判空
+  return normalize(data, lines);
+}
+
+// 补齐可能缺失的字段，避免渲染时到处判空
+function normalize(data, lines) {
   return {
     lines: lines.map((_, i) => {
       const found = (data.lines || []).find((l) => Number(l.index) === i) || {};

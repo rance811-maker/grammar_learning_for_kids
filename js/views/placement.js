@@ -1,5 +1,6 @@
 import { store } from '../store.js';
 import { curriculum } from '../curriculum.js';
+import { scrollToStart } from '../scrollToStart.js';
 import { track } from '../analytics.js';
 import { engine } from '../engine.js';
 import { sound } from '../sound.js';
@@ -140,6 +141,7 @@ function showCurrentQuestion() {
 
   root.innerHTML = renderQuestionCard();
   attachChoiceListeners();
+  scrollToStart(root);
 }
 
 function attachChoiceListeners() {

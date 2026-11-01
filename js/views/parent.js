@@ -271,8 +271,8 @@ function renderSettingsSection() {
       <div class="settings-group">
         <div class="settings-group__title">🔑 AI 服务（选填）</div>
         <div class="settings-group__desc">
-          三套内置课程和全部练习都不需要它。只有两件事要用：<b>作文的逐句批改</b>，
-          以及<b>自己定制新课程</b>。配一次，两件事都能用；不配也不影响孩子日常练习。
+          三套内置课程、全部练习和作文批改都不需要它：作文的逐句批改网站免费提供，每个账号每天 3 篇。
+          配了自己的 key，作文批改不限次数，还能<b>自己定制新课程</b>。
           key 只存在这台设备的浏览器里，不会上传服务器。
         </div>
         <div class="ai-key-panel" style="margin-top:var(--space-sm);"></div>
@@ -624,7 +624,7 @@ function mountOneKeyPanel(host) {
   // 未配置，或用户主动点了「更换」→ 显示完整编辑器。
   host.innerHTML = `
     <div class="parent-field" style="background:#FFF8E1;border:1px solid #F0E0A8;border-radius:10px;padding:12px 14px;">
-      <label>🔑 ${configured ? '更换 / 重新录入 API key' : '配置 AI 服务（作文批改和课程生成共用，配一次即可）'}</label>
+      <label>🔑 ${configured ? '更换 / 重新录入 API key' : '配置自己的 AI 服务（作文批改不限次数、自己定制课程，配一次即可）'}</label>
       <select data-key-provider style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;margin-bottom:8px;">
         <option value="gemini" ${p === 'gemini' ? 'selected' : ''}>Gemini（免费额度·输出上限较低，长单元可能被截断）</option>
         <option value="claude" ${p === 'claude' ? 'selected' : ''}>Claude（按量付费·质量更高更稳，推荐正式生成）</option>

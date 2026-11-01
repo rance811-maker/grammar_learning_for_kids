@@ -139,7 +139,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把左右两边正确配对",
+          instruction: "左边是以 If 开头的前半句，右边是后半句。按意思把它们连成完整的句子。",
           left: [
             "If it rains,",
             "If I were rich,",
@@ -167,7 +167,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把句子和它的条件句类型配对",
+          instruction: "左边是四个 if 句子，右边是句子类型。右边有的名字一样，看下面的小字就能分清。右边每项只连一句。",
           left: [
             "If I see Tom, I will say hi.",
             "If I had a car, I would drive.",
@@ -204,7 +204,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把 'unless' 句子和它的意思配对",
+          instruction: "左边是 unless 句子，右边是用 If 改写的句子。把意思相同的两句连起来。",
           left: [
             "Unless you run, you'll be late.",
             "Unless it rains, we'll play outside.",
@@ -688,7 +688,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把左右两边正确配对",
+          instruction: "左边是句子开头，右边是后半句。按意思把它们连成完整的句子。",
           left: [
             "Chocolate is made",
             "The book was written",
@@ -753,7 +753,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把句子和它的时态配对",
+          instruction: "左边是四个句子，右边是时态。右边有的名字一样，看下面的小字就能分清。右边每项只连一句。",
           left: [
             "The cake is eaten quickly.",
             "The cake was eaten yesterday.",
@@ -1237,7 +1237,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把左右两边正确配对",
+          instruction: "左边是句子开头，右边是后半句。按意思把它们连成完整的句子。",
           left: [
             "The man who",
             "The cake which",
@@ -1265,7 +1265,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把关系词和它的用法配对",
+          instruction: "左边是 who、which、where、whose。每个词用来指什么？连到右边的说明。",
           left: ["who", "which", "where", "whose"],
           right: [
             "for people",
@@ -1297,7 +1297,7 @@ export const unitsBatch = [
         },
         {
           type: "match",
-          instruction: "把句子和正确的关系词配对",
+          instruction: "左边每句都缺一个词（___）。把每句连到右边能填进空格的那个词。",
           left: [
             "The teacher ___ helps us is kind.",
             "The game ___ we played was fun.",
