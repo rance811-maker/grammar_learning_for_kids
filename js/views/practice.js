@@ -274,6 +274,9 @@ function renderErrorQuestion(q) {
     </div>`;
 }
 
+// 找错题的改法是「删掉这个词」：(remove)、(delete)、（删除）、(no article) 这几种写法都算
+const isRemoval = (c) => /^\s*[(（]\s*(remove|delete|删除|删掉|去掉|no article)[^)）]*[)）]\s*$/i.test(String(c));
+
 function shuffleArray(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -797,7 +800,10 @@ function showFeedback(isCorrect, question, userAnswer, result) {
   let correctionHtml = '';
   if (question.type === 'error' && result.correction) {
     const wrongWord = question.words?.[question.errorIndex] ?? '';
-    correctionHtml = `<div class="feedback-banner__correct-answer">正确写法：<s>${wrongWord}</s> → <strong>${result.correction}</strong></div>`;
+    // 这个词本来就不该有（多了一个 will / to / the）：数据里记成 (remove)，显示成「删掉」，不让孩子看到一串英文
+    correctionHtml = isRemoval(result.correction)
+      ? `<div class="feedback-banner__correct-answer">正确写法：删掉 <s>${wrongWord}</s></div>`
+      : `<div class="feedback-banner__correct-answer">正确写法：<s>${wrongWord}</s> → <strong>${result.correction}</strong></div>`;
   }
 
   // The plain "correct answer" line is only useful on wrong answers, and not for
