@@ -131,6 +131,27 @@ export function questionTextKey(q) {
   return String(t).trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 120);
 }
 
+// 错题本（孩子的复习中心、家长报告）里一条错题显示的那句原题。
+// 各题型题干放在不同字段：找错、排序是词块 words，连线是 left，情境是 context / dialogue。
+// 以前一律取 sentence || instruction，这几种只剩「点击句子中的错误单词」这类通用说明，
+// 几条看着一模一样，分不清是哪道。排序题只列打乱的词块，不给正确句子，免得复习时答案摆在眼前。
+export function questionPreview(q, max = 60) {
+  if (!q) return '';
+  const list = (a, sep) => (Array.isArray(a) ? a.filter(Boolean).join(sep) : '');
+  let t = '';
+  if (q.type === 'error') t = list(q.words, ' ') || list(q.sentence, ' ');
+  else if (q.type === 'reorder') t = list(q.words, ' / ');
+  else if (q.type === 'match') t = list(q.left, ' / ');
+  else if (q.type === 'scenario') {
+    const last = Array.isArray(q.dialogue) ? q.dialogue[q.dialogue.length - 1] : null;
+    t = q.context || (typeof last === 'string' ? last : last?.text) || '';
+  }
+  if (!t) t = (typeof q.sentence === 'string' && q.sentence) || q.context || q.instruction || '';
+  t = String(t).replace(/_+/g, '____').replace(/\s+/g, ' ').trim();
+  // 截断时补省略号，别停在单词中间让人以为题目就到这儿
+  return t.length > max ? `${t.slice(0, max).trimEnd()}…` : t;
+}
+
 function getQuestionsForLevel(unitId, level) {
   const unit = getUnits()[unitId];
   if (!unit?.levels?.[level]) return [];

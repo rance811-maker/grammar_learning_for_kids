@@ -44,27 +44,36 @@ function renderRankLadder(currentRank) {
 
 const BADGE_ICONS = ['🌟', '💪', '🎯', '🏅', '🔥', '📚', '✨', '🎓', '💡', '🏆', '🎖️', '👑'];
 
+// 历史记录一行的名字。专项复习、模拟挑战记进历史时 unitId 是 'review' / 'boss'、level 是 null，
+// 直接拼会显示成「Unit review - Lv.null」。
+function historyName(h) {
+  if (h.unitId === 'review') return '专项复习';
+  if (h.unitId === 'boss') return `${curriculum.examLabel()} 模拟挑战`;
+  return `Unit ${h.unitId} - Lv.${h.level}`;
+}
+
 export function render() {
   const { player } = store.state;
   const rank = RANK_INFO[player.rank] || RANK_INFO.bronze;
   const accuracy = store.getAccuracyRate();
   const accuracyPct = Math.round(accuracy * 100);
-  const weakSkills = store.getWeakestSkills(3);
+  // 「我的弱点」只列掌握度 < 80% 的，别把下面「语法掌握度」里已经是绿条的也标红
+  const weakSkills = store.getWeakSkills(3);
   const allMastery = store.getAllMastery();
   const badges = store.getBadges();
   const history = store.state.history.slice(-10).reverse();
 
   const units = curriculum.getUnits();
   const unitIds = Object.keys(units).map(Number);
+  // 数的是「通过了几关」（每单元 5 关，至少 1 星算通过），不是课程。
+  // 用 isLevelPassed 而不是 completed：老存档里 0 星也可能被记成 completed。
   let completedLessons = 0;
   for (const uid of unitIds) {
-    const u = store.state.units[uid];
-    if (u) {
-      for (const lv of Object.values(u.practiceLevels)) {
-        if (lv.completed) completedLessons++;
-      }
+    for (let lv = 1; lv <= 5; lv++) {
+      if (store.isLevelPassed(uid, lv)) completedLessons++;
     }
   }
+  const totalLessons = unitIds.length * 5;
 
   // Next rank progress
   let rankProgressHtml = '';
@@ -158,9 +167,30 @@ export function render() {
         </div>`);
     }
   }
+  // 结算页发的成就徽章（连击之王、完美无瑕、速度之星、满星、连续打卡、模拟通关）以前只在结算页闪一下，
+  // 这里只画单元徽章，拿到了也找不到。排在单元徽章前面：单元那 12 格大多还锁着，别让刚拿的被挤到下面。
+  // 满星是每关一枚，最多 60 枚，逐个摆会把页面撑得很长，合成一格写数量。
+  const achievements = badges.filter(b => !String(b.id || '').startsWith('unit_'));
+  const perfect = achievements.filter(b => String(b.id).startsWith('perfect_'));
+  const achItems = achievements.filter(b => !String(b.id).startsWith('perfect_')).map(b => `
+        <div class="badge-item" title="${b.name}${b.date ? `｜${b.date}` : ''}">
+          <div class="badge-item__icon">${b.icon || '🏅'}</div>
+          <div class="badge-item__name">${b.name}</div>
+        </div>`);
+  if (perfect.length) {
+    achItems.push(`
+        <div class="badge-item" title="${perfect.map(b => b.name).join('、')}">
+          <div class="badge-item__icon">🌟</div>
+          <div class="badge-item__name">满星 ×${perfect.length}</div>
+        </div>`);
+  }
+  const subTitle = (t) => `<div style="font-size:var(--text-sm);color:var(--color-text-light);margin-bottom:var(--space-sm);">${t}</div>`;
   badgesHtml = `
     <div class="badge-collection">
       <div class="badge-collection__title">🏅 徽章收集</div>
+      ${achItems.length ? `${subTitle('成就徽章')}
+      <div class="badge-grid" id="achievementBadges" style="margin-bottom:var(--space-lg);">${achItems.join('')}</div>
+      ${subTitle('单元徽章')}` : ''}
       <div class="badge-grid">${badgeItems.join('')}</div>
     </div>`;
 
@@ -173,7 +203,7 @@ export function render() {
       return `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--space-sm) 0;border-bottom:1px solid var(--color-border);">
           <div>
-            <div style="font-size:var(--text-sm);font-weight:600;">Unit ${h.unitId} - Lv.${h.level}</div>
+            <div style="font-size:var(--text-sm);font-weight:600;">${historyName(h)}</div>
             <div style="font-size:var(--text-xs);color:var(--color-muted);">${h.date || ''}</div>
           </div>
           <div style="text-align:right;">
@@ -211,7 +241,7 @@ export function render() {
           <div class="stat-card__label">总积分</div>
         </div>
         <div class="stat-card">
-          <div class="stat-card__value">🔥 ${player.currentStreak}</div>
+          <div class="stat-card__value">🔥 ${store.getDisplayStreak()}</div>
           <div class="stat-card__label">连续天数</div>
         </div>
         <div class="stat-card">
@@ -222,8 +252,8 @@ export function render() {
 
       <div class="stats-cards mb-lg">
         <div class="stat-card" style="grid-column:span 3;">
-          <div class="stat-card__value">${completedLessons}</div>
-          <div class="stat-card__label">已完成课程</div>
+          <div class="stat-card__value">${completedLessons} <span style="font-size:var(--text-base);color:var(--color-muted);">/ ${totalLessons}</span></div>
+          <div class="stat-card__label">已通过关卡</div>
         </div>
       </div>
 

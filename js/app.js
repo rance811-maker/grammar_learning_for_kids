@@ -311,7 +311,7 @@ function renderSidebar(route) {
           ${demo ? '' : `<div class="sidebar__stats">
             <span class="sidebar__stat sidebar__stat--rank">${rank.icon} ${rank.name}</span>
             <span class="sidebar__stat sidebar__stat--score">⭐ ${p.totalScore} 积分</span>
-            <span class="sidebar__stat sidebar__stat--streak">🔥 连续 ${p.currentStreak} 天</span>
+            <span class="sidebar__stat sidebar__stat--streak">🔥 连续 ${store.getDisplayStreak()} 天</span>
           </div>`}
         </div>
       </div>
