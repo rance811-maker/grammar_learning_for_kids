@@ -9,13 +9,20 @@ const WHAT = {
   mission: { icon: '📝', title: '注册后就能写作文、让 AI 老师批改' },
   placement: { icon: '🧭', title: '注册后先做 3 分钟摸底' },
   parent: { icon: '🔒', title: '家长专区需要先注册' },
+  // 口语没有摸底这一步，而且是要花钱的：额度得在注册前就说清楚，不能等用完了才知道
+  oral: {
+    icon: '🎙️',
+    title: '注册后就能把真实开口说的英语拿来批改',
+    desc: '免费注册，只要一个家长邮箱。注册后有 3 次免费批改，每次录音最长 10 分钟——'
+      + '语音转文字和 AI 逐句批改都按用量花真钱，所以先给 3 次体验，觉得有用再说。',
+  },
 };
 
 const RETURN_KEY = 'gq-return';
 
 // 注册 / 登录成功后回到哪里。只记和示例数据无关的页面：练习、发现这些页面的单元和关卡
 // 是在示例进度上点出来的，换成自己的进度后多半还没解锁，回首页更合适。
-const RETURNABLE = new Set(['parent', 'placement']);
+const RETURNABLE = new Set(['parent', 'placement', 'oral']);
 
 export function rememberReturn(route, params) {
   try {
@@ -44,6 +51,8 @@ export function render(route) {
   const expired = store.sessionExpired();
   const desc = expired
     ? '登录已过期，重新登录就能接着学。这台设备上还没上传的记录，登录后会一起同步。'
+    : w.desc
+      ? w.desc
     : store.hasLocalProgress()
       ? '免费注册，只要一个家长邮箱。这台设备上以前做过的练习还在，注册后会一起带进新账号；进度自动存到云端，换手机、电脑都能接着学。'
       : '免费注册，只要一个家长邮箱。注册后先做 12 道题摸底，学习计划按孩子的水平来排；进度自动存到云端，换手机、电脑都能接着学。';

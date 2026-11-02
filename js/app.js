@@ -9,19 +9,19 @@ import * as portfolio from './views/portfolio.js';
 import * as stats from './views/stats.js';
 import * as placement from './views/placement.js';
 import * as review from './views/review.js';
+import * as oral from './views/oral.js';
 import * as account from './views/account.js';
 import * as parent from './views/parent.js';
 import * as syllabus from './views/syllabus.js';
 import * as feedback from './views/feedback.js';
 import * as about from './views/about.js';
-import * as install from './views/install.js';
 import * as gate from './views/gate.js';
 import { curriculum } from './curriculum.js';
-import { initPwa, mountInstallHint } from './pwa.js';
+import { initPwa } from './pwa.js';
 import { initAnalytics, trackView } from './analytics.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20261101a';
+const BUILD_VERSION = '20261102a';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -49,19 +49,20 @@ const routes = {
   'stats': stats,
   'placement': placement,
   'review': review,
+  'oral': oral,
   'account': account,
   'parent': parent,
   'syllabus': syllabus,
   'feedback': feedback,
   'about': about,
-  'install': install,
 };
 
 // 没登录时这些页面要先注册（看示例可以，用不行）。其余页面照常打开，显示示例数据。
-const GATED_ROUTES = new Set(['practice', 'discover', 'mission', 'placement', 'parent']);
+// 口语实战场没有示例数据可看：批改要花真钱（转写 + AI），而且结果按账号存在服务端。
+const GATED_ROUTES = new Set(['practice', 'discover', 'mission', 'placement', 'parent', 'oral']);
 
 // 这些页面本身不展示学习数据，不挂「示例数据」横条
-const NO_DEMO_BANNER = new Set(['account', 'about', 'feedback', 'install']);
+const NO_DEMO_BANNER = new Set(['account', 'about', 'feedback']);
 
 const titles = {
   '': '学习地图',
@@ -73,12 +74,12 @@ const titles = {
   'stats': '我的',
   'placement': '摸底测试',
   'review': '复习中心',
+  'oral': '口语实战场',
   'account': '账号与同步',
   'parent': '家长专区',
   'syllabus': '语法提纲',
   'feedback': '意见反馈',
   'about': '这是什么',
-  'install': '添加到桌面',
 };
 
 function router() {
@@ -117,7 +118,6 @@ function router() {
   if (!gated && view.mount) {
     view.mount(...params);
   }
-  if (route === '') mountInstallHint(app.querySelector('.content > .view') || app.querySelector('.content'));
   // 被拦下的记成 gate，不记成原页面：后台漏斗里「开始摸底」只该数真正进了摸底的人
   if (gated) trackView('gate', [route, ...params]);
   else trackView(route, params);
@@ -129,6 +129,8 @@ function router() {
 
 const NAV_ITEMS = [
   { route: '', icon: '🗺️', label: '学习地图' },
+  // 学 → 实战 → 补漏：地图上闯关是演练，这里拿真实开口说的话来验
+  { route: 'oral', icon: '🎙️', label: '口语实战场' },
   { route: 'review', icon: '🎯', label: '复习中心' },
   { route: 'portfolio', icon: '📁', label: '我的作品集' },
   { route: 'stats', icon: '📊', label: '我的进度' },
@@ -150,54 +152,55 @@ function activeNavRoute(route) {
     // The review-mode practice session belongs under the 复习中心 tab.
     return location.hash.startsWith('#practice/review') ? 'review' : '';
   }
-  return ['review', 'portfolio', 'stats', 'parent', 'feedback'].includes(route) ? route : '';
+  return ['oral', 'review', 'portfolio', 'stats', 'parent', 'feedback'].includes(route) ? route : '';
 }
 
 function renderShell(route, content, gated = false) {
-  const topLevelRoutes = ['', 'review', 'portfolio', 'stats', 'account', 'parent', 'about', 'feedback'];
+  const topLevelRoutes = ['', 'oral', 'review', 'portfolio', 'stats', 'account', 'parent', 'about', 'feedback'];
   const showBackBtn = !topLevelRoutes.includes(route);
   const title = titles[route] || 'Grammar Quest';
+  const demo = store.isDemo() && !gated && !NO_DEMO_BANNER.has(route);
+  // 宽屏上顶层页面的页面带本来是藏起来的；没登录时它要放注册按钮，得露出来
+  const titleOnly = !showBackBtn && !demo;
 
   return `
     ${renderSiteBand()}
     <div class="layout">
       ${renderSidebar(route)}
       <div class="main-col">
-        <header class="topbar${showBackBtn ? '' : ' topbar--title-only'}">
+        <header class="topbar${titleOnly ? ' topbar--title-only' : ''}">
           ${showBackBtn
             ? `<button class="topbar__back" id="navBackBtn">← 返回</button>`
             : '<span class="topbar__back-placeholder"></span>'}
           <h1 class="topbar__title">${title}</h1>
           <span class="topbar__spacer"></span>
+          ${demo ? renderDemoActions() : ''}
         </header>
-        <main class="content">${store.isDemo() && !gated && !NO_DEMO_BANNER.has(route) ? renderDemoBanner() : ''}${content}</main>
+        <main class="content">${demo ? renderDemoNotice() : ''}${content}</main>
       </div>
     </div>`;
 }
 
 // 没登录时每一页顶上的说明：现在看到的进度、错题、作品都是编的示例。
 // 这台设备上以前（没注册时）做过练习的，告诉他记录还在，注册或登录就能接着学。
-function renderDemoBanner() {
+// 只放一句话；注册、登录按钮放在页面带右端（见 renderDemoActions），不和说明挤在一起。
+function renderDemoNotice() {
+  const text = store.sessionExpired()
+    ? '🔑 <strong>登录已过期</strong>，现在显示的是示例数据。重新登录后，这台设备上还没上传的记录会一起同步。'
+    : store.hasLocalProgress()
+      ? '👀 <strong>这是示例数据</strong>。你在这台设备上做过的练习还在，注册新账号会一起带进去。'
+      : '👀 <strong>示例数据</strong>：一位同学学了 10 天的样子';
+  return `<p class="demo-banner" role="note">${text}</p>`;
+}
+
+// 页面带是 sticky 的，按钮放这里，往下翻也一直看得到
+function renderDemoActions() {
   if (store.sessionExpired()) {
-    return `
-    <div class="demo-banner" role="note">
-      <span class="demo-banner__text">🔑 <strong>登录已过期</strong>，现在显示的是示例数据。重新登录就能接着学，这台设备上还没上传的记录会一起同步。</span>
-      <span class="demo-banner__actions">
-        <a class="btn btn--primary demo-banner__btn" href="#account">重新登录</a>
-      </span>
-    </div>`;
+    return '<a class="btn btn--primary topbar__cta" href="#account">重新登录</a>';
   }
-  const text = store.hasLocalProgress()
-    ? '<strong>这是示例数据</strong>，不是你的记录。你在这台设备上做过的练习还在：注册新账号会一起带进去（登录已有账号则换成账号里的进度）。'
-    : '<strong>这是示例数据</strong>：一位同学学了 10 天的样子，不是你的记录。注册后先做摸底，生成你自己的学习计划。';
   return `
-    <div class="demo-banner" role="note">
-      <span class="demo-banner__text">👀 ${text}</span>
-      <span class="demo-banner__actions">
-        <a class="btn btn--primary demo-banner__btn" href="#account/register">免费注册</a>
-        <a class="demo-banner__login" href="#account">登录</a>
-      </span>
-    </div>`;
+    <a class="topbar__login" href="#account">登录</a>
+    <a class="btn btn--primary topbar__cta" href="#account/register">免费注册</a>`;
 }
 
 // 站点带：全站唯一说明"这是什么网站、给谁用"的地方。

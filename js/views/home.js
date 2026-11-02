@@ -49,21 +49,19 @@ function renderHeader(player) {
   const day = daysSince(store.account?.createdAt || store.state.startedAt);
   const cheer = CHEERS[day % CHEERS.length];
 
-  // 没登录时首页是示例数据，别对着看的人说「这是你学习的第 10 天」
+  // 没登录时首页是示例数据：顶上的横条已经说了「一位同学学了 10 天」，这里不再重复，只留状态条
   const demo = store.isDemo();
-  const greet = demo ? '示例同学的学习地图' : name ? `亲爱的 ${escapeHtml(name)}，` : '亲爱的同学，';
-  const sinceLine = demo
-    ? `这是 TA 学习的第 <strong>${day}</strong> 天。注册后，这里会换成你自己的进度。`
-    : name
-      ? `这是你注册 Grammar Quest 并学习的第 <strong>${day}</strong> 天。`
-      : `这是你使用 Grammar Quest 的第 <strong>${day}</strong> 天。`;
+  const greet = name ? `亲爱的 ${escapeHtml(name)}，` : '亲爱的同学，';
+  const sinceLine = name
+    ? `这是你注册 Grammar Quest 并学习的第 <strong>${day}</strong> 天。`
+    : `这是你使用 Grammar Quest 的第 <strong>${day}</strong> 天。`;
 
   return `
     <div class="home-header">
-      <div class="home-header__hello">
+      ${demo ? '' : `<div class="home-header__hello">
         <div class="home-header__greet">${greet}</div>
-        <div class="home-header__sub">${sinceLine}${demo ? '' : cheer}</div>
-      </div>
+        <div class="home-header__sub">${sinceLine}${cheer}</div>
+      </div>`}
       <a class="status-strip" href="#stats" title="查看完整进度">
         <span class="status-strip__item">${rank.icon} ${rank.name}</span>
         <span class="status-strip__item">⭐ ${player.totalScore}</span>
@@ -221,6 +219,18 @@ export function render() {
       </div>`;
   }
 
+  // 口语实战场入口：和 BOSS 卡一样是「验收」——关卡里做对的，开口说时还会不会错。
+  // 放在地图上，是让两半互相指路：地图练、实战场验、复习中心补。
+  const oralHtml = `
+      <a class="card mb-md oral-entry" href="#oral">
+        <div class="oral-entry__icon">🎙️</div>
+        <div class="oral-entry__info">
+          <div class="oral-entry__title">口语实战场</div>
+          <div class="oral-entry__desc">说一段英语，看哪些语法还会错</div>
+        </div>
+        <div class="oral-entry__chevron">›</div>
+      </a>`;
+
   // Quick start button (when no plan or plan completed)
   let quickStartHtml = '';
   if (!plan || plan.certificateEarned) {
@@ -276,6 +286,7 @@ export function render() {
       ${planHtml}
       ${quickStartHtml}
       ${bossHtml}
+      ${oralHtml}
 
       <div class="card mb-md" style="text-align:center;">
         <div style="font-size:var(--text-sm);color:var(--color-text-light);margin-bottom:var(--space-sm);">

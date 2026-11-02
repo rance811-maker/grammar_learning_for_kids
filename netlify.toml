@@ -1,6 +1,14 @@
 [build]
   publish = "."
 
+# 口语实战场的后端。函数必须跟着仓库走——Netlify 每次部署都是全站快照，
+# 哪一次部署没带上它们，界面还在、所有接口直接 404。
+[functions]
+  directory = "netlify/functions"
+  # vendor/ 里的 @netlify/blobs 是 curl 下来手动放进去的（这台机器 npm 连不上），
+  # 用 esbuild 打包时它是普通的相对 import，不需要装依赖。
+  node_bundler = "esbuild"
+
 # IMPORTANT: use the "/*" splat, which reliably matches files in
 # subdirectories (e.g. /js/engine.js, /css/style.css). Earlier rules used
 # "/*.js" and "/*.html", which on Netlify do NOT match nested paths — so the

@@ -1,0 +1,292 @@
+/* 口语实战场的样式。
+
+   规则本体是从独立产品 Spoken Grammar 原样搬来的，每条都加了 .view-oral 前缀，
+   不会漏到 Grammar Quest 别的页面上。颜色不再自己定义，全部映射到 GQ 的 token
+   （见文件末尾），所以亮色、暗色都跟着 GQ 走。 */
+
+
+
+.view-oral [hidden]{display:none!important}
+/* 不能用 display:none —— Safari 不给 display:none 的 input 弹文件对话框 */
+.view-oral .offscreen{position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0}
+.view-oral .wrap{max-width:860px;margin:0 auto;padding:0 16px}
+
+
+
+
+
+
+.view-oral .pills{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;padding-top:2px}
+.view-oral .pill{font-size:11px;padding:3px 9px;border-radius:99px;border:1px solid var(--line);
+  color:var(--muted);white-space:nowrap}
+.view-oral .pill.on{background:var(--accent-soft);border-color:transparent;color:var(--accent);font-weight:600}
+.view-oral .pill.off{background:var(--warn-soft);border-color:transparent;color:var(--warn);cursor:pointer}
+.view-oral .pill.click{cursor:pointer}
+.view-oral .pill.click:hover{border-color:var(--accent);color:var(--accent)}
+
+.view-oral nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.view-oral nav::-webkit-scrollbar{display:none}
+.view-oral nav button{appearance:none;background:none;border:0;border-bottom:2px solid transparent;
+  padding:9px 14px;font:inherit;font-size:14px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.view-oral nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+
+
+.view-oral .drop{border:2px dashed var(--line);border-radius:14px;padding:44px 24px;text-align:center;
+  background:var(--panel);transition:.15s;cursor:pointer}
+.view-oral .drop.hot{border-color:var(--accent);background:var(--accent-soft)}
+.view-oral .drop b{display:block;font-size:16px;margin-bottom:6px}
+.view-oral .drop span{color:var(--muted);font-size:13px}
+
+.view-oral .bar{display:flex;gap:20px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;padding:14px 18px;margin-bottom:22px}
+.view-oral .stat b{display:block;font-size:22px;line-height:1.2;font-variant-numeric:tabular-nums}
+.view-oral .stat span{font-size:12px;color:var(--muted)}
+
+.view-oral .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:14px 16px;margin-bottom:10px}
+.view-oral .card.style{border-style:dashed}
+.view-oral .chead{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.view-oral .ts{font:600 12px/1 var(--mono);background:var(--accent-soft);color:var(--accent);
+  border:0;border-radius:6px;padding:5px 8px;cursor:pointer;font-variant-numeric:tabular-nums}
+.view-oral .ts:hover{filter:brightness(.95)}
+.view-oral .tag{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--bg);
+  border:1px solid var(--line);color:var(--muted)}
+.view-oral .conf{font-size:11px;color:var(--muted);margin-left:auto;font-variant-numeric:tabular-nums}
+.view-oral .line{font:14px/1.6 var(--mono);display:flex;gap:9px;padding:3px 0;word-break:break-word}
+.view-oral .line i{font-style:normal;flex:none;width:12px;text-align:center;font-weight:700}
+.view-oral .line.x i{color:var(--bad)} .view-oral .line.v i{color:var(--good)}
+.view-oral .line.o i, .view-oral .line.o span{color:var(--muted)}
+.view-oral .rwlab{font-size:11px;color:var(--muted);flex:none;width:34px;padding-top:2px}
+.view-oral .line.x mark{background:var(--bad-soft);color:var(--bad);border-radius:3px;padding:0 2px}
+.view-oral .line.v mark{background:var(--good-soft);color:var(--good);border-radius:3px;padding:0 2px}
+.view-oral mark{background:none;color:inherit}
+.view-oral .note{color:var(--muted);font-size:13px;margin-top:9px;padding-left:21px}
+
+.view-oral h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  margin:30px 0 12px;font-weight:600}
+.view-oral h2:first-child{margin-top:0}
+.view-oral .hint{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:11px 14px;
+  font-size:13px;margin-bottom:14px}
+.view-oral .hint.dismiss{position:relative;padding-right:38px}
+.view-oral .xbtn{position:absolute;top:6px;right:8px;appearance:none;background:none;border:0;
+  color:inherit;font-size:20px;line-height:1;padding:2px 6px;cursor:pointer;opacity:.6}
+.view-oral .xbtn:hover{opacity:1}
+.view-oral .empty{color:var(--muted);text-align:center;padding:44px 16px;font-size:14px}
+
+/* 原文 */
+.view-oral .turn{display:flex;gap:10px;padding:7px 0;align-items:flex-start}
+.view-oral .turn.gap{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
+.view-oral .turn .ts{background:none;color:var(--muted);padding:4px 2px}
+.view-oral .turn.me .ts{color:var(--accent)}
+.view-oral .turn p{margin:0;font:14px/1.7 var(--mono);flex:1;word-break:break-word}
+.view-oral .turn.me p{border-left:2px solid var(--accent);padding-left:11px}
+.view-oral .turn.other p{color:var(--muted);padding-left:13px;font-size:13px}
+.view-oral .turn.hasErr p{background:var(--bad-soft);border-radius:0 6px 6px 0}
+.view-oral .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-bottom:16px;flex-wrap:wrap}
+.view-oral .legend em{font-style:normal;border-left:2px solid var(--accent);padding-left:7px}
+
+.view-oral .who{font-size:13px;color:var(--muted);margin-bottom:14px}
+/* 知识卡 */
+.view-oral .knowhead{appearance:none;background:none;border:0;width:100%;padding:0;cursor:pointer;
+  display:flex;align-items:center;gap:10px;font:inherit;color:var(--ink);text-align:left}
+.view-oral .knowhead b{font-size:15px}
+.view-oral .knowhead .meta{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.view-oral .knowhead .arrow{margin-left:auto;font-size:12px;color:var(--accent)}
+.view-oral .kh{font-size:13px;margin:16px 0 6px;color:var(--accent);letter-spacing:.02em}
+.view-oral .kp{margin:0;font-size:14px;line-height:1.85;color:var(--ink)}
+.view-oral .klist{margin:0;padding-left:20px}
+.view-oral .klist li{font-size:14px;line-height:1.85;padding:3px 0}
+
+.view-oral .tscroll{overflow-x:auto}
+.view-oral table{width:100%;border-collapse:collapse;font-size:14px}
+.view-oral th, .view-oral td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+.view-oral th{font-size:12px;color:var(--muted);font-weight:600}
+.view-oral td.num{font-variant-numeric:tabular-nums;text-align:right}
+.view-oral .verdict{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--line);white-space:nowrap}
+.view-oral .verdict.hot{background:var(--bad-soft);color:var(--bad);border-color:transparent;font-weight:600}
+.view-oral .rowlist{list-style:none;margin:0;padding:0}
+.view-oral .rowlist li{display:flex;gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);
+  cursor:pointer;flex-wrap:wrap}
+.view-oral .rowlist li:hover{color:var(--accent)}
+.view-oral .rowlist .meta{margin-left:auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* 进度 */
+.view-oral .prog{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}
+.view-oral .spin{width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--accent);
+  border-radius:50%;display:inline-block;animation:sg-sp .8s linear infinite;vertical-align:-2px}
+@keyframes sg-sp{to{transform:rotate(360deg)}}
+.view-oral .log{font:11px/1.6 var(--mono);color:var(--muted);margin-top:14px;max-height:190px;
+  overflow:auto;white-space:pre-wrap}
+.view-oral .err{background:var(--bad-soft);color:var(--bad);border-radius:10px;padding:13px 15px;
+  font-size:13px;white-space:pre-wrap;font-family:var(--mono);margin-bottom:14px;word-break:break-word}
+
+/* 录音 */
+.view-oral .rec{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px;text-align:center}
+.view-oral .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:22px}
+.view-oral .seg button{appearance:none;background:none;border:0;padding:8px 18px;font:inherit;font-size:13px;
+  color:var(--muted);cursor:pointer;border-right:1px solid var(--line)}
+.view-oral .seg button:last-child{border-right:0}
+.view-oral .seg button[aria-pressed="true"]{background:var(--accent);color:#fff;font-weight:600}
+.view-oral .prompt{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+  margin-bottom:22px;text-align:left}
+.view-oral .prompt .lab{font-size:11px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+.view-oral .prompt .q{font-size:16px;margin:7px 0 4px;line-height:1.5}
+.view-oral .prompt .en{font:13px/1.6 var(--mono);color:var(--muted)}
+.view-oral .prompt .re{margin-top:12px}
+.view-oral .bigbtn{appearance:none;border:0;border-radius:99px;background:var(--accent);color:#fff;
+  font:600 16px/1 inherit;padding:18px 44px;cursor:pointer}
+.view-oral .bigbtn:hover{filter:brightness(1.07)}
+.view-oral .bigbtn.stop{background:var(--bad)}
+.view-oral .clock{font:700 46px/1 var(--mono);font-variant-numeric:tabular-nums;margin:6px 0 4px}
+.view-oral .clock.warn{color:var(--bad)}
+.view-oral .sub{font-size:13px;color:var(--muted);margin-bottom:20px}
+.view-oral .meter{display:flex;align-items:flex-end;justify-content:center;gap:3px;height:52px;margin:0 0 8px}
+.view-oral .meter i{width:5px;background:var(--line);border-radius:2px;height:4px;transition:height .07s linear}
+.view-oral .meter i.on{background:var(--accent)}
+.view-oral .silent{color:var(--bad);font-size:13px;min-height:20px}
+.view-oral .rrow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+.view-oral .ok{background:var(--good-soft);color:var(--good);border-radius:10px;padding:11px 14px;
+  font-size:13px;margin-bottom:14px}
+
+/* 设置 */
+.view-oral .form{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:22px}
+.view-oral .form label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
+.view-oral .form label:first-child{margin-top:0}
+.view-oral .form input{width:100%;font:14px/1.4 var(--mono);padding:11px 12px;
+  border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);
+  -webkit-appearance:none;appearance:none}
+.view-oral .form input:focus{border-color:var(--accent);outline:2px solid var(--accent-soft);outline-offset:1px}
+/* 作用域别锁在 .form 里——表单外面也用这个类写补充说明，
+   锁住的话那些字会退回正文的深色，看着像正文而不是提示 */
+.view-oral .help{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.7}
+/* 卡片外面的独立提示：往里缩一点，和上面的内容拉开距离 */
+.view-oral .help.tip{margin:14px 2px 0;font-size:13px}
+.view-oral .form .rrow{justify-content:flex-start}
+.view-oral .linkbtn{appearance:none;background:none;border:0;padding:4px 0;margin-top:2px;
+  color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer}
+.view-oral .linkbtn:hover{color:var(--accent)}
+
+/* 首页 */
+.view-oral .hero{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:24px 22px;margin-bottom:14px}
+.view-oral .hero h3{margin:0 0 6px;font-size:19px}
+.view-oral .hero p{margin:0 0 8px;color:var(--muted);font-size:14px;line-height:1.8}
+.view-oral .hero p:last-of-type{margin-bottom:0}
+/* 三步走，不堆成一大段——手机上一大段几乎没人读 */
+.view-oral .steps{counter-reset:step;list-style:none;margin:14px 0 4px;padding:0}
+.view-oral .steps li{counter-increment:step;position:relative;padding:0 0 12px 30px;
+  color:var(--muted);font-size:14px;line-height:1.75}
+.view-oral .steps li:last-child{padding-bottom:0}
+.view-oral .steps li:before{content:counter(step);position:absolute;left:0;top:1px;
+  width:20px;height:20px;border-radius:50%;background:var(--accent-soft);color:var(--accent);
+  font:600 12px/20px inherit;text-align:center}
+.view-oral .hero .rrow{justify-content:flex-start;margin-top:18px}
+.view-oral .focus{background:var(--accent-soft);border-radius:12px;padding:14px 16px;margin-bottom:14px;
+  font-size:14px;color:var(--accent)}
+.view-oral .focus b{font-size:15px}
+.view-oral .form p{font-size:13px;color:var(--muted);margin:0 0 12px}
+
+/* 播放器 */
+.view-oral .player{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--panel);
+  border-top:1px solid var(--line);
+  padding:10px 0 calc(10px + env(safe-area-inset-bottom,0px))}
+.view-oral .player .wrap{display:flex;align-items:center;gap:12px}
+.view-oral .player audio{flex:1;min-width:0;height:34px}
+.view-oral .player .nm{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:34%}
+@media(max-width:560px){.view-oral .player .nm{display:none}}
+.view-oral button.ghost{appearance:none;background:var(--panel);border:1px solid var(--line);color:var(--ink);
+  border-radius:8px;padding:7px 13px;font:inherit;font-size:13px;cursor:pointer}
+.view-oral button.ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ------------------------------------------------------------------ 换成 GQ 的样子 */
+
+.view-oral {
+  --bg: var(--color-bg);
+  --panel: var(--color-card);
+  --ink: var(--color-text);
+  --muted: var(--color-text-light);
+  --line: var(--color-border);
+  /* GQ 里「选中 / 可点」一律是蓝色（侧边栏当前项、次按钮），主操作才是绿色 */
+  --accent: var(--color-secondary-dark);
+  --accent-soft: rgba(28, 176, 246, 0.12);
+  --bad: var(--color-danger-dark);
+  --bad-soft: rgba(255, 75, 75, 0.10);
+  --good: var(--color-primary-dark);
+  --good-soft: rgba(88, 204, 2, 0.12);
+  /* 和 GQ 顶部「示例数据」那条提示同一组颜色 */
+  --warn: #5C4A00;
+  --warn-soft: #FFF6D6;
+  --mono: var(--font-mono);
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+@media (prefers-color-scheme: dark) {
+  .view-oral { --warn: #F3D98A; --warn-soft: rgba(255, 200, 0, 0.12); }
+}
+
+.view-oral .sg-head { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.view-oral .sg-lead { flex: 1 1 280px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.view-oral .pills { margin-left: 0; }
+
+/* 二级标签：选中态和 GQ 侧边栏当前项同色 */
+.view-oral nav { border-bottom: 2px solid var(--line); margin-bottom: 20px; }
+.view-oral nav button { font-weight: 700; margin-bottom: -2px; }
+.view-oral nav button[aria-selected="true"] {
+  color: var(--color-secondary);
+  border-bottom-color: var(--color-secondary);
+  font-weight: 700;
+}
+/* 手机上八个标签一行放不下。独立版是横向滚动、滚动条藏起来——右边那几个
+   （历史、设置）根本没人知道在那儿；独立版的「设置」还是顶栏常驻按钮，合并后
+   挪进了这一排，藏起来就等于没有。所以窄屏折成两行，全部看得见。 */
+@media (max-width: 560px) {
+  .view-oral nav { flex-wrap: wrap; overflow-x: visible; row-gap: 2px; }
+  .view-oral nav button { padding: 8px 10px; }
+}
+
+/* 主按钮 = GQ 的 btn--primary：绿底白字，底下一道深绿「立体边」 */
+.view-oral .bigbtn {
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-lg);
+  font-weight: 700;
+  box-shadow: 0 4px 0 var(--color-primary-dark);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.view-oral .bigbtn:hover { filter: brightness(1.04); }
+.view-oral .bigbtn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--color-primary-dark); }
+.view-oral .bigbtn:disabled { opacity: 0.6; cursor: not-allowed; }
+.view-oral .bigbtn.stop { background: var(--color-danger); box-shadow: 0 4px 0 var(--color-danger-dark); }
+
+/* 次按钮 = GQ 的 btn--secondary：蓝色描边 */
+.view-oral button.ghost {
+  background: transparent;
+  border: 2px solid var(--color-secondary);
+  color: var(--color-secondary-dark);
+  border-radius: var(--radius-md);
+  font-weight: 700;
+}
+.view-oral button.ghost:hover { background: var(--accent-soft); border-color: var(--color-secondary); color: var(--color-secondary-dark); }
+.view-oral button.ghost:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* GQ 全局有 ul, ol { list-style: none }，知识卡「判断规则」「这周怎么练」的编号会被抹掉 */
+.view-oral .klist { list-style: decimal; }
+
+/* 卡片圆角对齐 GQ */
+.view-oral .card, .view-oral .bar, .view-oral .form, .view-oral .prog,
+.view-oral .hero, .view-oral .drop, .view-oral .rec { border-radius: var(--radius-lg); }
+.view-oral .seg button[aria-pressed="true"] { background: var(--color-secondary); }
+
+/* 播放器：独立版是贴着窗口底边的 fixed 横条。在 GQ 里桌面端左边有侧边栏，
+   fixed 会盖住侧边栏底部，所以改成贴着内容栏底部的 sticky。 */
+.view-oral .player {
+  position: sticky;
+  left: auto; right: auto; bottom: 0;
+  margin: 28px 0 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.06);
+}
+.view-oral .player .wrap { max-width: none; }
