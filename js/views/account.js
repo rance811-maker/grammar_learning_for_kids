@@ -246,8 +246,10 @@ function mountLoggedIn() {
       }
       // 家长专区的解锁跟着这次登录走：退出后同一个标签页再登录（哪怕是别的账号）也要重新输家长密码
       lockParentZone();
+      // 整页重新加载，而不是只换页：口语页的录音（麦克风）、进行中的转写和批改都存在模块变量里，
+      // 不重新加载就会一直开着，下一个人登录后还会用他的身份提交上一个人的录音
       location.hash = '';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      location.reload();
     });
   }
 }

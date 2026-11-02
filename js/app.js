@@ -85,14 +85,25 @@ const titles = {
 // 上一次真正画出来的页面地址：用来分辨「换了页面」和「同一页重绘」
 let lastRenderedHash = null;
 
+// 这个页面加载以来登录过的账号。同一个标签页里换成了另一个账号（登录过期后用别的账号登录），
+// 整页重新加载：口语页的录音、转写和批改这类进行中的任务是按模块变量存的，
+// 不重新加载就会跟着到下一个账号那里，用新账号的身份提交。
+let pageUid = null;
+
 function router() {
   const hash = location.hash.slice(1) || '';
   const parts = hash.split('/');
   const route = parts[0] || '';
   const params = parts.slice(1);
 
-  // 会话在别处没了（另一个标签页退出、续期被拒）：缓存的账号也作废，下面按没登录处理
-  if (store.account && cloud.cloudEnabled() && !cloud.hasSession()) store._refreshAccount();
+  // 会话在别处没了（另一个标签页退出、续期被拒）：缓存的账号也作废，下面按没登录处理；
+  // 家长专区一起上锁，重新登录（哪怕是同一个账号）要重新输家长密码
+  if (store.account && cloud.cloudEnabled() && !cloud.hasSession()) { store._refreshAccount(); parent.lock(); }
+
+  if (store.account) {
+    if (pageUid && pageUid !== store.account.userId) { location.reload(); return; }
+    pageUid = store.account.userId;
+  }
 
   if (route === '' && store.isPlacementNeeded()) {
     location.hash = 'placement';
@@ -532,7 +543,7 @@ window.addEventListener('storage', (e) => {
   const u = cloud.currentUser();
   if (u && !u.id) return;   // 另一个标签页正在用确认链接登录，还没拿到账号信息
   const after = (u && u.id) || null;
-  if ((before || null) !== after) location.reload();
+  if ((before || null) !== after) { parent.lock(); location.reload(); }
 });
 
 // Initialize

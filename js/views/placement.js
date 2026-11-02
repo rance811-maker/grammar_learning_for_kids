@@ -143,9 +143,10 @@ function canResume() {
 }
 
 export function render() {
-  // 做过摸底的账号要凭家长的通行条才能重做（见 allowPlacementRetake）；做到一半离开又回来的，接着做
+  // 做过摸底的账号要凭家长的通行条才能重做（见 allowPlacementRetake），通行条读一次就作废，
+  // 重做到一半离开、再回来（包括按浏览器后退）也要家长重新点。首次摸底不需要通行条，离开再回来接着做。
   const retake = takeRetakePass();
-  if (store.state.placementCompleted && !retake && !canResume()) {
+  if (store.state.placementCompleted && !retake) {
     testState = null;
     return renderAlreadyDone();
   }
