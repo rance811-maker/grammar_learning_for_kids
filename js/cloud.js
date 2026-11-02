@@ -85,10 +85,11 @@ async function authFetch(path, { method = 'POST', body, token } = {}) {
 }
 
 // 取一个有效的 access token，必要时用 refresh token 续期。
-async function validAccessToken() {
+// force：本机看令牌还没到期，但服务端已经不认它了（见 invokeFunction），也去续一次。
+async function validAccessToken({ force = false } = {}) {
   let s = readSession();
   if (!s || !s.access_token) throw new Error('NO_SESSION');
-  if (Date.now() < s.expires_at - 60000) return s.access_token;
+  if (!force && Date.now() < s.expires_at - 60000) return s.access_token;
   if (!s.refresh_token) throw new Error('NO_SESSION');
 
   let r;
@@ -154,8 +155,15 @@ export const cloud = {
 
   // 调用云函数（Supabase Edge Function），用当前登录用户的身份。
   // 失败时抛出的错误带 status 和 code（云函数返回的 error 字段），调用方按它们给提示。
-  async invokeFunction(name, body, { timeoutMs = 90000 } = {}) {
-    const token = await validAccessToken();
+  //
+  // 云函数回 401：它拿令牌去问 Supabase「这是谁」没通过——多半是在别的设备退出登录、改了密码，
+  // 本机看令牌还没到期，不会自己去续。先强制续期再请求一次（401 时云函数还没扣额度）：
+  // 续期被拒，validAccessToken 会清掉会话、抛 NO_SESSION；续上了服务端还是不认，也清掉。
+  // 不清的话侧栏和账号页一直显示「已登录」，批改却永远失败，也找不到重新登录的入口。
+  // 只清会话、不动本机存档：和续期被拒是同一条路，重新登录后本机没上传的进度照常先传上去。
+  // retried：内部用，标记这是续期之后的那一次。
+  async invokeFunction(name, body, { timeoutMs = 90000, retried = false } = {}) {
+    const token = await validAccessToken({ force: retried });
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     let res;
@@ -168,6 +176,12 @@ export const cloud = {
       });
     } finally {
       clearTimeout(timer);
+    }
+    if (res.status === 401) {
+      if (!retried) return cloud.invokeFunction(name, body, { timeoutMs, retried: true });
+      // 只清自己手里这份：等待期间别的标签页可能已经换了新登录
+      if (readSession()?.access_token === token) writeSession(null);
+      throw new Error('NO_SESSION');
     }
     const data = await res.json().catch(() => null);
     if (!res.ok) {

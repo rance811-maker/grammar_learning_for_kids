@@ -938,11 +938,22 @@ export const store = {
 
   // --- Portfolio ---
 
+  // 一个单元的写作任务在作品集里只留一篇：重写后再保存，换成新写的这篇。
+  // 以前每次都 push，重写两次计数就成了「已完成 2 / 12 篇」，打开看到的却还是最早那篇。
   saveToPortfolio(entry) {
+    this.state.portfolio = this.state.portfolio.filter((p) => p.unitId !== entry.unitId);
     this.state.portfolio.push({
       ...entry,
       date: entry.date || toDateString(new Date()),
     });
+    this.save();
+  },
+
+  // 批改比保存晚到：把批改补进同一单元、内容一样的那一篇（期间又重写保存过就不补）
+  setPortfolioReview(unitId, content, review) {
+    const entry = this.state.portfolio.find((p) => p.unitId === unitId && p.content === content);
+    if (!entry) return;
+    entry.review = review;
     this.save();
   },
 

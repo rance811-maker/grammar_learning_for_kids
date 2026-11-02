@@ -119,7 +119,8 @@ export function friendlyAiError(err) {
   const status = err && err.status;
   const raw = String((err && err.message) || err || '').toLowerCase();
   if (raw.includes('abort') || raw.includes('timeout') || raw.includes('timed out')) return 'AI 响应超时了，请检查网络后重试';
-  if (raw.includes('failed to fetch') || raw.includes('networkerror') || raw.includes('network request') || raw.includes('load failed')) return '网络连接不上，检查一下网络再试试';
+  // 'network'：cloud.js 续期令牌时连不上 supabase.co 抛的 NETWORK（作文批改走这条），不能把英文代码露给孩子
+  if (raw.includes('failed to fetch') || raw.includes('networkerror') || raw.includes('network request') || raw.includes('load failed') || raw === 'network') return '网络连接不上，检查一下网络再试试';
   if (status === 401 || status === 403 || raw.includes('api key') || raw.includes('api_key') || raw.includes('unauthorized') || raw.includes('permission denied') || raw.includes('api key not valid')) return 'API key 无效或没有权限，请检查 key 是否填对';
   if (status === 429 || raw.includes('rate limit') || raw.includes('quota') || raw.includes('resource_exhausted') || raw.includes('too many requests')) return 'AI 调用太频繁或额度用完了，等一会儿再试';
   if ((status && status >= 500) || raw.includes('overloaded') || raw.includes('unavailable') || raw.includes('try again later')) return 'AI 服务暂时繁忙，请稍后重试';
