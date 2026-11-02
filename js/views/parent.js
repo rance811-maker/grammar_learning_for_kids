@@ -3,6 +3,7 @@ import { cloud, friendlyError } from '../cloud.js';
 import { SUB_SKILL_NAMES } from '../data/skill-names.js';
 import { fillAnswerText } from '../fillAnswers.js';
 import { renderTip } from '../tipFormat.js';
+import { questionPreview } from '../engine.js';
 import { curriculum, BUILT_IN_ID } from '../curriculum.js';
 import { generateSyllabus, generateAllUnits, hasApiKey, friendlyAiError, buildMaterial, generateUnitPreview, generateCoverage, hasBlueprint, deterministicCoverage } from '../unitGenerator.js';
 import { allowPlacementRetake } from './placement.js';
@@ -1127,17 +1128,16 @@ function renderReport() {
 
   // --- (a) Overview stats ---
   const totalScore = player.totalScore;
-  const currentStreak = player.currentStreak;
+  const currentStreak = store.getDisplayStreak();   // 停练多天后不再显示停练前的数
   const accuracyRate = store.getAccuracyRate();
   const accuracyPct = Math.round(accuracyRate * 100);
 
-  // Count completed levels across all units
+  // 已通过的关卡数（12 个单元 × 5 关，至少 1 星算通过）。按 isLevelPassed 数，
+  // 老存档里 0 星也可能被记成 completed，数 completed 会多算。
   let completedLevels = 0;
   for (let u = 1; u <= 12; u++) {
-    const unit = store.state.units[u];
-    if (!unit) continue;
     for (let lv = 1; lv <= 5; lv++) {
-      if (unit.practiceLevels[lv]?.completed) completedLevels++;
+      if (store.isLevelPassed(u, lv)) completedLevels++;
     }
   }
 
@@ -1222,12 +1222,15 @@ function renderReport() {
   const recentSessions = [...history].reverse().slice(0, 10);
   const sessionRows = recentSessions.length > 0
     ? recentSessions.map(s => {
-        const unitTitle = curriculum.getUnit(s.unitId)?.title || `单元 ${s.unitId}`;
+        // 专项复习、模拟挑战记进历史时 unitId 是 'review' / 'boss'、没有关卡号
+        const sessionName = s.unitId === 'review' ? '专项复习'
+          : s.unitId === 'boss' ? `${curriculum.examLabel()} 模拟挑战`
+          : `${curriculum.getUnit(s.unitId)?.title || `单元 ${s.unitId}`} Lv.${s.level || '-'}`;
         const starsDisplay = '⭐'.repeat(s.stars || 0);
         const accPct = s.accuracy != null ? Math.round(s.accuracy * 100) : (s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0);
         return `<tr>
           <td style="padding:8px 6px;font-size:0.8rem;color:#666;white-space:nowrap;">${esc(s.date || '')}</td>
-          <td style="padding:8px 6px;font-size:0.8rem;">${esc(unitTitle)} Lv.${s.level || '-'}</td>
+          <td style="padding:8px 6px;font-size:0.8rem;">${esc(sessionName)}</td>
           <td style="padding:8px 6px;font-size:0.8rem;">${starsDisplay || '-'}</td>
           <td style="padding:8px 6px;font-size:0.8rem;text-align:right;">${accPct}%</td>
           <td style="padding:8px 6px;font-size:0.8rem;text-align:right;font-weight:600;">${s.score || 0}</td>
@@ -1241,7 +1244,8 @@ function renderReport() {
   const mistakeRows = recentMistakes.length > 0
     ? recentMistakes.map(m => {
         const q = m.question || {};
-        const text = q.sentence || q.instruction || q.context || '(无题目内容)';
+        // 按题型取原题（找错、排序、连线、情境题没有 sentence），家长这里不截断
+        const text = questionPreview(q, Infinity) || '(无题目内容)';
         return `<div style="padding:8px 0;border-bottom:1px solid #f0f0f0;">
           <div style="font-size:0.8rem;color:#333;line-height:1.4;">${esc(text)}</div>
           <div style="font-size:0.7rem;color:#999;margin-top:2px;">${esc(m.date || '')} · 单元 ${m.unitId || '?'} Lv.${m.level || '?'}</div>
@@ -1325,8 +1329,8 @@ function renderReport() {
         <div style="font-size:0.8rem;color:#666;margin-top:4px;">综合正确率</div>
       </div>
       <div style="background:#f5f5f5;border-radius:8px;padding:16px;text-align:center;">
-        <div style="font-size:1.5rem;font-weight:700;color:#6a1b9a;">${completedLevels}</div>
-        <div style="font-size:0.8rem;color:#666;margin-top:4px;">已完成关卡</div>
+        <div style="font-size:1.5rem;font-weight:700;color:#6a1b9a;">${completedLevels}<span style="font-size:0.85rem;font-weight:600;color:#999;"> / 60</span></div>
+        <div style="font-size:0.8rem;color:#666;margin-top:4px;">已通过关卡</div>
       </div>
     </div>
 
