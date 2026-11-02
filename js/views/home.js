@@ -144,7 +144,7 @@ export function render() {
 
     const needsGen = unitData._needsGeneration ? ' unit-node--needs-gen' : '';
     nodesHtml += `
-      <div class="unit-node ${statusClass}${needsGen}" data-unit-id="${uid}">
+      <div class="unit-node ${statusClass}${needsGen}" data-unit-id="${uid}" ${status === 'locked' ? 'aria-disabled="true"' : 'tabindex="0" role="button"'}>
         <div class="unit-node__circle">${circleContent}</div>
         <div class="unit-node__no">Unit ${uid}</div>
         <span class="unit-node__name">${unitData.title || 'Unit ' + uid}</span>

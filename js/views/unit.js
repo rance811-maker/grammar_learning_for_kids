@@ -31,6 +31,11 @@ const LEVEL_NAMES = {
   5: 'Lv.5 挑战',
 };
 
+// 卡片是 div 做的按钮：让键盘能 Tab 到、按回车打开（按键在 app.js 里统一处理）。
+// 锁着的卡片不进 Tab 顺序，只告诉读屏软件它现在点不了。
+const CARD_BUTTON = 'tabindex="0" role="button"';
+const CARD_LOCKED = 'aria-disabled="true"';
+
 function renderStars(count) {
   let html = '';
   for (let i = 0; i < 3; i++) {
@@ -79,7 +84,7 @@ export function render(unitId) {
   // Discover card
   const discoverStatus = discoverDone ? '✅ 已完成' : '开始阅读';
   const discoverCard = `
-    <div class="phase-card phase-card--discover" data-action="discover" data-unit="${unitId}">
+    <div class="phase-card phase-card--discover" data-action="discover" data-unit="${unitId}" ${CARD_BUTTON}>
       <div class="phase-card__icon">📖</div>
       <div class="phase-card__info">
         <div class="phase-card__title">发现</div>
@@ -109,7 +114,7 @@ export function render(unitId) {
           ? '<span class="badge badge--warning">未通过</span>'
           : '<span class="badge">开始练习</span>';
     const desc = completed
-      ? '已通关 - 再次挑战可提升星级'
+      ? (stars >= 3 ? '已通关 - 满星了，想巩固可以再练' : '已通关 - 再次挑战可提升星级')
       : failedBefore
         ? '上次没过 - 答错不超过 2 题就能通关'
         : unlocked
@@ -117,7 +122,7 @@ export function render(unitId) {
           : '通过前一关后解锁';
 
     levelsHtml += `
-      <div class="phase-card phase-card--practice${lockedClass}" data-action="practice" data-unit="${unitId}" data-level="${lv}">
+      <div class="phase-card phase-card--practice${lockedClass}" data-action="practice" data-unit="${unitId}" data-level="${lv}" ${unlocked ? CARD_BUTTON : CARD_LOCKED}>
         <div class="phase-card__icon">${unlocked ? '📝' : '🔒'}</div>
         <div class="phase-card__info">
           <div class="phase-card__title">${LEVEL_NAMES[lv]}</div>
@@ -138,7 +143,7 @@ export function render(unitId) {
 
   const missionTitle = unitData.mission?.title || '写作任务';
   const missionCard = `
-    <div class="phase-card phase-card--mission${missionLockedClass}" data-action="mission" data-unit="${unitId}">
+    <div class="phase-card phase-card--mission${missionLockedClass}" data-action="mission" data-unit="${unitId}" ${missionUnlocked ? CARD_BUTTON : CARD_LOCKED}>
       <div class="phase-card__icon">🎯</div>
       <div class="phase-card__info">
         <div class="phase-card__title">${missionTitle}</div>

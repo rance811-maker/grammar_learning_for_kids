@@ -6,14 +6,16 @@
 
 // 横跨页面顶部、滚动时钉在上面的栏：手机上的图标导航、页面标题栏、练习进度条。
 // 电脑上的侧栏也是 sticky，但它在左边、不挡内容，按宽度排除。
+// 钉住后的下沿 = 它的 top + 高度：手机上练习进度条贴在导航下面（top 不是 0），两条栏是叠起来的，
+// 只取最高那条会让题目开头落在进度条底下。
 function coveredTop() {
   let cover = 0;
   for (const el of document.querySelectorAll('.sidebar, .topbar, .practice-header')) {
-    const pos = getComputedStyle(el).position;
-    if (pos !== 'sticky' && pos !== 'fixed') continue;
+    const cs = getComputedStyle(el);
+    if (cs.position !== 'sticky' && cs.position !== 'fixed') continue;
     const r = el.getBoundingClientRect();
     if (r.width < window.innerWidth * 0.5 || r.height > window.innerHeight * 0.4) continue;
-    cover = Math.max(cover, r.height);
+    cover = Math.max(cover, (parseFloat(cs.top) || 0) + r.height);
   }
   return cover;
 }

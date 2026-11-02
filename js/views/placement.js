@@ -99,9 +99,21 @@ function renderResults() {
     </div>`;
 }
 
+// 做到一半离开再回来（点了 🗺️ 学习地图，首页又把没做摸底的人送回这里；或者先去看了别的页面），
+// 接着做，不从头再来。以前每次进来都重新抽题，已经答的几题悄悄作废。
+// 换了账号或课程就不接着做：题是按当时的课程抽的，答案也要记到当时那个账号上。
+function canResume() {
+  return testState && testState.started && !testState.done
+    && testState.owner === (store.account?.userId ?? null)
+    && testState.courseId === store.state.activeCurriculumId;
+}
+
 export function render() {
-  const questions = pickQuestions();
-  testState = { questions, currentIndex: 0, answers: [] };
+  if (!canResume()) {
+    testState = { questions: pickQuestions(), currentIndex: 0, answers: [], started: false, done: false,
+      owner: store.account?.userId ?? null, courseId: store.state.activeCurriculumId };
+  }
+  const { questions } = testState;
 
   return `
     <div id="placementRoot">
@@ -122,9 +134,16 @@ export function render() {
 }
 
 export function mount() {
+  if (testState.started) {
+    // 接着上次答到的那题（答完一题、还没跳到下一题就离开的，也从下一题开始）
+    testState.currentIndex = testState.answers.length;
+    showCurrentQuestion();
+    return;
+  }
   const beginBtn = document.getElementById('placementBeginBtn');
   if (beginBtn) {
     beginBtn.addEventListener('click', () => {
+      testState.started = true;
       showCurrentQuestion();
     });
   }
@@ -188,8 +207,11 @@ function handleAnswer(userAnswer) {
       </div>`;
   }
 
+  const st = testState;
   setTimeout(() => {
-    testState.currentIndex++;
+    if (testState !== st) return;   // 已经换成新的一轮摸底了
+    // 按已答题数定位，不用 ++：这 1.2 秒里如果离开又回来，回来时已经跳到下一题了，不能再跳一次
+    st.currentIndex = st.answers.length;
     showCurrentQuestion();
   }, 1200);
 }
@@ -197,6 +219,7 @@ function handleAnswer(userAnswer) {
 function showResultsScreen() {
   const root = document.getElementById('placementRoot');
   if (!root) return;
+  testState.done = true;
 
   const results = testState.answers.map((a, i) => ({
     unitId: a.unitId,
