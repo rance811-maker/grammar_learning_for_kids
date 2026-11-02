@@ -243,10 +243,11 @@ export const unitsBatch = [
         },
         {
           type: "reorder",
+          acceptableSentences: ["Right now, my brother is playing football."],
           instruction: "把单词排列成正确的句子",
           words: ["is", "brother", "playing", "my", "football", "now", "right"],
           correct: "My brother is playing football right now.",
-          explanation: "主语 + is/are + 动词-ing + 其他 + 时间状语。My brother is playing football right now.",
+          explanation: "主语 + is/are + 动词-ing + 其他 + 时间状语。My brother is playing football right now. 时间状语 right now 也可以放在句首：Right now, my brother is playing football.",
           subSkill: "time_markers"
         },
         {
@@ -619,10 +620,10 @@ export const unitsBatch = [
         {
           type: "choice",
           instruction: "选择正确的答案",
-          sentence: "We ___ dinner at 7 pm last night.",
+          sentence: "We ___ dinner when you called at 7 pm last night.",
           options: ["have", "had", "were having", "having"],
           correct: 2,
-          explanation: "at 7 pm last night → 昨晚七点那个时刻正在做 → 过去进行时 → were having。",
+          explanation: "you called（你打来电话）是短动作，打断了正在进行的长动作「吃晚饭」→ 长动作用过去进行时；主语 We 是复数 → were having。",
           subSkill: "was_were"
         },
         {
@@ -714,14 +715,9 @@ export const unitsBatch = [
           type: "choice",
           instruction: "选择正确的答案",
           sentence: "The children ___ while the teacher ___ on the board.",
-          options: [
-            "talked / wrote",
-            "were talking / was writing",
-            "talked / was writing",
-            "were talking / wrote"
-          ],
+          options: ["talking / writing","were talking / was writing","was talking / were writing","were talk / was write"],
           correct: 1,
-          explanation: "两个同时进行的长动作 → 都用过去进行时。While 连接两个并行动作。",
+          explanation: "孩子们说话、老师写字是同时进行的两个长动作 → 都用过去进行时 was/were + 动词-ing。The children 是复数 → were talking；the teacher 是单数 → was writing。A 少了 was/were，C 把 was 和 were 用反了，D 的动词没加 -ing。",
           subSkill: "when_while"
         },
         {
@@ -774,10 +770,11 @@ export const unitsBatch = [
         },
         {
           type: "reorder",
+          acceptableSentences: ["The phone rang while she was doing her homework."],
           instruction: "把单词排列成正确的句子",
           words: ["was", "she", "while", "homework", "her", "doing", "the", "rang", "phone"],
           correct: "While she was doing her homework, the phone rang.",
-          explanation: "While + 主语 + was/were + -ing（长动作），主语 + 动词过去式（短动作）。",
+          explanation: "While + 主语 + was/were + -ing（长动作），主语 + 动词过去式（短动作）。while 句子也可以放在后面：The phone rang while she was doing her homework.",
           subSkill: "when_while"
         },
         {
@@ -808,10 +805,11 @@ export const unitsBatch = [
         },
         {
           type: "reorder",
+          acceptableSentences: ["When I was sleeping, the dog barked.","I was sleeping when the dog barked.","When the dog barked, I was sleeping."],
           instruction: "把单词排列成正确的句子",
           words: ["the", "when", "dog", "I", "sleeping", "was", "barked"],
           correct: "The dog barked when I was sleeping.",
-          explanation: "短动作 when 长动作：The dog barked（短）when I was sleeping（长）。",
+          explanation: "短动作用一般过去时（barked），长动作用过去进行时（was sleeping）：The dog barked（短）when I was sleeping（长）。换个顺序也对：When I was sleeping, the dog barked. / I was sleeping when the dog barked.",
           subSkill: "when_while"
         },
         {
@@ -829,10 +827,10 @@ export const unitsBatch = [
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["I", "was", "go", "to", "the", "cinema", "yesterday"],
-          errorIndex: 2,
+          sentence: ["I","goed","to","the","cinema","yesterday"],
+          errorIndex: 1,
           correction: "went",
-          explanation: "yesterday → 一般过去时 → I went to the cinema yesterday. ✓ 不是 was go。",
+          explanation: "yesterday → 一般过去时。go 是不规则动词，过去式是 went，不能直接加 -ed 写成 goed。I went to the cinema yesterday. ✓",
           subSkill: "irregular_verbs"
         },
         {
@@ -962,15 +960,10 @@ export const unitsBatch = [
         {
           type: "choice",
           instruction: "阅读短文，选择正确答案",
-          sentence: "Emma's diary: 'It ___ a beautiful day. Birds ___ in the trees and the sun ___ brightly. I decided to go for a bike ride.'",
-          options: [
-            "was / sang / shone",
-            "was / were singing / was shining",
-            "is / are singing / is shining",
-            "was / were singing / shone"
-          ],
+          sentence: "Emma's diary: 'Last Sunday it ___ a beautiful day. Birds ___ in the trees and the sun ___ brightly. I decided to go for a bike ride.'",
+          options: ["was / were sing / was shine","was / were singing / was shining","is / are singing / is shining","was / was singing / were shining"],
           correct: 1,
-          explanation: "日记描述过去的场景背景 → 过去进行时（birds were singing, sun was shining）；was a beautiful day → 状态。背景描写用进行时让画面更生动。",
+          explanation: "Last Sunday 和 I decided 都说明日记写的是过去的事。描写当时正在进行的场景（鸟在唱歌、太阳在照耀）→ 过去进行时 was/were + 动词-ing：Birds 是复数 → were singing，the sun 是单数 → was shining；It was a beautiful day 是过去的状态。A 的动词没加 -ing，C 用了现在时，D 把 was 和 were 用反了。",
           subSkill: "when_while"
         },
         {
@@ -1342,10 +1335,11 @@ export const unitsBatch = [
         },
         {
           type: "reorder",
+          acceptableSentences: ["She has read the book already."],
           instruction: "把单词排列成正确的句子",
           words: ["she", "already", "the", "has", "read", "book"],
           correct: "She has already read the book.",
-          explanation: "already 放在 has 和过去分词之间。She has already read the book. ✓",
+          explanation: "already 一般放在 has 和过去分词之间：She has already read the book. ✓ 也可以放在句末：She has read the book already. ✓",
           subSkill: "already_yet"
         },
         {
@@ -1380,10 +1374,10 @@ export const unitsBatch = [
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["I", "have", "went", "to", "Paris", "three", "times"],
+          sentence: ["I","have","went","to","Paris","three","times","since","2020"],
           errorIndex: 2,
           correction: "been",
-          explanation: "现在完成时用过去分词。go 的过去分词是 gone/been。I have been to Paris. ✓（不是 have went）。",
+          explanation: "since 2020 表示从过去一直到现在 → 用现在完成时 have + 过去分词。went 是过去式，不能放在 have 后面。表示「去过某地（已经回来了）」用 have been to，been 是 be 的过去分词（go 的过去分词是 gone）。I have been to Paris three times since 2020. ✓",
           subSkill: "past_participle"
         },
         {
@@ -1398,10 +1392,10 @@ export const unitsBatch = [
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["I", "have", "seen", "this", "movie", "yesterday"],
-          errorIndex: 5,
-          correction: "(remove — use past simple: I saw this movie yesterday)",
-          explanation: "yesterday 是具体过去时间 → 不能和现在完成时一起用！应该是 I saw this movie yesterday. 或者 I have seen this movie before.",
+          sentence: ["I","have","watched","this","movie","last","night"],
+          errorIndex: 1,
+          correction: "(remove)",
+          explanation: "last night（昨晚）是具体的过去时间 → 要用一般过去时，不能用现在完成时。删掉 have：I watched this movie last night. ✓（watch 的过去式和过去分词都是 watched）想用现在完成时，就不能说具体时间：I have watched this movie before. ✓",
           subSkill: "specific_time_marker"
         },
         {
