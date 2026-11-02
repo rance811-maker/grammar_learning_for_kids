@@ -85,6 +85,9 @@ const titles = {
   'install': '添加到桌面',
 };
 
+// 上一次真正画出来的页面地址：用来分辨「换了页面」和「同一页重绘」
+let lastRenderedHash = null;
+
 function router() {
   const hash = location.hash.slice(1) || '';
   const parts = hash.split('/');
@@ -117,6 +120,14 @@ function router() {
   else if (route !== 'account') gate.clearReturn();
   const content = gated ? gate.render(route) : view.render(...params);
   app.innerHTML = renderShell(route, content, gated);
+  // 换了页面就从顶上开始看。hash 路由没有对应的锚点，浏览器不会自己滚，新页面会停在上一页的
+  // 滚动位置（读完故事回到单元页，只看到一排锁着的关）。同一个地址重绘（云端同步完、
+  // 切课程后重跑路由）不动，免得正在看的地方被拉回顶上。放在 mount 前：练习、摸底自己的
+  // scrollToStart 照常生效。
+  if (location.hash !== lastRenderedHash) {
+    lastRenderedHash = location.hash;
+    window.scrollTo(0, 0);
+  }
 
   if (!gated && view.mount) {
     view.mount(...params);
@@ -156,12 +167,17 @@ function activeNavRoute(route) {
     // The review-mode practice session belongs under the 复习中心 tab.
     return location.hash.startsWith('#practice/review') ? 'review' : '';
   }
-  return ['oral', 'review', 'portfolio', 'stats', 'parent', 'feedback'].includes(route) ? route : '';
+  if (['oral', 'review', 'portfolio', 'stats', 'parent', 'feedback'].includes(route)) return route;
+  // 账号页高亮账号块；「这是什么」「添加到桌面」不属于任何一项，都不高亮。
+  // 以前一律返回 ''，正好等于「学习地图」，人在账号页，导航却显示还在地图上。
+  if (['account', 'about', 'install'].includes(route)) return route;
+  return '';
 }
 
 function renderShell(route, content, gated = false) {
   const topLevelRoutes = ['', 'oral', 'review', 'portfolio', 'stats', 'account', 'parent', 'about', 'feedback'];
-  const showBackBtn = !topLevelRoutes.includes(route);
+  // 还没做过摸底时，「返回」去首页又会被送回摸底、重新开始，等于没有出口，干脆不显示
+  const showBackBtn = !topLevelRoutes.includes(route) && !(route === 'placement' && store.isPlacementNeeded());
   const title = titles[route] || 'Grammar Quest';
 
   return `
@@ -306,7 +322,7 @@ function renderSidebar(route) {
       <nav class="sidebar__nav">${items}</nav>
       <div class="sidebar__footer">
         <div class="sidebar__account-panel">
-          <button class="sidebar__account" data-route="account"
+          <button class="sidebar__account${active === 'account' ? ' active' : ''}" data-route="account"
                   aria-label="${escapeHtml(accountLabel)}" title="${escapeHtml(accountLabel)}">${accountLine}</button>
           ${demo ? '' : `<div class="sidebar__stats">
             <span class="sidebar__stat sidebar__stat--rank">${rank.icon} ${rank.name}</span>
@@ -368,9 +384,17 @@ function mountCloudSaveBanner() {
   });
 }
 
+// 练习做到一半，从导航、顶栏「← 返回」、页面上的站内链接离开，都和练习页的 ✕ 一样先问一句：
+// 以前只有 ✕ 会问，旁边这几个入口一点就走，已经答的题全部作废。
+function confirmLeavePage() {
+  const route = (location.hash.slice(1) || '').split('/')[0];
+  return route !== 'practice' || practice.confirmLeave();
+}
+
 function mountNav() {
   document.querySelectorAll('.sidebar__item, .sidebar__account').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (!confirmLeavePage()) return;
       location.hash = btn.dataset.route;
     });
   });
@@ -441,11 +465,14 @@ function mountBackButton() {
       const parts = hash.split('/');
       const route = parts[0];
 
-      if (route === 'practice' && parts[1] === 'review') {
-        location.hash = 'review';
+      // 练习页的「返回」和 ✕ 是同一件事：没答完先确认，回到该回的地方
+      // （复习 → 复习中心，模拟挑战 → 首页，不再拼出不存在的 #unit/boss）
+      if (route === 'practice') {
+        if (!practice.confirmLeave()) return;
+        location.hash = practice.backTargetFor(parts[1]);
         return;
       }
-      if (route === 'discover' || route === 'practice' || route === 'mission') {
+      if (route === 'discover' || route === 'mission') {
         const unitId = parts[1];
         if (unitId) {
           location.hash = `unit/${unitId}`;
@@ -516,6 +543,24 @@ store.init();
 initPwa();
 initAnalytics();
 window.addEventListener('hashchange', router);
+
+// 站内链接（站点带的 Grammar Quest、「看完整介绍」、云端保存失败提示里的「重新登录」）：
+// 练习做到一半点到也先确认。捕获阶段处理，赶在浮层自己拦冒泡之前。
+document.addEventListener('click', (e) => {
+  const a = e.target instanceof Element && e.target.closest('a[href^="#"]');
+  if (a && !confirmLeavePage()) e.preventDefault();
+}, true);
+
+// 地图上的单元、单元页的关卡卡片、作品集卡片是 div 做的按钮（role="button" tabindex="0"）：
+// 键盘聚焦到上面，按回车或空格和点一下一样。真正的 <button>、链接浏览器自己会处理。
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target;
+  if (!(el instanceof HTMLElement) || el.getAttribute('role') !== 'button') return;
+  if (el.matches('button, a, input, textarea, select') || el.getAttribute('aria-disabled') === 'true') return;
+  e.preventDefault();   // 空格不要顺带把页面往下翻
+  el.click();
+});
 
 consumeAuthCallback().then(() => {
   router();

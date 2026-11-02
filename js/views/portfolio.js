@@ -21,7 +21,7 @@ export function render() {
     if (entry) {
       const preview = (entry.content || '').slice(0, 80);
       cardsHtml += `
-        <div class="portfolio-card" data-unit-id="${uid}">
+        <div class="portfolio-card" data-unit-id="${uid}" tabindex="0" role="button">
           <div style="font-size:1.5rem;">${icon}</div>
           <div class="portfolio-card__title">${entry.title || missionTitle}</div>
           <div class="portfolio-card__date">${entry.date || ''}</div>

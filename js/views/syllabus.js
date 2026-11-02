@@ -97,7 +97,7 @@ export function render() {
 
     const clickable = o.generated && !p.locked;
     return `
-      <div class="syl-item${clickable ? ' syl-item--link' : ''}" ${clickable ? `data-unit-id="${o.id}"` : ''}>
+      <div class="syl-item${clickable ? ' syl-item--link' : ''}" ${clickable ? `data-unit-id="${o.id}" tabindex="0" role="button"` : ''}>
         <div class="syl-item__head">
           <span class="syl-item__no">Unit ${o.id}</span>
           ${statusHtml}
