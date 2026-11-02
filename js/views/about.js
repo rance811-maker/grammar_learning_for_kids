@@ -1,3 +1,5 @@
+import { store } from '../store.js';
+
 // 「这是什么」——站点定位的正式住址，也是可以单独发给别人的地址（/#about）。
 //
 // 为什么单独开一页：定位长文案原本放在首页内容区，但新用户打开站点会被
@@ -6,13 +8,19 @@
 // 却天天挡在孩子和练习按钮之间——两头不讨好。
 
 export function render() {
+  // 底部的大按钮：还没做过摸底（或没登录，先去注册）才给「做摸底」。
+  // 已经在学的孩子点品牌名就能进这一页，以前点一下大绿按钮就重做摸底、学习计划进度清零，
+  // 而且一句提示都没有。重新摸底只放在家长专区，要家长密码加确认。
+  const placementCta = store.isDemo() || store.isPlacementNeeded()
+    ? '<a class="btn btn--primary btn--large" href="#placement">让孩子先做 3 分钟摸底</a>'
+    : '<a class="btn btn--primary btn--large" href="#">回到学习地图</a>';
   return `
     <div class="view view-about">
       <div class="about-hero">
         <h1 class="about-hero__title">给中国孩子的英语语法精准练习</h1>
         <p class="about-hero__lead">
           不做通用题库——按孩子的<strong>考试目标</strong>和<strong>当前水平</strong>定制课程，只练该练的。
-          家长可自定义整套课程；写作由 AI 逐句批改，指出错在哪、为什么错；
+          家长还可以定制自己的课程（要自备 AI key，或付费请我们做）；写作由 AI 逐句批改，指出错在哪、为什么错；
           开口说的英语也能拿来批改，找出真说话时还在犯的错。
         </p>
       </div>
@@ -29,8 +37,9 @@ export function render() {
         <h2>家长可以自定义整套课程</h2>
         <p>
           内置 PET、雅思 6 分、雅思 7 分三套课程，免费注册就能用。
-          如果孩子的目标不在其中，家长可以在「家长专区」按目标和水平定制一套新的，
-          也可以上传自己的教材或考纲让课程照着编排。
+          如果孩子的目标不在其中，有两条路：一是家长在「家长专区」填上自己的 AI key（Gemini 或 Claude），
+          按目标和水平自己生成一套，还可以上传教材或考纲让课程照着编排；
+          二是不想折腾，付费请我们按孩子的情况定制。
         </p>
         <p class="about-note">
           每套课程都能在「查看语法提纲」里看清 12 个单元分别练什么、按什么顺序练。
@@ -43,6 +52,9 @@ export function render() {
           孩子写完一段话，AI 会一句一句看：哪句有问题、错在哪、为什么错，
           并给出改正后的完整句子。它也会检查前后是否自相矛盾——
           比如上一句说 dinner、下一句写成 lunch，这类错误单看一句是发现不了的。
+        </p>
+        <p class="about-note">
+          批改由网站免费提供，每个账号每月 5 篇；家长配了自己的 AI key 就不限次数。
         </p>
       </div>
 
@@ -80,9 +92,15 @@ export function render() {
       <div class="about-section about-section--plain">
         <h2>我们记录哪些数据</h2>
         <p>
-          为了知道网站好不好用，我们会匿名记录访问和练习情况：打开了哪些页面、停留多久、
-          用的是手机还是电脑、完成了哪一关和对了几题。不记录姓名、答题内容和 IP 地址。
+          为了知道网站好不好用，我们会记录访问和练习情况：打开了哪些页面、停留多久、
+          用的是手机还是电脑、完成了哪一关和对了几题。没登录时这些记录是匿名的；
+          登录后会关联到你的账号（比如能看到这个账号最近一次是什么时候来的）。
+          不记录 IP 地址，也不记录答题内容。
           登录后，学习进度会保存在你的账号里，方便换设备继续练。
+        </p>
+        <p>
+          孩子提交的作文会发给网站的批改服务，由 AI 逐句批改，不会公开；
+          家长配了自己的 AI key 时，作文直接发给那家 AI 服务（Google 的 Gemini 或 Anthropic 的 Claude）。
         </p>
         <p>
           口语实战场另说：录音文件只留在你自己的设备上，不上传；转写出来的文字和批改结果存在你的账号下。
@@ -92,7 +110,7 @@ export function render() {
       </div>
 
       <div class="about-actions">
-        <a class="btn btn--primary btn--large" href="#placement">让孩子先做 3 分钟摸底</a>
+        ${placementCta}
         <a class="btn btn--secondary" href="#parent">进入家长专区</a>
       </div>
     </div>`;

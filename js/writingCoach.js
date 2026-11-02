@@ -12,6 +12,7 @@ import { cloud } from './cloud.js';
 // - 家长在家长专区配了自己的 key：浏览器直接调 AI，不限次数（下面两段提示词）
 // - 没配：走网站的云函数 gq-review-writing，用网站的 key，每个账号每天限几篇。
 //   云函数里有同一套提示词（supabase/functions/gq-review-writing/review.ts），改这里时记得同步那边。
+// - 配了，但这把 key 用不了（失效、额度用完、模型下线）：这一篇退回网站的云函数，见 ownKeyUnusable。
 const PROMPT = `You are a kind but precise English writing coach for a Chinese child (about 10-12 years old).
 The child completed a guided writing task: the app gave some fixed prompt words, and the child filled in the rest.
 
@@ -87,12 +88,24 @@ function cloudError(e) {
   return e;   // 网络问题等，交给 friendlyAiError
 }
 
+// 家长自己的 key 这次用不了：key 填错 / 失效、额度或余额用完、模型被服务商下线。
+// 这几种重试也没用，与其让孩子对着「批改没跑成功」一直点重试，不如改走网站的免费批改。
+// 网络断了、服务商临时繁忙不算：那种情况免费批改多半也一样不通，重试就好。
+function ownKeyUnusable(e) {
+  const s = e && e.status;
+  const raw = String((e && e.message) || '').toLowerCase();
+  return s === 401 || s === 403 || s === 404 || s === 429
+    || raw.includes('api key') || raw.includes('api_key') || raw.includes('credit balance')
+    || raw.includes('quota') || raw.includes('resource_exhausted') || raw.includes('is not found');
+}
+
 /**
  * @param {Array<{prefix:string, text:string, suffix:string}>} lines 学生写的每一行
  * @param {object} ctx { grammarType, unitTitle, cefr }
+ * @param {object} opts { useCloud }：true = 不管有没有 key 都走网站的云函数（自己的 key 用不了时回落用）
  */
-export async function reviewWriting(lines, ctx = {}) {
-  if (!hasApiKey()) {
+export async function reviewWriting(lines, ctx = {}, { useCloud = !hasApiKey() } = {}) {
+  if (useCloud) {
     // 走网站的云函数：只传写作内容和单元信息，提示词在服务端拼
     let data;
     try {
@@ -123,13 +136,25 @@ export async function reviewWriting(lines, ctx = {}) {
     .filter(Boolean)
     .join('\n');
 
-  const data = await aiJson(ctx.exam === 'ielts' ? EXAM_PROMPT : PROMPT, userText, (d) => {
-    if (!d || !Array.isArray(d.lines)) {
-      const e = new Error('批改返回的格式有误，请重试');
-      e.friendly = true;
-      throw e;
+  let data;
+  try {
+    data = await aiJson(ctx.exam === 'ielts' ? EXAM_PROMPT : PROMPT, userText, (d) => {
+      if (!d || !Array.isArray(d.lines)) {
+        const e = new Error('批改返回的格式有误，请重试');
+        e.friendly = true;
+        throw e;
+      }
+    });
+  } catch (e) {
+    if (ownKeyUnusable(e) && cloud.cloudEnabled() && cloud.hasSession()) {
+      try {
+        return await reviewWriting(lines, ctx, { useCloud: true });
+      } catch {
+        // 免费批改也没成（比如额度用完）：还是报家长 key 的问题，那才是家长要去修的
+      }
     }
-  });
+    throw e;
+  }
 
   return normalize(data, lines);
 }

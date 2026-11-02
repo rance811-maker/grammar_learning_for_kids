@@ -5,12 +5,19 @@ import { fillAnswerText } from '../fillAnswers.js';
 import { renderTip } from '../tipFormat.js';
 import { curriculum, BUILT_IN_ID } from '../curriculum.js';
 import { generateSyllabus, generateAllUnits, hasApiKey, friendlyAiError, buildMaterial, generateUnitPreview, generateCoverage, hasBlueprint, deterministicCoverage } from '../unitGenerator.js';
+import { allowPlacementRetake } from './placement.js';
 
 // AI 服务配置（与 unitGenerator 共用的存储键）
 const AI_PROVIDER_KEY = 'gq-ai-provider';
 function getAiProvider() { try { return localStorage.getItem(AI_PROVIDER_KEY) || 'gemini'; } catch { return 'gemini'; } }
 function setAiProvider(p) { try { localStorage.setItem(AI_PROVIDER_KEY, p); } catch { /* */ } }
 function setAiKeyVal(p, k) { try { localStorage.setItem(p === 'claude' ? 'gq-ai-key-claude' : 'gq-ai-key-gemini', k); } catch { /* */ } }
+// 清掉这台设备上所有的 AI key（含老版本的 gq-ai-key），作文批改回到网站的免费批改
+function clearAiKeys() {
+  for (const k of ['gq-ai-key-gemini', 'gq-ai-key-claude', 'gq-ai-key', AI_PROVIDER_KEY]) {
+    try { localStorage.removeItem(k); } catch { /* */ }
+  }
+}
 
 // 上传素材（PDF/照片）暂存
 let currFiles = [];
@@ -35,9 +42,10 @@ async function sha256(str) {
 }
 
 // 每次确认解锁状态时顺手续期，所以"闲置 30 分钟"算的是最后一次进家长专区之后。
+// 解锁记在当时登录的账号名下：同一个标签页退出后换别的账号登录，不能直接进人家的家长专区。
 function touchUnlock() {
   try {
-    sessionStorage.setItem(UNLOCK_KEY, JSON.stringify({ until: Date.now() + UNLOCK_IDLE_MINUTES * 60000 }));
+    sessionStorage.setItem(UNLOCK_KEY, JSON.stringify({ until: Date.now() + UNLOCK_IDLE_MINUTES * 60000, uid: store.account?.userId || '' }));
   } catch { /* 隐私模式下 sessionStorage 可能不可用，退化成每次都要输密码 */ }
 }
 
@@ -45,7 +53,7 @@ function isUnlocked() {
   try {
     const d = JSON.parse(sessionStorage.getItem(UNLOCK_KEY));
     if (!d || !d.until) return false;
-    if (d.until <= Date.now()) { clearUnlock(); return false; }
+    if (d.until <= Date.now() || !d.uid || d.uid !== store.account?.userId) { clearUnlock(); return false; }
     touchUnlock();
     return true;
   } catch { return false; }
@@ -57,7 +65,7 @@ function clearUnlock() {
   try { sessionStorage.removeItem(UNLOCK_KEY); } catch { /* ignore */ }
 }
 
-// 家长主动点「退出专区」时调用。路由切换不再自动上锁——那正是"反复输密码"的来源。
+// 家长主动点「退出专区」、或退出登录时调用。路由切换不再自动上锁——那正是"反复输密码"的来源。
 export function lock() { clearUnlock(); }
 
 // 失败锁定信息存 localStorage：即使关掉标签页/刷新也照样锁着，
@@ -125,6 +133,8 @@ function renderLocked() {
       <div class="parent-icon">⏰</div>
       <h2>操作太频繁</h2>
       <p class="parent-desc">错误次数过多，请 ${min} 分钟后再试</p>
+      <!-- 孩子乱输 5 次也不该把家长挡在外面：重置要验证账号密码，锁定期间照样可以走 -->
+      <button class="btn btn--text" id="resetLink" onclick="location.hash='parent/reset'">忘记密码？用账号密码重置</button>
     </div>`;
   }
   return `<div class="parent-card">
@@ -185,7 +195,8 @@ function renderDashboard() {
       </div>
       <p style="font-size:0.75rem;color:var(--color-muted);margin:0 0 10px;line-height:1.5;">
         孩子同一时间只学一套课程。点「让孩子学这套」即可切换。<br>
-        AI 课程的单元在孩子首次进入时会自动生成；也可点「补齐剩余单元」提前一次性生成好。
+        自己定制的课程，单元要先生成才能练：在这里点「补齐剩余单元」一次性生成好最省事；
+        也可以等孩子打开单元时点「生成本单元内容」，但那台设备上也要配过 AI key（key 只存在配它的那台设备上）。
       </p>
       ${currItems}
     </div>
@@ -280,7 +291,7 @@ function renderSettingsSection() {
 
       <div class="settings-group">
         <div class="settings-group__title">👤 账号</div>
-        <div class="settings-group__desc">已登录为「${esc(store.account.name)}」，学习记录正在云端自动同步</div>
+        <div class="settings-group__desc" id="parentSyncDesc">${accountSyncText()}</div>
         <button class="btn btn--secondary" id="goAccountBtn" style="margin-top:var(--space-sm);">账号管理</button>
       </div>
 
@@ -292,8 +303,25 @@ function renderSettingsSection() {
     </div>`;
 }
 
+// 「账号」一栏的同步状态。和底部「没能存到云端」横条看同一个标记，云端保存失败时不能还写「自动同步中」
+function accountSyncText() {
+  return `已登录为「${esc(store.account?.name)}」，${store._cloudSaveFailed
+    ? '⚠️ 有学习记录还没存到云端（数据还在这台设备上，详情见「账号管理」）'
+    : '学习记录正在云端自动同步'}`;
+}
+let _watchingSync = false;
+
 function mountSettingsSection() {
   mountCurrKeyPanel();
+
+  // 家长停在这一页时，自动重试失败 / 成功，这一栏跟着换说法（只挂一次）
+  if (!_watchingSync) {
+    _watchingSync = true;
+    window.addEventListener('gq-cloud-save', () => {
+      const el = document.getElementById('parentSyncDesc');
+      if (el && store.account) el.innerHTML = accountSyncText();
+    });
+  }
 
   document.querySelectorAll('.goal-option').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -310,11 +338,13 @@ function mountSettingsSection() {
     location.hash = 'account';
   });
 
+  // 原来一确认就把 learningPlan 清空并存盘（会同步到云端），孩子没做完摸底就离开，
+  // 原计划和计划进度就找不回来了。现在什么都不动，只放行这一次摸底：
+  // 做完时 completePlacement 才按新结果重排计划，中途离开原计划原样还在。
+  // 摸底页对做过摸底的账号默认不给开始（防孩子从「这是什么」页误点重做），所以要带上这张通行条。
   document.getElementById('retakePlacementBtn')?.addEventListener('click', () => {
-    if (confirm('确定要重新做摸底测试吗？已完成的练习进度会保留。')) {
-      store.state.placementCompleted = false;
-      store.state.learningPlan = null;
-      store.save();
+    if (confirm('重新做一次摸底测试？做完后会按新结果重新安排学习计划；中途离开的话，原来的计划不变。已完成的练习进度会保留。')) {
+      allowPlacementRetake();
       location.hash = 'placement';
     }
   });
@@ -616,8 +646,10 @@ function mountOneKeyPanel(host) {
       <div class="parent-field" style="background:var(--color-bg-soft,#F1F8E9);border:1px solid #C5E1A5;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span style="font-size:0.9rem;">🔑 AI 服务：<b>${PROVIDER_NAMES[p] || p}</b> · 已配置 ✓</span>
         <button class="btn btn--tiny btn--outline" data-key-edit style="margin-left:auto;">更换 / 重新录入 key</button>
+        <button class="btn btn--tiny btn--outline" data-key-clear>清除 key</button>
       </div>`;
     host.querySelector('[data-key-edit]')?.addEventListener('click', () => { _keyEditorOpen = true; mountCurrKeyPanel(); });
+    mountKeyClear(host);
     return;
   }
 
@@ -633,18 +665,38 @@ function mountOneKeyPanel(host) {
       <div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap;">
         <button class="btn btn--small btn--primary" data-key-save>保存 key</button>
         ${configured ? '<button class="btn btn--small btn--outline" data-key-cancel>取消</button>' : ''}
+        ${configured ? '<button class="btn btn--small btn--outline" data-key-clear>清除 key</button>' : ''}
         <span style="font-size:0.72rem;color:#999;">Gemini: aistudio.google.com/apikey · Claude: console.anthropic.com</span>
       </div>
-      <div style="font-size:0.72rem;color:#999;margin-top:6px;">key 只存在你这台设备的浏览器里，不会上传服务器。</div>
+      <div data-key-msg style="font-size:0.8rem;color:var(--color-danger);margin-top:6px;"></div>
+      <div style="font-size:0.72rem;color:#999;margin-top:6px;">key 只存在你这台设备的浏览器里，不会上传服务器；在这台设备上登录的账号都会用它，退出登录也不会清掉。不是自己的设备，用完记得点「清除 key」。</div>
     </div>`;
-  host.querySelector('[data-key-provider]')?.addEventListener('change', e => setAiProvider(e.target.value));
+  // 下拉框只在点「保存 key」时才写进存储：原来一改就写，改了再点「取消」，
+  // 服务商已经被换掉，配好的 key 看上去像丢了（面板显示未配置），批改也不再用它。
   host.querySelector('[data-key-cancel]')?.addEventListener('click', () => { _keyEditorOpen = false; mountCurrKeyPanel(); });
+  mountKeyClear(host);
   host.querySelector('[data-key-save]')?.addEventListener('click', () => {
     const prov = host.querySelector('[data-key-provider]').value;
     const key = host.querySelector('[data-key-input]').value.trim();
-    if (!key) return;
+    if (!key) {
+      const msg = host.querySelector('[data-key-msg]');
+      if (msg) msg.textContent = configured ? '先把新的 key 粘贴进来再保存；不想用了就点「清除 key」' : '先把 key 粘贴进来再保存';
+      host.querySelector('[data-key-input]')?.focus();
+      return;
+    }
     setAiProvider(prov);
     setAiKeyVal(prov, key);
+    _keyEditorOpen = false;
+    mountCurrKeyPanel();
+  });
+}
+
+// 「清除 key」：key 失效、不想再付费、或者是借来的设备时，家长要能自己退回网站的免费批改。
+// 原来面板上只有保存和取消，空着点保存也被忽略，配上就再也去不掉。
+function mountKeyClear(host) {
+  host.querySelector('[data-key-clear]')?.addEventListener('click', () => {
+    if (!confirm('清除这台设备上保存的 AI key？\n清除后作文改用网站的免费批改（有次数限制）；自己定制课程要重新填 key。')) return;
+    clearAiKeys();
     _keyEditorOpen = false;
     mountCurrKeyPanel();
   });
@@ -1036,7 +1088,7 @@ async function runTrialUnit(sylItem, material, cefr = '') {
         <div style="font-weight:600;font-size:0.82rem;margin-top:8px;">练习题样例：</div>
         ${samples || '<div style="font-size:0.8rem;color:var(--color-muted);">（本单元第 1 关暂无题目样例）</div>'}
         ${renderVerifyNote(data._verify)}
-        <div style="font-size:0.72rem;color:var(--color-muted);margin-top:8px;">题目质量满意就「确认并创建」；不满意可「重新生成」大纲。</div>
+        <div style="font-size:0.72rem;color:var(--color-muted);margin-top:8px;">题目质量满意就点下面的「确认并定制课程」；不满意可「重新生成」大纲。</div>
       </div>`;
     if (btn) { btn.style.display = 'none'; }
   } catch (e) {
@@ -1096,7 +1148,9 @@ function renderReport() {
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
+    // 按本地日期拼，和练习记录一致（store 的 toDateString）。toISOString 是 UTC：
+    // 北京时间 0–8 点打开报告时，今天的练习一次都不算，整列柱子错开一天。
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const month = d.getMonth() + 1;
     const day = d.getDate();
     dayLabels.push(`${month}/${day}`);
@@ -1133,10 +1187,10 @@ function renderReport() {
         else if (entry.mastery < 80) color = '#ff9800'; // yellow/orange
         return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
           <div style="flex:1;min-width:0;">
-            <div style="font-size:0.85rem;font-weight:500;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(entry.name)}</div>
+            <div style="font-size:0.85rem;font-weight:500;color:#333;word-break:break-word;">${esc(entry.name)}</div>
             <div style="font-size:0.7rem;color:#999;">${entry.attempts} 次练习</div>
           </div>
-          <div style="width:100px;flex-shrink:0;">
+          <div style="width:72px;flex-shrink:0;">
             <div style="background:#e0e0e0;border-radius:4px;height:8px;overflow:hidden;">
               <div style="background:${color};height:100%;width:${entry.mastery}%;border-radius:4px;transition:width 0.3s;"></div>
             </div>
@@ -1147,7 +1201,9 @@ function renderReport() {
     : '<p style="color:#999;font-size:0.85rem;">还没有掌握度数据，开始练习后这里会显示各技能掌握情况。</p>';
 
   // --- (d) Weakest skills ---
-  const weakest = store.getWeakestSkills(5);
+  // getWeakestSkills 只是按掌握度排序取前几个（出题也靠它，不能在那里加门槛），
+  // 掌握度 80% 以上的在上面是绿色的，不该再红字列进「需重点加强」。
+  const weakest = store.getWeakestSkills(5).filter((w) => (w.mastery || 0) < 0.8);
   const weakestSection = weakest.length > 0
     ? `<div style="background:#fff3e0;border:1px solid #ffe0b2;border-radius:8px;padding:16px;">
         <h3 style="margin:0 0 12px;font-size:1rem;color:#e65100;">⚠️ 薄弱环节（需重点加强）</h3>
@@ -1169,7 +1225,7 @@ function renderReport() {
         const starsDisplay = '⭐'.repeat(s.stars || 0);
         const accPct = s.accuracy != null ? Math.round(s.accuracy * 100) : (s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0);
         return `<tr>
-          <td style="padding:8px 6px;font-size:0.8rem;color:#666;">${esc(s.date || '')}</td>
+          <td style="padding:8px 6px;font-size:0.8rem;color:#666;white-space:nowrap;">${esc(s.date || '')}</td>
           <td style="padding:8px 6px;font-size:0.8rem;">${esc(unitTitle)} Lv.${s.level || '-'}</td>
           <td style="padding:8px 6px;font-size:0.8rem;">${starsDisplay || '-'}</td>
           <td style="padding:8px 6px;font-size:0.8rem;text-align:right;">${accPct}%</td>
@@ -1269,7 +1325,7 @@ function renderReport() {
       </div>
       <div style="background:#f5f5f5;border-radius:8px;padding:16px;text-align:center;">
         <div style="font-size:1.5rem;font-weight:700;color:#6a1b9a;">${completedLevels}</div>
-        <div style="font-size:0.8rem;color:#666;margin-top:4px;">已完成课程</div>
+        <div style="font-size:0.8rem;color:#666;margin-top:4px;">已完成关卡</div>
       </div>
     </div>
 
@@ -1301,11 +1357,11 @@ function renderReport() {
         <table style="width:100%;border-collapse:collapse;">
           <thead>
             <tr style="border-bottom:2px solid #e0e0e0;">
-              <th style="padding:8px 6px;text-align:left;font-size:0.75rem;color:#999;font-weight:600;">日期</th>
-              <th style="padding:8px 6px;text-align:left;font-size:0.75rem;color:#999;font-weight:600;">课程</th>
-              <th style="padding:8px 6px;text-align:left;font-size:0.75rem;color:#999;font-weight:600;">星级</th>
-              <th style="padding:8px 6px;text-align:right;font-size:0.75rem;color:#999;font-weight:600;">正确率</th>
-              <th style="padding:8px 6px;text-align:right;font-size:0.75rem;color:#999;font-weight:600;">得分</th>
+              <th style="padding:8px 6px;text-align:left;font-size:0.75rem;color:#999;font-weight:600;white-space:nowrap;">日期</th>
+              <th style="padding:8px 6px;text-align:left;font-size:0.75rem;color:#999;font-weight:600;white-space:nowrap;">课程</th>
+              <th style="padding:8px 6px;text-align:left;font-size:0.75rem;color:#999;font-weight:600;white-space:nowrap;">星级</th>
+              <th style="padding:8px 6px;text-align:right;font-size:0.75rem;color:#999;font-weight:600;white-space:nowrap;">正确率</th>
+              <th style="padding:8px 6px;text-align:right;font-size:0.75rem;color:#999;font-weight:600;white-space:nowrap;">得分</th>
             </tr>
           </thead>
           <tbody>
