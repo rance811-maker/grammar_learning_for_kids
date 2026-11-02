@@ -1203,7 +1203,8 @@ function renderReport() {
   // --- (d) Weakest skills ---
   // getWeakestSkills 只是按掌握度排序取前几个（出题也靠它，不能在那里加门槛），
   // 掌握度 80% 以上的在上面是绿色的，不该再红字列进「需重点加强」。
-  const weakest = store.getWeakestSkills(5).filter((w) => (w.mastery || 0) < 0.8);
+  // 按显示出来的百分比判断：0.796 在上面显示成绿色的 80%，这里也不能再红字列出来
+  const weakest = store.getWeakestSkills(5).filter((w) => Math.round((w.mastery || 0) * 100) < 80);
   const weakestSection = weakest.length > 0
     ? `<div style="background:#fff3e0;border:1px solid #ffe0b2;border-radius:8px;padding:16px;">
         <h3 style="margin:0 0 12px;font-size:1rem;color:#e65100;">⚠️ 薄弱环节（需重点加强）</h3>

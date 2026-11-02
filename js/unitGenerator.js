@@ -201,7 +201,10 @@ async function callAI(systemPrompt, userText) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: systemPrompt + '\n\n' + userText }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
+        // 别名指向的是会先「思考」的新 Flash，思考用掉的 token 也算在 maxOutputTokens 里。
+        // 还按老 2.0-flash 的 8192 给，整单元生成常常思考完就没剩多少，JSON 被截断。
+        // 新 Flash 的输出上限是 65536，给 32768 足够；按实际生成的 token 计费，给大不多花钱。
+        generationConfig: { temperature: 0.7, maxOutputTokens: 32768 },
       }),
     }
   );
