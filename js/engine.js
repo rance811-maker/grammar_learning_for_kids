@@ -143,8 +143,10 @@ export function questionPreview(q, max = 60) {
   else if (q.type === 'reorder') t = list(q.words, ' / ');
   else if (q.type === 'match') t = list(q.left, ' / ');
   else if (q.type === 'scenario') {
+    // 情境 + 对话最后一句。光有情境不够：雅思 7 分的情境只是「雅思口语 Part 1 · Friends」这种话题名，
+    // 好几道共用一个，单看它又分不清是哪道了
     const last = Array.isArray(q.dialogue) ? q.dialogue[q.dialogue.length - 1] : null;
-    t = q.context || (typeof last === 'string' ? last : last?.text) || '';
+    t = [q.context, typeof last === 'string' ? last : last?.text].filter(Boolean).join(' — ');
   }
   if (!t) t = (typeof q.sentence === 'string' && q.sentence) || q.context || q.instruction || '';
   t = String(t).replace(/_+/g, '____').replace(/\s+/g, ' ').trim();
