@@ -164,9 +164,9 @@ function activeNavRoute(route) {
     return location.hash.startsWith('#practice/review') ? 'review' : '';
   }
   if (['oral', 'review', 'portfolio', 'stats', 'parent', 'feedback'].includes(route)) return route;
-  // 账号页高亮账号块；「这是什么」「添加到桌面」不属于任何一项，都不高亮。
+  // 账号页高亮账号块；「这是什么」不属于任何一项，不高亮。
   // 以前一律返回 ''，正好等于「学习地图」，人在账号页，导航却显示还在地图上。
-  if (['account', 'about', 'install'].includes(route)) return route;
+  if (['account', 'about'].includes(route)) return route;
   return '';
 }
 
