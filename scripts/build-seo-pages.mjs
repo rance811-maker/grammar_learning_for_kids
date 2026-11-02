@@ -26,7 +26,7 @@ const META = {
     slug: 'ielts6',
     name: '雅思 6 分语法课程',
     h1: '雅思 6 分语法：12 个单元语法点清单',
-    lead: '对标雅思 6 分（CEFR B2）的英语语法课程，以真实考试题型为准',
+    lead: '对标雅思 6 分（CEFR B2）的英语语法课程，例句和写作任务取材于雅思写作和口语场景',
   },
   'preset-ielts7': {
     slug: 'ielts7',

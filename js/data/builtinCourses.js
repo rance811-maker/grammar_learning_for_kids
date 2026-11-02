@@ -28,7 +28,7 @@ export const BUILTIN_COURSES = [
   },
   {
     id: ielts6.id,
-    title: ielts6.title,
+    title: '雅思 6 分语法',   // 和 PET 的「PET 语法训练」、关于页的叫法一致（课程文件里的标题是一整句话）
     description: ielts6.description,
     goal: ielts6.goal,
     cefr: ielts6.cefr,
@@ -37,7 +37,7 @@ export const BUILTIN_COURSES = [
   },
   {
     id: ielts7.id,
-    title: ielts7.title,
+    title: '雅思 7 分语法',
     description: ielts7.description,
     goal: ielts7.goal,
     cefr: ielts7.cefr,
