@@ -91,7 +91,8 @@ function cloudError(e) {
     const n = (e.data && e.data.limit) || p.defaultLimit;
     return friendly(`${p.this}的 ${n} 篇免费批改已经用完了，${p.reset}。家长也可以在「家长专区 → 学习设置 → AI 服务」配自己的 key，不限次数。`);
   }
-  if (e.status === 401 || String(e.message).includes('NO_SESSION')) return friendly('登录已过期，请重新登录后再批改');
+  // 登录没了：重试不会成功，mission.js 按 code 'login_required' 给「重新登录」而不是「重试」
+  if (e.status === 401 || String(e.message).includes('NO_SESSION')) return Object.assign(friendly('登录已过期，重新登录后就能批改。'), { code: 'login_required' });
   if (e.code === 'not_configured') return friendly('批改服务暂时没开通，过一会儿再试');
   if (e.code === 'ai_busy') return friendly('批改的人有点多，等一会儿再试');
   if (e.code === 'too_long') return friendly('写得太长了，批改一次最多 600 个字符一行，删短一点再交');
