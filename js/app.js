@@ -21,7 +21,7 @@ import { initPwa } from './pwa.js';
 import { initAnalytics, trackView } from './analytics.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20261102a';
+const BUILD_VERSION = '20261104a';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -195,7 +195,7 @@ function renderShell(route, content, gated = false) {
     <div class="layout">
       ${renderSidebar(route)}
       <div class="main-col">
-        <header class="topbar${titleOnly ? ' topbar--title-only' : ''}">
+        <header class="topbar${titleOnly ? ' topbar--title-only' : ''}${route === 'about' ? ' topbar--about' : ''}">
           ${showBackBtn
             ? `<button class="topbar__back" id="navBackBtn">← 返回</button>`
             : '<span class="topbar__back-placeholder"></span>'}
