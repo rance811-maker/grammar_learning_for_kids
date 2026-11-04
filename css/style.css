@@ -3573,7 +3573,8 @@ ul, ol {
   padding: 0;
   border: 0;
   background: none;
-  color: var(--color-muted);
+  /* 默认就是蓝色：灰色看起来像装饰，没人知道能点 */
+  color: var(--color-secondary);
   cursor: pointer;
   /* 跟在定位语文字后面，换行时一起走，不会自己掉到下一行去 */
   margin-left: 6px;
@@ -3584,7 +3585,7 @@ ul, ol {
 /* 挖空的部分用站点带自己的底色，深色底上也不会变成一块白 */
 .siteband__what .siteband__what-mark { fill: var(--color-card); }
 .siteband__what:hover,
-.siteband__what[aria-expanded="true"] { color: var(--color-secondary); }
+.siteband__what[aria-expanded="true"] { color: var(--color-secondary-dark); }
 
 .siteband__pop {
   position: absolute;
@@ -3605,13 +3606,6 @@ ul, ol {
   font-size: var(--text-sm);
   line-height: 1.75;
   color: var(--color-text);
-}
-.siteband__pop-list {
-  margin: 0 0 var(--space-sm);
-  padding-left: 1.2em;
-  font-size: var(--text-xs);
-  line-height: 1.85;
-  color: var(--color-text-light);
 }
 .siteband__pop-more {
   font-size: var(--text-xs);
@@ -3752,6 +3746,19 @@ ul, ol {
   margin: var(--space-lg) 0;
 }
 .about-actions .btn { text-decoration: none; }
+/* 次按钮和绿色主按钮用同一套立体样式：同样大小、同样的底边，白底灰边，一眼看出一主一次 */
+.about-actions .btn--secondary {
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  border-radius: var(--radius-lg);
+  background: var(--color-card);
+  color: var(--color-secondary-dark);
+  border: 2px solid var(--color-border);
+  box-shadow: 0 4px 0 var(--color-border);
+}
+.about-actions .btn--secondary:hover { background: var(--color-bg); }
+.about-actions .btn--secondary:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--color-border); }
 /* 次要入口用文字链接，不和绿色主按钮抢 */
 .about-actions__link {
   padding: 10px 4px;

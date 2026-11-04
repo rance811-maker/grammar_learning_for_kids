@@ -21,15 +21,17 @@ import { initPwa } from './pwa.js';
 import { initAnalytics, trackView } from './analytics.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20261104a';
+const BUILD_VERSION = '20261104b';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
-// Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
-// version at a glance instead of guessing about stale caches.
+// 右下角的版本小标：用来确认线上跑的是哪一版。普通用户不需要看到它，默认隐藏；
+// 网址后面加 ?build（www.grammar-quest.net/?build）才显示。元素一直在页面里，
+// 意见反馈页从它读版本号填进反馈模板。
 function showBuildBadge() {
   if (document.getElementById('buildBadge')) return;
   const badge = document.createElement('div');
   badge.id = 'buildBadge';
+  badge.hidden = !/[?&]build\b/.test(location.search);
   badge.textContent = 'build ' + BUILD_VERSION;
   badge.style.cssText =
     'position:fixed;bottom:3px;right:5px;z-index:9999;font:10px/1 monospace;' +
@@ -275,11 +277,6 @@ function renderSiteWhatPop() {
       <p class="siteband__pop-lead">
         不做通用题库——按孩子的<strong>考试目标</strong>和<strong>当前水平</strong>定制课程，只练该练的。
       </p>
-      <ul class="siteband__pop-list">
-        <li>先做 12 道题摸底，学习计划按结果排，不是所有孩子都从第一单元开始</li>
-        <li>内置 PET、雅思 6 分、雅思 7 分三套课程，免费注册就能用</li>
-        <li>写作由 AI 逐句批改，指出错在哪、为什么错</li>
-      </ul>
       <a class="siteband__pop-more" href="#about">看完整介绍 ›</a>
     </div>`;
 }
