@@ -3,7 +3,7 @@ import { engine, questionTextKey } from '../engine.js';
 import { cloud } from '../cloud.js';
 import { curriculum } from '../curriculum.js';
 import { track } from '../analytics.js';
-import { displayForm, fillSentence } from '../fillAnswers.js';
+import { displayForm, fillSentence, isZeroForm } from '../fillAnswers.js';
 import { sound } from '../sound.js';
 import { confetti } from '../celebrate.js';
 import { scrollToStart } from '../scrollToStart.js';
@@ -31,14 +31,33 @@ function clearAdvanceTimer() {
 
 function advanceToNext() {
   clearAdvanceTimer();
-  const feedbackArea = document.getElementById('feedbackArea');
-  if (feedbackArea) feedbackArea.innerHTML = '';
+  // 人已经不在练习页了（比如用浏览器的后退离开）：别在后台接着跳题、把这一场跑完记成绩
+  if (!document.getElementById('questionArea')) return;
+  clearFeedback();
   if (sessionEnded) return;
   session.currentIndex += 1;
   renderCurrentQuestion();
 }
 
+// 从练习离开回到哪里：复习 → 复习中心，模拟挑战 / 测试题 → 首页，其余 → 所在单元
+export function backTargetFor(unitId) {
+  return unitId === 'review' ? 'review'
+    : !unitId || unitId === 'boss' || unitId === 'demo' ? ''
+    : `unit/${unitId}`;
+}
+
+// 要离开练习页时调用（✕、顶栏「← 返回」、导航）。正在答题就先确认，返回 false 表示孩子选了留下。
+// 没在答题（锁着的关、已经出了结算页、被拦下的注册引导）直接放行。
+export function confirmLeave() {
+  const inProgress = session && !sessionEnded && session.questions?.length && document.getElementById('questionArea');
+  // 取消时不停自动跳题：答对后点 ✕ 再取消，原来计时器已经被清掉，题目就卡在那儿不动了
+  if (inProgress && !confirm('确定要退出练习吗？当前进度不会保存。')) return false;
+  clearAdvanceTimer();
+  return true;
+}
+
 export function render(unitId, level) {
+  clearAdvanceTimer();   // 上一场答对后的自动跳题还没触发，别让它跳到这一场
 
   if (unitId === 'review') {
     session = engine.createReviewSession();
@@ -102,10 +121,16 @@ export function render(unitId, level) {
 }
 
 export function mount(unitId, level) {
-  const backTarget = unitId === 'review' ? 'review'
-    : unitId === 'boss' ? ''
-    : unitId === 'demo' ? ''
-    : `unit/${unitId}`;
+  const backTarget = backTargetFor(unitId);
+  stackHeaderBelowNav();
+
+  // ✕ 在锁着的关、没题的页面上也要能用（以前这种页面只接了「返回关卡」，✕ 点了没反应）
+  const closeBtn = document.getElementById('practiceClose');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      if (confirmLeave()) location.hash = backTarget;
+    });
+  }
 
   // Back button for empty sessions
   const backBtn = document.getElementById('practiceBackBtn');
@@ -116,22 +141,21 @@ export function mount(unitId, level) {
     return;
   }
 
-  const closeBtn = document.getElementById('practiceClose');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', () => {
-      clearAdvanceTimer();
-      if (sessionEnded) {
-        location.hash = backTarget;
-        return;
-      }
-      if (confirm('确定要退出练习吗？当前进度不会保存。')) {
-        location.hash = backTarget;
-      }
-    });
-  }
-
   renderCurrentQuestion();
 }
+
+// 手机上顶部的图标导航（.sidebar）也是 sticky top:0。练习的进度条横栏原来同样贴 top:0，
+// 滚动时压在导航上，图标只露出上半截。改成贴在导航正下方，两条栏上下叠放。
+// 导航高度随字体、图标渲染略有不同，所以量出来再设，不在 CSS 里写死。宽屏上侧栏在左边，不用让。
+function stackHeaderBelowNav() {
+  const header = document.querySelector('.practice-header');
+  const nav = document.querySelector('.sidebar');
+  if (!header || !nav) return;
+  const r = nav.getBoundingClientRect();
+  const navOnTop = getComputedStyle(nav).position === 'sticky' && r.width >= window.innerWidth * 0.5;
+  header.style.top = navOnTop ? `${Math.round(r.height)}px` : '';
+}
+window.addEventListener('resize', stackHeaderBelowNav);
 
 function renderCurrentQuestion() {
   if (!session) return;
@@ -162,6 +186,7 @@ function renderCurrentQuestion() {
   area.innerHTML = renderQuestion(q);
   updateProgress();
   attachQuestionListeners(q);
+  stackHeaderBelowNav();   // 每题重量一次：网页字体晚到时导航条高度会变
   // 上一题看反馈时页面多半滚到了下面：新题从开头显示
   scrollToStart(area);
 }
@@ -273,6 +298,9 @@ function renderErrorQuestion(q) {
       <button class="btn-primary" id="errorSubmit" disabled>确认选择</button>
     </div>`;
 }
+
+// 找错题的改法是「删掉这个词」：(remove)、(delete)、（删除）、(no article) 这几种写法都算
+const isRemoval = (c) => /^\s*[(（]\s*(remove|delete|删除|删掉|去掉|no article)[^)）]*[)）]\s*$/i.test(String(c));
 
 function shuffleArray(arr) {
   const a = [...arr];
@@ -525,10 +553,14 @@ function refreshMatchState(q) {
   document.querySelectorAll('.match-item[data-type="match"]').forEach(el => {
     const side = el.dataset.side;
     const idx = Number(el.dataset.index);
-    const matched = side === 'left'
-      ? matchPairs.some(p => p[0] === idx)
-      : matchPairs.some(p => p[1] === idx);
-    el.classList.toggle('match-item--matched', matched);
+    const mine = matchPairs
+      .map((p, i) => ({ p, i }))
+      .filter(({ p }) => (side === 'left' ? p[0] : p[1]) === idx);
+    el.classList.toggle('match-item--matched', mine.length > 0);
+    // 连好的两张卡片用和连线同一个颜色描边：小屏上两列只隔一道缝，光靠细线认不清谁连谁。
+    // 右边一张卡被好几项连着（多对一）时没有单一颜色，保持默认的绿色。
+    if (mine.length === 1) el.style.setProperty('--pair-color', PAIR_COLORS[mine[0].i % PAIR_COLORS.length]);
+    else el.style.removeProperty('--pair-color');
   });
   drawMatchLines(q);
   const submitBtn = document.getElementById('matchSubmit');
@@ -618,11 +650,34 @@ function attachFillListeners(q) {
   const submitBtn = document.getElementById('fillSubmit');
   const inputs = document.querySelectorAll('.fill-input');
 
+  // 一个空都没填就交：多半是手滑或者还没想好，不该白扣一颗心、记进错题本。
+  // 按钮不能直接设成灰的——零冠词、省略关系代词这类「不填才对」的单空题，空着交就是正确作答。
+  const acceptable = q.acceptableAnswers?.length ? q.acceptableAnswers : [q.correctAnswer || q.answer].filter(Boolean);
+  const blankOk = inputs.length === 1 && acceptable.some(isZeroForm);
+  function submitFill() {
+    const empty = [...inputs].every((el) => !el.value.replace(/[,，\s]/g, ''));
+    if (empty && !blankOk) {
+      let tip = document.getElementById('fillEmptyTip');
+      if (!tip) {
+        tip = document.createElement('div');
+        tip.id = 'fillEmptyTip';
+        tip.className = 'fill-empty-tip';
+        tip.setAttribute('role', 'alert');
+        tip.textContent = '先在空里写上答案，再点「检查答案」';
+        submitBtn.before(tip);
+      }
+      inputs[0].focus();
+      return;
+    }
+    submitAnswer(q, collectFillAnswer());
+  }
+
   if (submitBtn && inputs.length) {
     submitBtn.addEventListener('click', () => {
       if (feedbackVisible) return;
-      submitAnswer(q, collectFillAnswer());
+      submitFill();
     });
+    inputs.forEach((input) => input.addEventListener('input', () => document.getElementById('fillEmptyTip')?.remove()));
 
     let composing = false;
     inputs.forEach((input, i) => {
@@ -634,7 +689,7 @@ function attachFillListeners(q) {
         // 多空题：在前面的空按回车跳到下一个空，最后一个空按回车才交卷（多空题逐空判分后，
         // 没填完就交卷会白白丢一颗心）
         if (i < inputs.length - 1) { e.preventDefault(); inputs[i + 1].focus(); return; }
-        submitAnswer(q, collectFillAnswer());
+        submitFill();
       });
     });
   }
@@ -731,6 +786,19 @@ function showAnswerFeedback(question, userAnswer, isCorrect, result) {
       });
       break;
     }
+    case 'match': {
+      // 连错的那几对两张卡都标红，一眼看出错在哪儿。多对一时右边一张卡同时连着对的和错的，
+      // 只标左边那张，右边那张不算错。
+      const marks = result.userPairsOk || [];
+      const rightOk = new Set(userAnswer.filter((_, i) => marks[i]).map((p) => p[1]));
+      marks.forEach((ok, i) => {
+        if (ok) return;
+        const [l, r] = userAnswer[i] || [];
+        document.querySelector(`.match-item[data-side="left"][data-index="${l}"]`)?.classList.add('match-item--wrong');
+        if (!rightOk.has(r)) document.querySelector(`.match-item[data-side="right"][data-index="${r}"]`)?.classList.add('match-item--wrong');
+      });
+      break;
+    }
     case 'fill': {
       // 多空题答错时逐空标对错，填错的空后面紧跟着写出正确答案，一眼看出是哪个空错了
       const inputs = [...document.querySelectorAll('.fill-input')];
@@ -772,8 +840,31 @@ function blanksAnswerHtml(per) {
   return `<div class="feedback-banner__correct-answer">正确答案<ol class="fb-blanks">${items}</ol></div>`;
 }
 
+// 连线题答错：只列连错的那几对该怎么连，一对一行（连错的卡片已经标红，连对的不用再看一遍；
+// 小屏上四对全列出来，横幅要占满大半个屏幕）
+function pairsAnswerHtml(pairs) {
+  const wrong = pairs.filter((p) => !p.ok);
+  const items = (wrong.length ? wrong : pairs).map((p) => `<li class="fb-pair">${p.text}</li>`).join('');
+  return `<div class="feedback-banner__correct-answer">${wrong.length ? '连错的这几对，应该这样连：' : '正确答案：'}<ol class="fb-blanks">${items}</ol></div>`;
+}
+
 const CORRECT_PHRASES = ['回答正确！', '答对了！', '没错！', '厉害！', '完全正确！', '漂亮！', 'Excellent!', 'Perfect!', 'Well done!'];
 const WRONG_PHRASES = ['回答错误', '不太对哦', '再想想', '差一点点'];
+
+// 反馈横幅 fixed 贴在屏幕底部，答错时连正确答案带解析能有半屏高。在页面底部垫出同样高的空白，
+// 往下滚就能把被它挡住的题目（比如整块连线区）露出来，对照着看错在哪。
+function reserveFeedbackSpace() {
+  const area = document.getElementById('feedbackArea');
+  const banner = area?.querySelector('.feedback-banner');
+  if (area) area.style.height = banner ? `${banner.offsetHeight}px` : '';
+}
+
+function clearFeedback() {
+  const area = document.getElementById('feedbackArea');
+  if (!area) return;
+  area.innerHTML = '';
+  area.style.height = '';
+}
 
 function showFeedback(isCorrect, question, userAnswer, result) {
   const feedbackArea = document.getElementById('feedbackArea');
@@ -797,7 +888,10 @@ function showFeedback(isCorrect, question, userAnswer, result) {
   let correctionHtml = '';
   if (question.type === 'error' && result.correction) {
     const wrongWord = question.words?.[question.errorIndex] ?? '';
-    correctionHtml = `<div class="feedback-banner__correct-answer">正确写法：<s>${wrongWord}</s> → <strong>${result.correction}</strong></div>`;
+    // 这个词本来就不该有（多了一个 will / to / the）：数据里记成 (remove)，显示成「删掉」，不让孩子看到一串英文
+    correctionHtml = isRemoval(result.correction)
+      ? `<div class="feedback-banner__correct-answer">正确写法：删掉 <s>${wrongWord}</s></div>`
+      : `<div class="feedback-banner__correct-answer">正确写法：<s>${wrongWord}</s> → <strong>${result.correction}</strong></div>`;
   }
 
   // The plain "correct answer" line is only useful on wrong answers, and not for
@@ -808,6 +902,8 @@ function showFeedback(isCorrect, question, userAnswer, result) {
   const per = question.type === 'fill' ? perBlank(result, isCorrect, document.querySelectorAll('.fill-input').length) : null;
   const correctAnswerHtml = per
     ? blanksAnswerHtml(per)
+    : !isCorrect && question.type === 'match' && result.pairs?.length
+      ? pairsAnswerHtml(result.pairs)
     : !isCorrect && result.correctAnswer && question.type !== 'error'
       ? `<div class="feedback-banner__correct-answer">正确答案：${result.correctAnswer}</div>${altHtml}`
       : '';
@@ -825,6 +921,8 @@ function showFeedback(isCorrect, question, userAnswer, result) {
     ? ''
     : `<button class="btn-primary" id="continueBtn" style="background:rgba(255,255,255,0.25);box-shadow:0 4px 0 rgba(0,0,0,0.15);">继续</button>`;
 
+  // 正确答案和解析包在 __body 里：横幅有高度上限，太长时只有这一段在横幅里滚动，
+  // 标题和「继续」一直看得见，不用先滚到底才找得到按钮
   feedbackArea.innerHTML = `
     <div class="feedback-banner ${bannerClass}">
       <div class="feedback-banner__header">
@@ -832,11 +930,14 @@ function showFeedback(isCorrect, question, userAnswer, result) {
         <span>${title}</span>
         ${scoreInfo}${comboInfo}
       </div>
-      ${correctionHtml}
-      ${correctAnswerHtml}
-      ${explanationHtml}
+      <div class="feedback-banner__body">
+        ${correctionHtml}
+        ${correctAnswerHtml}
+        ${explanationHtml}
+      </div>
       ${continueBtnHtml}
     </div>`;
+  reserveFeedbackSpace();
 
   if (isCorrect) {
     clearAdvanceTimer();
@@ -854,6 +955,7 @@ function showFeedback(isCorrect, question, userAnswer, result) {
       btn.style.cssText = 'background:rgba(255,255,255,0.25);box-shadow:0 4px 0 rgba(0,0,0,0.15);';
       btn.addEventListener('click', advanceToNext);
       feedbackArea.querySelector('.feedback-banner')?.append(btn);
+      reserveFeedbackSpace();
     });
   } else {
     const continueBtn = document.getElementById('continueBtn');
@@ -936,9 +1038,12 @@ function showResults() {
   if (isBoss) {
     starsHtml = `<div style="font-size:3.5rem;">${bossPassed ? '🎓' : '💪'}</div>`;
     titleText = bossPassed ? `${curriculum.examLabel()} 模拟通过！` : '再接再厉！';
+    // 「还差一点」只在真的差得不多时说；0%、30% 也这么说就是哄人了
     subtitleText = bossPassed
       ? `综合正确率 ${accuracyPct}% · 已达标(≥70%)`
-      : `综合正确率 ${accuracyPct}% · 距达标还差一点`;
+      : accuracyPct >= 60
+        ? `综合正确率 ${accuracyPct}% · 距达标(≥70%)还差一点`
+        : `综合正确率 ${accuracyPct}% · 达标需要 ≥70%`;
   } else {
     starsHtml = [1, 2, 3].map(i =>
       `<span class="result-star ${i <= results.stars ? 'result-star--earned' : ''}">⭐</span>`
@@ -951,9 +1056,10 @@ function showResults() {
     if (results.stars === 0 && !isReview) subtitleText += ' · 答错不超过 2 题就能通关';
   }
 
-  // 题库已经做完一遍、这次不得不出了旧题时，如实告诉孩子，而不是装作新题
+  // 出了做过的题时如实告诉孩子，而不是装作新题。选题现在先保证本关自己的题（见 engine.selectQuestions），
+  // 本关的题做过也会再出，不再是「整个单元都做完一遍」才有旧题，所以不说「全部做过一遍」。
   const repeatHtml = session.repeatedCount > 0
-    ? `<div class="result-note">本单元的题你已经全部做过一遍，这次有 ${session.repeatedCount} 道是复习旧题。</div>`
+    ? `<div class="result-note">这次有 ${session.repeatedCount} 道是之前做过的题，再练一遍记得更牢。</div>`
     : '';
 
   // 语法点原样是 mixed_tense_sequences 这样的英文 id，家长一眼看不懂。
@@ -1035,8 +1141,7 @@ function showResults() {
   }
 
   // Hide feedback area
-  const feedbackArea = document.getElementById('feedbackArea');
-  if (feedbackArea) feedbackArea.innerHTML = '';
+  clearFeedback();
   const comboArea = document.getElementById('comboArea');
   if (comboArea) comboArea.innerHTML = '';
 

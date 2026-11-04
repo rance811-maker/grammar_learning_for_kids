@@ -75,6 +75,12 @@ const RANK_THRESHOLDS = [
   { rank: "bronze", min: 0 },
 ];
 
+// 掌握度到这条线就不算「薄弱」了（「语法掌握度」进度条也是从这里开始变绿）
+const WEAK_MASTERY_BELOW = 0.8;
+
+// 模拟挑战（学习计划第 10 天的综合测试）要几个单元通过 Lv.3 才开放
+export const BOSS_LV3_NEEDED = 6;
+
 function createDefaultState() {
   const units = {};
   for (let i = 1; i <= 12; i++) {
@@ -723,6 +729,16 @@ export const store = {
     this.save();
   },
 
+  // 界面上显示的连续天数。currentStreak 只在练习时更新，停练多天后存档里还是停练前的数，
+  // 首页、侧栏、「我的」、家长报告直接读它，就会出现「连续 2 天」和「近 7 天练习 0 次」并排。
+  // 最后一次练习不是今天也不是昨天，说明已经断了，显示 0。只读，不改存档、不触发同步。
+  getDisplayStreak() {
+    const { currentStreak, lastPracticeDate } = this.state.player;
+    if (!lastPracticeDate) return currentStreak || 0;
+    const gap = daysBetween(lastPracticeDate, toDateString(new Date()));
+    return gap > 1 ? 0 : currentStreak || 0;
+  },
+
   getRank() {
     const score = this.state.player.totalScore;
     for (const { rank, min } of RANK_THRESHOLDS) {
@@ -893,6 +909,13 @@ export const store = {
       .map(([skill, data]) => ({ skill, ...data }));
   },
 
+  // 给孩子、家长看的「薄弱点」：只列掌握度还不到 80% 的（和「语法掌握度」进度条变绿是同一条线）。
+  // getWeakestSkills 只是按掌握度排序取最低的 n 个，100% 的也会排进去，直接拿来显示就成了
+  // 「100% 也是弱点」。出题挑补充题时仍用 getWeakestSkills：那里要的是「相对最弱」，全会了也得有题练。
+  getWeakSkills(n) {
+    return this.getWeakestSkills(Infinity).filter((w) => w.mastery < WEAK_MASTERY_BELOW).slice(0, n);
+  },
+
   getAllMastery() {
     return { ...this.state.mastery };
   },
@@ -938,11 +961,22 @@ export const store = {
 
   // --- Portfolio ---
 
+  // 一个单元的写作任务在作品集里只留一篇：重写后再保存，换成新写的这篇。
+  // 以前每次都 push，重写两次计数就成了「已完成 2 / 12 篇」，打开看到的却还是最早那篇。
   saveToPortfolio(entry) {
+    this.state.portfolio = this.state.portfolio.filter((p) => p.unitId !== entry.unitId);
     this.state.portfolio.push({
       ...entry,
       date: entry.date || toDateString(new Date()),
     });
+    this.save();
+  },
+
+  // 批改比保存晚到：把批改补进同一单元、内容一样的那一篇（期间又重写保存过就不补）
+  setPortfolioReview(unitId, content, review) {
+    const entry = this.state.portfolio.find((p) => p.unitId === unitId && p.content === content);
+    if (!entry) return;
+    entry.review = review;
     this.save();
   },
 
@@ -1332,11 +1366,16 @@ export const store = {
   // The BOSS is unlocked once the child has cleared Lv.3 of enough units to
   // have broad grammar coverage.
   isBossUnlocked() {
+    return this.countLv3Passed() >= BOSS_LV3_NEEDED;
+  },
+
+  // 通过了 Lv.3 的单元数。首页在计划第 10 天要告诉孩子离综合测试开放还差几个。
+  countLv3Passed() {
     let lv3Count = 0;
     for (let i = 1; i <= 12; i++) {
       if (this.isLevelPassed(i, 3)) lv3Count++;
     }
-    return lv3Count >= 6;
+    return lv3Count;
   },
 
   recordBossResult(accuracy) {

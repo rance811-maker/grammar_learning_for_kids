@@ -60,6 +60,8 @@ function normalizeQuestion(q, id) {
         ...base,
         words: q.words || [],
         correctSentence: q.correctSentence ?? q.correct ?? '',
+        // 有的句子不止一种正确语序（状语放句首或句末），其余写法列在这里，判分时都算对
+        ...(Array.isArray(q.acceptableSentences) ? { acceptableSentences: q.acceptableSentences } : {}),
       };
 
     case 'error':
@@ -96,6 +98,8 @@ function normalizeQuestion(q, id) {
         hint: q.hint || '',
         acceptableAnswers,
         correctAnswer: acceptableAnswers[0] || '',
+        // 多空题逐空列出可接受的写法：[[第 1 空…], [第 2 空…]]（fillAnswers.fillBlankSets 会校验格式）
+        ...(Array.isArray(q.blankAnswers) ? { blankAnswers: q.blankAnswers } : {}),
       };
     }
 

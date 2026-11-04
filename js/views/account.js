@@ -1,6 +1,8 @@
 import { store } from '../store.js';
 import { cloudEnabled, friendlyError } from '../cloud.js';
 import { takeReturn } from './gate.js';
+import { lock as lockParentZone } from './parent.js';
+import { hasApiKey } from '../unitGenerator.js';
 
 export function render(sub) {
   // 云端未配置：只能本机使用。
@@ -49,13 +51,12 @@ export function render(sub) {
         <div class="account-card">
           <div class="account-card__icon">🧒</div>
           <div class="account-card__title">你好，${escapeHtml(name)}！</div>
-          <p class="account-card__desc">
-            学习记录正在自动云端同步，换设备登录同一个账号就能接着学。
-          </p>
-          <div class="account-status">☁️ 已登录 · 自动同步中</div>
+          <div id="syncStatus">${syncStatusHtml()}</div>
           ${email ? `<div class="account-hint">邮箱：${escapeHtml(email)}</div>` : ''}
           <button class="btn btn--secondary" id="logoutBtn" style="margin-top:var(--space-md);">退出登录</button>
           <p class="account-hint">退出后这台设备上只能看示例，重新登录就能接着学。</p>
+          ${email ? `<button class="account-link" id="changePwdBtn" type="button">修改登录密码</button>
+          <div class="account-msg" id="accMsg"></div>` : ''}
         </div>
       </div>`;
   }
@@ -152,23 +153,103 @@ function mountReset() {
   });
 }
 
+// 同步状态要说实话：底部已经弹出「没能存到云端」时，这里还写「自动同步中」就自相矛盾了。
+// 看的是和底部横条同一个标记（store._cloudSaveFailed），不看「有没上传的改动」——
+// 那个每次保存后到上传完的一两秒里都是真的，正常情况下也会一闪而过地报错。
+function syncStatusHtml() {
+  if (store._cloudSaveFailed) {
+    return `
+      <p class="account-card__desc">
+        有学习记录还没存到云端。<strong>数据还在这台设备上，没有丢</strong>。
+        联网后点下面的按钮再传一次；传上去之前先别退出登录。
+      </p>
+      <div class="account-status">⚠️ 已登录 · 还有记录没同步</div>
+      <button class="btn btn--primary" id="syncNowBtn" style="margin-top:var(--space-sm);">立即重新同步</button>`;
+  }
+  return `
+    <p class="account-card__desc">
+      学习记录正在自动云端同步，换设备登录同一个账号就能接着学。
+    </p>
+    <div class="account-status">☁️ 已登录 · 自动同步中</div>`;
+}
+
+function mountSyncStatus() {
+  const box = document.getElementById('syncStatus');
+  if (!box) return;
+  box.innerHTML = syncStatusHtml();
+  const btn = document.getElementById('syncNowBtn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = '正在同步…';
+    // _pushNow 自己会核对账号、本机存档归属，和退出登录前的那次补传走的是同一条路
+    await store._pushNow();
+    mountSyncStatus();
+  });
+}
+
+let _watchingSync = false;
+
 function mountLoggedIn() {
+  mountSyncStatus();
+  // 底部横条出现 / 收起时（自动重试成功、失败），账号页开着就跟着换说法。只挂一次
+  if (!_watchingSync) {
+    _watchingSync = true;
+    window.addEventListener('gq-cloud-save', () => {
+      if (document.getElementById('syncStatus')) mountSyncStatus();
+    });
+  }
+
+  // 改密码：已登录也可以直接发重设邮件，不用先退出再走「忘记密码」（比如孩子看到了密码）
+  const changePwdBtn = document.getElementById('changePwdBtn');
+  const msg = document.getElementById('accMsg');
+  if (changePwdBtn && msg) {
+    changePwdBtn.addEventListener('click', async () => {
+      const email = store.account && store.account.email;
+      if (!email) return;
+      changePwdBtn.disabled = true;
+      msg.textContent = '';
+      msg.className = 'account-msg';
+      try {
+        await store.requestPasswordReset(email);
+        msg.textContent = '改密码的邮件已发到 ' + email + '，点开邮件里的链接设一个新密码。';
+        msg.className = 'account-msg account-msg--ok';
+      } catch (e) {
+        msg.textContent = friendlyError(e);
+        msg.className = 'account-msg account-msg--error';
+      } finally {
+        changePwdBtn.disabled = false;
+      }
+    });
+  }
+
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
-      if (!confirm('确定要退出登录吗？退出后这台设备上只能看示例，重新登录就能接着学。')) return;
+      // 家长的 AI key 按设备存、不跟账号走（兄弟姐妹各一个账号可以共用）。退出不清它，
+      // 但得说一声：借来的设备上，下一个登录的人会接着用这把 key 批改、生成课程。
+      const keyNote = hasApiKey()
+        ? '\n\n这台设备上还存着家长配的 AI key，退出登录不会清掉它。不是自己的设备，请先到「家长专区 → AI 服务」点「清除 key」。'
+        : '';
+      if (!confirm('确定要退出登录吗？退出后这台设备上只能看示例，重新登录就能接着学。' + keyNote)) return;
       logoutBtn.disabled = true;
       let res = await store.logout();
       if (res.unsynced) {
-        // 还有练习没传上云端（断网或登录过期）：退出后这台设备上的这些记录就看不到了
-        if (!confirm('还有学习记录没能存到云端（网络不通或登录已过期）。现在退出，这些记录会从这台设备上移走（留有备份，但换设备看不到）。\n\n建议先联网、或重新登录一次再退出。仍然要退出吗？')) {
+        // 还有练习没传上云端（断网或登录过期）。退出时 store 会在本机留一份备份，但网站上没有任何
+        // 地方能把它找回来（自动并回去要和别的设备上的新进度合并，弄不好会覆盖掉，没敢做），
+        // 所以这里不能说「留有备份」，要照实说找不回来。
+        if (!confirm('还有学习记录没能存到云端（网络不通或登录已过期）。现在退出，这些记录就找不回来了，换设备、重新登录都看不到。\n\n建议先联网、或重新登录一次，等记录传上去再退出。仍然要退出吗？')) {
           logoutBtn.disabled = false;
           return;
         }
         res = await store.logout({ force: true });
       }
+      // 家长专区的解锁跟着这次登录走：退出后同一个标签页再登录（哪怕是别的账号）也要重新输家长密码
+      lockParentZone();
+      // 整页重新加载，而不是只换页：口语页的录音（麦克风）、进行中的转写和批改都存在模块变量里，
+      // 不重新加载就会一直开着，下一个人登录后还会用他的身份提交上一个人的录音
       location.hash = '';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      location.reload();
     });
   }
 }

@@ -140,10 +140,10 @@ export const unitsBatch = [
         {
           type: "choice",
           instruction: "选择正确的答案",
-          sentence: "She started ___ the piano when she was six. (both forms are correct here)",
+          sentence: "She started ___ the piano when she was six.",
           options: ["play", "to play", "plays", "played"],
           correct: 1,
-          explanation: "start 后面既可以接 to + 动词原形，也可以接 -ing。这里 to play 是正确选项之一（started to play / started playing 都可以）。",
+          explanation: "start 后面既可以接 to + 动词原形，也可以接 -ing（started to play / started playing 都对）。选项里只有 to play 是对的。",
           subSkill: "both_forms"
         },
         {
@@ -297,28 +297,28 @@ export const unitsBatch = [
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["She", "enjoys", "to", "dance", "with", "her", "friends"],
+          sentence: ["She","enjoys","sing","with","her","friends"],
           errorIndex: 2,
-          correction: "dancing",
-          explanation: "enjoy 后面要接动名词（-ing 形式），不能用 to → She enjoys dancing. ✓（删去 to，把 dance 改成 dancing）",
+          correction: "singing",
+          explanation: "enjoy 后面要接动名词（-ing 形式），不能接动词原形 → She enjoys singing with her friends. ✓",
           subSkill: "verb_plus_ing"
         },
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["He", "is", "good", "at", "to", "swim"],
+          sentence: ["He","is","good","at","swim"],
           errorIndex: 4,
           correction: "swimming",
-          explanation: "介词 at 后面要用动名词（-ing 形式），不能用 to → good at swimming. ✓",
+          explanation: "介词 at 后面要用动名词（-ing 形式），不能用动词原形 → He is good at swimming. ✓",
           subSkill: "preposition_plus_ing"
         },
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["To", "swim", "is", "very", "good", "exercise"],
+          sentence: ["Swim","is","very","good","exercise"],
           errorIndex: 0,
           correction: "Swimming",
-          explanation: "用动名词当主语更自然 → Swimming is very good exercise. ✓",
+          explanation: "动词原形 swim 不能直接当主语，要用动名词（-ing 形式）→ Swimming is very good exercise. ✓",
           subSkill: "as_subject"
         },
         {
@@ -338,10 +338,10 @@ export const unitsBatch = [
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["They", "finished", "to", "paint", "the", "fence"],
+          sentence: ["They","finished","paint","the","fence"],
           errorIndex: 2,
           correction: "painting",
-          explanation: "finish 后面接动名词（-ing 形式），不用 to → They finished painting the fence. ✓",
+          explanation: "finish 后面接动名词（-ing 形式），不能接动词原形 → They finished painting the fence. ✓",
           subSkill: "verb_plus_ing"
         },
         {
@@ -420,7 +420,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格阅读）",
+          instruction: "读这条消息，里面有两个空。选出两个空都填对的那一组",
           sentence: "Read the message: 'Hi Sam! I've finished ___ my project. Now I plan ___ a film tonight. Want to come?'",
           options: [
             "doing / to watch",
@@ -450,16 +450,11 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
-          sentence: "Which sentence is correct for a PET email about your hobbies?",
-          options: [
-            "Reading is my favourite hobby and I love to collecting books.",
-            "Reading is my favourite hobby and I love collecting books.",
-            "To read is my favourite hobby and I love collect books.",
-            "Reading is my favourite hobby and I love to collecting books."
-          ],
+          instruction: "哪个句子是正确的？",
+          sentence: "Which sentence is correct for an email about your hobbies?",
+          options: ["Reading is my favourite hobby and I love to collecting books.","Reading is my favourite hobby and I love collecting books.","To read is my favourite hobby and I love collect books.","Read is my favourite hobby and I love collecting books."],
           correct: 1,
-          explanation: "动名词当主语（Reading is...）；love + -ing（love collecting）。",
+          explanation: "动名词当主语（Reading is...，不能用 Read is）；love 后面接 -ing（love collecting），不能用 love to collecting 或 love collect。",
           subSkill: "as_subject"
         },
         {
@@ -480,7 +475,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
+          instruction: "句子里有两个空，选出两个空都填对的那一组",
           sentence: "Complete the sentence for your story: 'My sister hopes ___ a famous singer, and she practises ___ every day.'",
           options: [
             "becoming / to sing",
@@ -785,7 +780,7 @@ export const unitsBatch = [
         },
         {
           type: "fill",
-          instruction: "用 if 把疑问句转述，填入正确的词",
+          instruction: "把直接引语改成间接引语，填入正确的词",
           sentence: "Direct: 'Do you like ice cream?' Reported: He asked me ___ I liked ice cream.",
           answer: "if",
           acceptableAnswers: ["if", "whether"],
@@ -802,11 +797,11 @@ export const unitsBatch = [
         },
         {
           type: "fill",
-          instruction: "把时间词改成转述形式填空",
-          sentence: "Direct: 'I will call you tomorrow.' Reported: She said she would call me ___ next day.",
-          answer: "the",
-          acceptableAnswers: ["the"],
-          explanation: "tomorrow → the next day（the following day）。",
+          instruction: "转述时 tomorrow 要换个说法。把新说法填进空格（可以填几个词）",
+          sentence: "Direct: 'I will call you tomorrow.' Reported: She said she would call me ___.",
+          answer: "the next day",
+          acceptableAnswers: ["the next day","the following day","the day after"],
+          explanation: "转述时 tomorrow → the next day（也可以说 the following day）。She said she would call me the next day. ✓",
           subSkill: "time_place_change"
         },
         {
@@ -832,10 +827,10 @@ export const unitsBatch = [
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["He", "said", "me", "that", "he", "was", "busy"],
-          errorIndex: 2,
+          sentence: ["Grandpa","said","me","a","funny","story"],
+          errorIndex: 1,
           correction: "told",
-          explanation: "say 后面不能直接跟人。要么用 told me，要么用 said that。这里应该是 He told me that... ✓",
+          explanation: "say 后面不能直接跟人（said me ✗），讲故事也要用 tell：tell + 人 + a story。应该是 Grandpa told me a funny story. ✓",
           subSkill: "say_tell"
         },
         {
@@ -850,19 +845,19 @@ export const unitsBatch = [
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["He", "asked", "me", "where", "did", "I", "live"],
-          errorIndex: 4,
-          correction: "(delete) I lived",
-          explanation: "转述疑问句用陈述句语序，不用 did。应该是 He asked me where I lived. ✓",
+          sentence: ["She","asked","me","that","I","wanted","some","juice","or","not"],
+          errorIndex: 3,
+          correction: "if",
+          explanation: "转述是非问句（原话是 'Do you want some juice or not?'），要用 if 或 whether 引出，不用 that → She asked me if I wanted some juice or not. ✓",
           subSkill: "reported_questions"
         },
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["They", "told", "that", "they", "were", "ready"],
-          errorIndex: 2,
-          correction: "us / said",
-          explanation: "tell 后面要跟人。应该是 They told us that... 或 They said that... ✓",
+          sentence: ["They","told","they","were","ready"],
+          errorIndex: 1,
+          correction: "said",
+          explanation: "tell 后面一定要跟人（told me / told us）。这里 told 后面没有人，要用 say → They said they were ready. ✓（也可以说 They told us they were ready.）",
           subSkill: "say_tell"
         },
         {
@@ -882,15 +877,15 @@ export const unitsBatch = [
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["Mum", "said", "she", "would", "cook", "dinner", "now"],
-          errorIndex: 6,
+          sentence: ["Yesterday","Mum","said","she","would","cook","dinner","now"],
+          errorIndex: 7,
           correction: "then",
-          explanation: "转述时 now → then。Mum said she would cook dinner then. ✓",
+          explanation: "妈妈是昨天说的话，她说的 now 指的是那个时候，今天转述要变成 then → Yesterday Mum said she would cook dinner then. ✓",
           subSkill: "time_place_change"
         },
         {
           type: "choice",
-          instruction: "哪个句子是正确的？",
+          instruction: "哪个句子是正确的转述？",
           sentence: "Direct: 'I will help you.' 选出正确的转述：",
           options: [
             "He said he will help me.",
@@ -905,10 +900,10 @@ export const unitsBatch = [
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["The", "teacher", "told", "to", "open", "our", "books"],
-          errorIndex: 3,
-          correction: "us to",
-          explanation: "tell 后面要跟人再加 to do。应该是 The teacher told us to open our books. ✓",
+          sentence: ["The","teacher","told","us","opening","our","books"],
+          errorIndex: 4,
+          correction: "to open",
+          explanation: "转述命令用 tell + 人 + to + 动词原形，不用 -ing。应该是 The teacher told us to open our books. ✓",
           subSkill: "reporting_verbs"
         }
       ],
@@ -964,7 +959,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格阅读）",
+          instruction: "读 Sam 写的话和后面的转述句。转述句里有两个空，选出两个空都填对的那一组",
           sentence: "Read the note: Sam wrote 'I love this book. I will lend it to you tomorrow.' Reported: Sam said he ___ that book and he ___ lend it to me the next day.",
           options: [
             "loves / will",
@@ -979,7 +974,7 @@ export const unitsBatch = [
         {
           type: "scenario",
           instruction: "选择最合适的转述",
-          context: "Your dad said to you: 'I am tired now.' You report this to your mum.",
+          context: "Last night your dad said to you: 'I am tired now.' The next morning you tell your mum.",
           dialogue: [
             { speaker: "Mum", text: "What did Dad say?" }
           ],
@@ -989,12 +984,12 @@ export const unitsBatch = [
             "He told he was tired then."
           ],
           correct: 0,
-          explanation: "tell + 人（me）；am→was；now→then。He told me he was tired then. ✓",
+          explanation: "tell + 人（me）；am→was；爸爸是昨晚说的，now 指的是那个时候，要换成 then。He told me he was tired then. ✓",
           subSkill: "time_place_change"
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
+          instruction: "哪个句子是正确的转述？",
           sentence: "Which sentence correctly reports the question 'Where do you live?'",
           options: [
             "He asked me where do I live.",
@@ -1024,7 +1019,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
+          instruction: "句子里有两个空，选出两个空都填对的那一组",
           sentence: "Complete the report: My friend asked me ___ I wanted to join the chess club, and I said I ___ love to.",
           options: [
             "that / will",
@@ -1033,7 +1028,7 @@ export const unitsBatch = [
             "if / will"
           ],
           correct: 1,
-          explanation: "是非问句转述用 if；will → would（时态后移）。asked me if I wanted... I would love to. ✓",
+          explanation: "是非问句转述用 if；我当时回答的是 'I'd love to'（= I would love to，表示很想做），转述时 would 不变（不说 will love to）。My friend asked me if I wanted to join the chess club, and I said I would love to. ✓",
           subSkill: "reported_questions"
         }
       ]
@@ -1153,10 +1148,10 @@ export const unitsBatch = [
         {
           type: "choice",
           instruction: "选择正确的答案",
-          sentence: "There are some apples on the table. Can you pass me ___ apple?",
+          sentence: "There is an apple on the table. Can you pass me ___ apple, please?",
           options: ["a", "an", "the", "some"],
           correct: 2,
-          explanation: "前面已经提到这些苹果，特指其中的（你看得到的）那个 → 用 the。",
+          explanation: "前一句第一次提到这个苹果，用 an；再说到它时，大家都知道是桌上那一个 → 用 the。Can you pass me the apple, please? ✓",
           subSkill: "a_an_the"
         },
         {
@@ -1278,9 +1273,9 @@ export const unitsBatch = [
           type: "choice",
           instruction: "选择正确的答案",
           sentence: "We go to ___ school by bus every day.",
-          options: ["a", "an", "the", "(no article)"],
+          options: ["a","an","the","不填"],
           correct: 3,
-          explanation: "go to school（表示上学这件事）不加冠词 → 零冠词。go to school ✓。",
+          explanation: "go to school（表示上学这件事）不加冠词，空格不填 → We go to school by bus every day. ✓",
           subSkill: "zero_article"
         },
         {
@@ -1354,7 +1349,7 @@ export const unitsBatch = [
         },
         {
           type: "fill",
-          instruction: "用 the 或 (no article) 填空（不填就写 x）",
+          instruction: "空格里要不要用 the？要用就填 the，不用就填 x",
           sentence: "We play ___ football in the park after school.",
           answer: "x",
           acceptableAnswers: ["x", "no article", "none", "-"],
@@ -1442,8 +1437,8 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "哪个句子是正确的？",
-          sentence: "选出语法正确的句子：",
+          instruction: "选择最合适的句子",
+          sentence: "你想请朋友吃蛋糕，该怎么问？",
           options: [
             "Would you like any cake?",
             "Would you like some cake?",
@@ -1451,7 +1446,7 @@ export const unitsBatch = [
             "Would you like a much cake?"
           ],
           correct: 1,
-          explanation: "提供/邀请时（疑问句）用 some。Would you like some cake? ✓",
+          explanation: "请别人吃东西（提供、邀请）时，虽然是疑问句，也用 some → Would you like some cake? ✓（Would you like any cake? 语法上不算错，但请客时用 some 更自然、更有礼貌）",
           subSkill: "some_any"
         },
         {
@@ -1516,7 +1511,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格阅读）",
+          instruction: "读这段菜谱，里面有三个空。选出三个空都填对的那一组",
           sentence: "Read the recipe: 'You need ___ flour, two eggs and ___ butter. Mix them in ___ bowl.'",
           options: [
             "some / a little / a",
@@ -1546,7 +1541,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
+          instruction: "哪个句子是正确的？",
           sentence: "Which sentence is correct for a shopping list note?",
           options: [
             "We need an bananas and the bottle of water.",
@@ -1576,7 +1571,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案（PET 风格）",
+          instruction: "读这封邮件，里面有三个空。选出三个空都填对的那一组",
           sentence: "Complete the email: 'There is ___ fruit in the fridge but there aren't ___ vegetables. Can you buy ___ tomatoes?'",
           options: [
             "many / much / some",

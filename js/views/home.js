@@ -1,4 +1,4 @@
-import { store } from '../store.js';
+import { store, BOSS_LV3_NEEDED } from '../store.js';
 import { curriculum } from '../curriculum.js';
 import { engine } from '../engine.js';
 import { cloud } from '../cloud.js';
@@ -65,7 +65,7 @@ function renderHeader(player) {
       <a class="status-strip" href="#stats" title="查看完整进度">
         <span class="status-strip__item">${rank.icon} ${rank.name}</span>
         <span class="status-strip__item">⭐ ${player.totalScore}</span>
-        <span class="status-strip__item">🔥 ${player.currentStreak}</span>
+        <span class="status-strip__item">🔥 ${store.getDisplayStreak()}</span>
         <span class="status-strip__more">详情 ›</span>
       </a>
     </div>`;
@@ -144,7 +144,7 @@ export function render() {
 
     const needsGen = unitData._needsGeneration ? ' unit-node--needs-gen' : '';
     nodesHtml += `
-      <div class="unit-node ${statusClass}${needsGen}" data-unit-id="${uid}">
+      <div class="unit-node ${statusClass}${needsGen}" data-unit-id="${uid}" ${status === 'locked' ? 'aria-disabled="true"' : 'tabindex="0" role="button"'}>
         <div class="unit-node__circle">${circleContent}</div>
         <div class="unit-node__no">Unit ${uid}</div>
         <span class="unit-node__name">${unitData.title || 'Unit ' + uid}</span>
@@ -163,12 +163,20 @@ export function render() {
     const planPct = Math.round((plan.completedSessions / plan.totalSessions) * 100);
 
     let sessionBtnHtml = '';
-    if (currentSession) {
-      const sessionLabel = currentSession.type === '综合测试'
-        ? '综合测试'
-        : needsDiscover(currentSession)
-          ? `Unit ${currentSession.unitId} · 先读故事`
-          : `Unit ${currentSession.unitId} · Lv.${currentSession.level}`;
+    // 到了综合测试那天但它还没开放：按钮换成凑够 6 个单元 Lv.3 的下一关，并说清楚为什么
+    const prep = currentSession?.type === '综合测试' && !store.isBossUnlocked() ? bossPrepStep() : null;
+    if (prep) {
+      const passed = store.countLv3Passed();
+      sessionBtnHtml = `
+        <div class="plan-boss-hint" style="font-size:var(--text-sm);color:var(--color-text-light);margin-top:var(--space-md);">
+          第 10 天是综合测试，要 ${BOSS_LV3_NEEDED} 个单元通过 Lv.3 才能开始。你已经过了 ${passed} 个，还差 ${BOSS_LV3_NEEDED - passed} 个。
+        </div>
+        <button class="btn btn--primary btn--large" id="todayPracticeBtn"
+                style="width:100%;margin-top:var(--space-sm);font-size:1rem;padding:var(--space-md);">
+          下一步 — ${stepLabel(prep)}
+        </button>`;
+    } else if (currentSession) {
+      const sessionLabel = currentSession.type === '综合测试' ? '综合测试' : stepLabel(currentSession);
       sessionBtnHtml = `
         <button class="btn btn--primary btn--large" id="todayPracticeBtn"
                 style="width:100%;margin-top:var(--space-md);font-size:1rem;padding:var(--space-md);">
@@ -195,7 +203,7 @@ export function render() {
       <div class="card mb-md" style="padding:var(--space-lg);text-align:center;background:linear-gradient(135deg,#fff9db,#ffe8a1);">
         <div style="font-size:2.5rem;margin-bottom:var(--space-sm);">🎓</div>
         <div style="font-weight:700;font-size:1.1rem;margin-bottom:var(--space-xs);">恭喜结业！</div>
-        <div style="font-size:var(--text-sm);color:var(--color-text-light);">你已完成 Think 2 语法冲刺计划！</div>
+        <div style="font-size:var(--text-sm);color:var(--color-text-light);">你已完成「${escapeHtml(currTitle)}」10 天学习计划！</div>
       </div>`;
   }
 
@@ -279,12 +287,14 @@ export function render() {
       </div>`;
   }
 
+  // 课程切换卡排在「开始今天的练习」后面：三个课程按钮各占一行，放在前面时
+  // 360×640 这类小屏第一屏只看得到它，每天要点的主按钮被挤到屏幕外。
   return `
     <div class="view view-map">
       ${renderHeader(player)}
-      ${switcherHtml}
       ${planHtml}
       ${quickStartHtml}
+      ${switcherHtml}
       ${bossHtml}
       ${oralHtml}
 
@@ -331,23 +341,18 @@ export function mount() {
       const session = store.getCurrentSession();
       if (!session) return;
       if (session.type === '综合测试') {
-        // 计划到了综合测试那天，但 BOSS 还没解锁（Lv.3 通过的单元不够 6 个）
+        // 计划到了综合测试那天，但 BOSS 还没解锁（Lv.3 通过的单元不够 6 个）：
+        // 计划前 9 天最多排 3 个单元，光按计划走凑不够。以前这里只弹个提示，计划就卡在 9/10，
+        // 现在直接带去按钮上写的那一关。
         if (!store.isBossUnlocked()) {
-          alert('综合测试还没解锁：先把 6 个单元的 Lv.3 通关（至少 1 星）。');
+          const prep = bossPrepStep();
+          if (prep) goToLevel(prep);
+          else alert(`综合测试还没解锁：先把 ${BOSS_LV3_NEEDED} 个单元的 Lv.3 通关（至少 1 星）。`);
           return;
         }
         location.hash = 'practice/boss';
-      } else if (!curriculum.isUnitGenerated(session.unitId)) {
-        // Unit content not generated yet — send to the unit page (which has the
-        // "generate content" button) instead of an empty practice session.
-        location.hash = `unit/${session.unitId}`;
-      } else if (needsDiscover(session)) {
-        location.hash = `discover/${session.unitId}`;
-      } else if (!store.state.units[session.unitId]?.practiceLevels?.[session.level]?.unlocked) {
-        // 计划指向的关卡还锁着（比如前一天 0 星没过）——去单元页，让孩子看到该先过哪一关
-        location.hash = `unit/${session.unitId}`;
       } else {
-        location.hash = `practice/${session.unitId}/${session.level}`;
+        goToLevel(session);
       }
     });
   }
@@ -376,6 +381,42 @@ export function mount() {
     });
   }
 
+}
+
+// 去计划（或综合测试前的准备）指向的那一关
+function goToLevel(step) {
+  if (!curriculum.isUnitGenerated(step.unitId)) {
+    // Unit content not generated yet — send to the unit page (which has the
+    // "generate content" button) instead of an empty practice session.
+    location.hash = `unit/${step.unitId}`;
+  } else if (needsDiscover(step)) {
+    location.hash = `discover/${step.unitId}`;
+  } else if (!store.state.units[step.unitId]?.practiceLevels?.[step.level]?.unlocked) {
+    // 计划指向的关卡还锁着（比如前一天 0 星没过）——去单元页，让孩子看到该先过哪一关
+    location.hash = `unit/${step.unitId}`;
+  } else {
+    location.hash = `practice/${step.unitId}/${step.level}`;
+  }
+}
+
+function stepLabel(step) {
+  return needsDiscover(step)
+    ? `Unit ${step.unitId} · 先读故事`
+    : `Unit ${step.unitId} · Lv.${step.level}`;
+}
+
+// 综合测试还差几个单元的 Lv.3 时，下一步练哪一关：已解锁、Lv.3 还没过的单元里，
+// 挑离 Lv.3 最近的（摸底掌握的单元复习过 Lv.2，Lv.3 已经开了，一关就能凑上一个），
+// 一样近就挑编号小的。返回 { unitId, level }，没有可练的返回 null。
+function bossPrepStep() {
+  let best = null;
+  for (let uid = 1; uid <= 12; uid++) {
+    const u = store.state.units[uid];
+    if (!u?.unlocked || !curriculum.getUnit(uid) || store.isLevelPassed(uid, 3)) continue;
+    const level = [3, 2, 1].find((lv) => u.practiceLevels?.[lv]?.unlocked && !store.isLevelPassed(uid, lv)) || 1;
+    if (!best || level > best.level) best = { unitId: uid, level };
+  }
+  return best;
 }
 
 // 计划排到某单元的 Lv.1、而这个单元的「发现」还没读：先去读故事、自己找出规则

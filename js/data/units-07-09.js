@@ -75,9 +75,9 @@ export const unitsBatch = [
           type: "choice",
           instruction: "选择正确的答案",
           sentence: "If I ___ rich, I would buy a big house.",
-          options: ["am", "was", "were", "will be"],
+          options: ["am","had","were","will be"],
           correct: 2,
-          explanation: "第二条件句（想象的情况）：If 后面用一般过去时，be 动词常用 were（所有人称）。If I were rich... ✓",
+          explanation: "第二条件句（想象的情况）：If 后面用一般过去时，be 动词常用 were（所有人称；口语里 I was 也可以）。If I were rich... ✓ am 和 will be 不是过去时；had 后面不能直接跟形容词 rich。",
           subSkill: "second_conditional"
         },
         {
@@ -308,10 +308,10 @@ export const unitsBatch = [
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["If", "it", "will", "rain", "we", "will", "stay", "home"],
+          sentence: ["If","we","will","miss","the","bus","we","will","be","late"],
           errorIndex: 2,
-          correction: "(remove will)",
-          explanation: "第一条件句中，If 部分不用 will，要用一般现在时。If it rains, we will stay home. ✓",
+          correction: "(remove)",
+          explanation: "第一条件句中，If 后面用一般现在时，不用 will。删掉 If 后面的 will → If we miss the bus, we will be late. ✓",
           subSkill: "first_conditional"
         },
         {
@@ -325,11 +325,11 @@ export const unitsBatch = [
         },
         {
           type: "error",
-          instruction: "点击句子中的错误单词",
+          instruction: "这句话多了一个词，点击这个多余的词",
           sentence: ["Unless", "you", "don't", "study", "you", "will", "fail"],
           errorIndex: 2,
-          correction: "(remove don't)",
-          explanation: "unless 本身已经包含否定（= if...not），不能再用 don't。Unless you study, you will fail. ✓",
+          correction: "(remove)",
+          explanation: "unless 本身已经包含否定（= if…not），后面不能再用 don't，所以 don't 是多余的。Unless you study, you will fail. ✓（意思和 If you don't study, you will fail 一样）",
           subSkill: "unless"
         },
         {
@@ -440,7 +440,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "I ___ you if I had your phone number, but I don't have it.",
           options: ["will call", "would call", "call", "called"],
           correct: 1,
@@ -465,7 +465,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "If you ___ this email today, you will get a free gift tomorrow.",
           options: ["answered", "would answer", "answer", "will answer"],
           correct: 2,
@@ -490,7 +490,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "We won't win the match ___ everyone plays their best.",
           options: ["if", "unless", "when", "because"],
           correct: 1,
@@ -736,10 +736,10 @@ export const unitsBatch = [
         {
           type: "choice",
           instruction: "选择正确的答案",
-          sentence: "___ this letter written by your grandfather?",
+          sentence: "___ this letter written by your grandfather many years ago?",
           options: ["Did", "Was", "Is", "Does"],
           correct: 1,
-          explanation: "过去被动语态的疑问句：Was/Were + 主语 + 过去分词？This letter（单数，过去）→ Was this letter written...? ✓",
+          explanation: "过去被动语态的疑问句：Was/Were + 主语 + 过去分词？This letter 是单数，many years ago 说明是过去的事 → Was this letter written...? ✓",
           subSkill: "passive_questions"
         },
         {
@@ -830,8 +830,8 @@ export const unitsBatch = [
           instruction: "用括号中单词的正确形式填空 (被动语态)",
           sentence: "The new stadium (open) ___ next month.",
           answer: "will be opened",
-          acceptableAnswers: ["will be opened"],
-          explanation: "新体育场下个月将被开放 → 将来被动语态：will be + 过去分词。will be opened。✓",
+          acceptableAnswers: ["will be opened","is going to be opened","is being opened","is to be opened"],
+          explanation: "新体育场下个月将被开放 → 将来时的被动语态：will be + 过去分词 → will be opened ✓。用 be going to 的被动 is going to be opened 也对；已经安排好的事也可以说 is being opened。",
           subSkill: "active_vs_passive"
         },
         {
@@ -875,10 +875,10 @@ export const unitsBatch = [
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["The", "window", "was", "broken", "with", "a", "ball"],
+          sentence: ["The","window","was","broken","with","my","brother"],
           errorIndex: 4,
           correction: "by",
-          explanation: "说明'被什么/谁'做的动作用 by。The window was broken by a ball. ✓（with 表示工具，但施动者用 by）",
+          explanation: "被动句里说是'被谁'做的，用 by。The window was broken by my brother. ✓（with 后面接用来做事的工具，比如 broken with a ball = 用球打破的；做这件事的人要用 by。）",
           subSkill: "by_agent"
         },
         {
@@ -989,11 +989,11 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "The results of the competition ___ tomorrow.",
-          options: ["announce", "are announced", "will be announced", "announced"],
+          options: ["announce","will announce","will be announced","announced"],
           correct: 2,
-          explanation: "比赛结果明天将被公布 → 将来被动语态 will be + 过去分词。will be announced。✓",
+          explanation: "比赛结果是“被”公布的，而且是明天的事 → 将来时的被动语态 will be + 过去分词：will be announced ✓。announce 和 will announce 都是主动，意思成了“结果去公布别的东西”；announced 前面少了 will be。",
           subSkill: "active_vs_passive"
         },
         {
@@ -1014,7 +1014,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "Millions of emails ___ every single day around the world.",
           options: ["is sent", "are sent", "send", "sends"],
           correct: 1,
@@ -1039,7 +1039,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "___ your bike repaired at that shop?",
           options: ["Did", "Does", "Was", "Do"],
           correct: 2,
@@ -1424,14 +1424,9 @@ export const unitsBatch = [
           type: "choice",
           instruction: "哪个句子是正确的？",
           sentence: "选出语法正确的句子：",
-          options: [
-            "The dog who has brown fur is mine.",
-            "The dog which has brown fur is mine.",
-            "The dog where has brown fur is mine.",
-            "The dog whose has brown fur is mine."
-          ],
+          options: ["The bike who has a red seat is mine.","The bike which has a red seat is mine.","The bike where has a red seat is mine.","The bike whose has a red seat is mine."],
           correct: 1,
-          explanation: "the dog 是动物（物），用 which（或 that）。The dog which has brown fur is mine. ✓",
+          explanation: "the bike 是物，用 which（或 that），不用 who。The bike which has a red seat is mine. ✓",
           subSkill: "which_things"
         },
         {
@@ -1485,11 +1480,7 @@ export const unitsBatch = [
           dialogue: [
             { speaker: "Mum", text: "So, who is your new friend?" }
           ],
-          options: [
-            "He's the boy which sits behind me.",
-            "He's the boy who sits behind me and loves football.",
-            "He's the boy where sits behind me."
-          ],
+          options: ["He's the boy which sits behind me.","He's the boy who sits behind me.","He's the boy where sits behind me."],
           correct: 1,
           explanation: "the boy 是人，用 who。He's the boy who sits behind me. ✓",
           subSkill: "who_people"
@@ -1497,7 +1488,7 @@ export const unitsBatch = [
         {
           type: "scenario",
           instruction: "选择最合适的回答",
-          context: "Your friend can't find a book and asks you about it.",
+          context: "You ask your friend to pass you a book from the shelf.",
           dialogue: [
             { speaker: "Friend", text: "Which book do you mean?" }
           ],
@@ -1513,22 +1504,18 @@ export const unitsBatch = [
         {
           type: "scenario",
           instruction: "选择最合适的回答",
-          context: "A tourist is asking you for directions to a special place.",
+          context: "A tourist points at a big building and asks you about it.",
           dialogue: [
             { speaker: "Tourist", text: "What is that big building over there?" }
           ],
-          options: [
-            "It's the library which you can read books.",
-            "It's the library where you can read and study.",
-            "It's the library who you can read books."
-          ],
+          options: ["It's the library which you can read books.","It's the library where you can read books.","It's the library who you can read books."],
           correct: 1,
-          explanation: "the library 是地点，用 where。It's the library where you can read and study. ✓",
+          explanation: "the library 是地点，用 where。It's the library where you can read books. ✓",
           subSkill: "where_places"
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "I met a girl ___ mother is a famous actress.",
           options: ["who", "which", "whose", "where"],
           correct: 2,
@@ -1553,7 +1540,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "The hotel ___ we stayed last summer had a huge pool.",
           options: ["which", "who", "where", "whose"],
           correct: 2,
@@ -1578,7 +1565,7 @@ export const unitsBatch = [
         },
         {
           type: "choice",
-          instruction: "选择正确的答案 (PET 风格)",
+          instruction: "选择正确的答案",
           sentence: "The musician ___ played the violin was only ten years old.",
           options: ["which", "who", "where", "whose"],
           correct: 1,

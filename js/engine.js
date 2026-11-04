@@ -131,6 +131,29 @@ export function questionTextKey(q) {
   return String(t).trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 120);
 }
 
+// 错题本（孩子的复习中心、家长报告）里一条错题显示的那句原题。
+// 各题型题干放在不同字段：找错、排序是词块 words，连线是 left，情境是 context / dialogue。
+// 以前一律取 sentence || instruction，这几种只剩「点击句子中的错误单词」这类通用说明，
+// 几条看着一模一样，分不清是哪道。排序题只列打乱的词块，不给正确句子，免得复习时答案摆在眼前。
+export function questionPreview(q, max = 60) {
+  if (!q) return '';
+  const list = (a, sep) => (Array.isArray(a) ? a.filter(Boolean).join(sep) : '');
+  let t = '';
+  if (q.type === 'error') t = list(q.words, ' ') || list(q.sentence, ' ');
+  else if (q.type === 'reorder') t = list(q.words, ' / ');
+  else if (q.type === 'match') t = list(q.left, ' / ');
+  else if (q.type === 'scenario') {
+    // 情境 + 对话最后一句。光有情境不够：雅思 7 分的情境只是「雅思口语 Part 1 · Friends」这种话题名，
+    // 好几道共用一个，单看它又分不清是哪道了
+    const last = Array.isArray(q.dialogue) ? q.dialogue[q.dialogue.length - 1] : null;
+    t = [q.context, typeof last === 'string' ? last : last?.text].filter(Boolean).join(' — ');
+  }
+  if (!t) t = (typeof q.sentence === 'string' && q.sentence) || q.context || q.instruction || '';
+  t = String(t).replace(/_+/g, '____').replace(/\s+/g, ' ').trim();
+  // 截断时补省略号，别停在单词中间让人以为题目就到这儿
+  return t.length > max ? `${t.slice(0, max).trimEnd()}…` : t;
+}
+
 function getQuestionsForLevel(unitId, level) {
   const unit = getUnits()[unitId];
   if (!unit?.levels?.[level]) return [];
@@ -254,27 +277,36 @@ export const engine = {
       return true;
     }
 
-    // 候选池 = 整个单元，按"离本关多远"分层，近层优先。
-    // 原来是先把本关 8 题全部取走再补别的关的题——于是立刻重试时本关 8 题原样
-    // 再来一遍。现在的规则：只要单元里还有没见过的题，就绝不出已经见过的；
-    // 见过的题只在整个单元都做完一遍之后才会重新出现，并且如实告诉孩子。
+    // 候选池 = 整个单元，分成本关、更低的关、更高的关三块。
+    // 以前的规则是「整个单元里只要还有没见过的题就绝不出见过的」，离本关近的先出。
+    // 可每场 12 题、每关只有 8 题，于是每一场都先把下一关的新题用掉：Lv.1 吃掉 Lv.2 的一半，
+    // Lv.2 吃掉 Lv.3 全部，轮到 Lv.3 时它自己的题早就见过了，一道都不出，全是 Lv.4、Lv.5 的题；
+    // 没过关重试 Lv.1，出的反而是更难的题。现在本关的题优先（见过的也比更高关的新题优先），
+    // 名额不够先用更低的关补，最后才动更高的关。一关的题只有在孩子打到这一关时才第一次出现。
+    // 立刻重试时本关的题会再来一遍——有 AI 变体的会换成没见过的变体（freshest），并如实告诉孩子。
     const unit = getUnits()[unitId];
-    const tiers = [];
+    let own = [];
+    const below = [], above = [];   // 下标 = 离本关几级，近的在前
     for (const [lk, lv] of Object.entries(unit?.levels || {})) {
-      const dist = Math.abs(Number(lk) - Number(level));
-      (tiers[dist] ||= []).push(...(lv.questions || []));
+      const d = Number(lk) - Number(level);
+      const qs = (lv.questions || []).map(freshest);
+      if (d === 0) own = qs;
+      else if (d < 0) below[-d] = qs;
+      else above[d] = qs;
     }
-    const seen = [];
-    for (const pool of tiers) {
-      if (!pool) continue;
-      const mapped = pool.map(freshest);
-      // 1) 本单元没见过的题，离本关近的先出，同一层内打乱
-      for (const q of shuffle(mapped.filter((q) => !shown.has(q.id)))) {
-        if (picked.length >= count) break;
-        take(q);
+    const unseenOf = (qs) => shuffle((qs || []).filter((q) => !shown.has(q.id)));
+    const seenOf = (qs) => (qs || []).filter((q) => shown.has(q.id)).sort(byStaleness);
+    let repeated = 0;
+    function fill(qs, isRepeat = false) {
+      for (const q of qs) {
+        if (picked.length >= count) return;
+        if (take(q) && isRepeat) repeated++;
       }
-      for (const q of mapped) if (shown.has(q.id)) seen.push(q);
     }
+
+    // 1) 本关没见过的题，然后是更低的关没见过的题（近的先出）
+    fill(unseenOf(own));
+    for (const t of below) if (t) fill(unseenOf(t));
 
     // 2) 薄弱技能的复习题（来自其它单元），同样只要没见过的，最多占三成
     const weakSkills = store.getWeakestSkills(5);
@@ -287,14 +319,13 @@ export const engine = {
       }
     }
 
-    // 3) 全部见过了才允许重复：挑最久没见的，并记下重复了几道
-    let repeated = 0;
-    if (picked.length < count) {
-      for (const q of seen.sort(byStaleness)) {
-        if (picked.length >= count) break;
-        if (take(q)) repeated++;
-      }
-    }
+    // 3) 本关、更低的关见过的题，挑最久没见的，记下重复了几道
+    fill(seenOf(own), true);
+    for (const t of below) if (t) fill(seenOf(t), true);
+
+    // 4) 还不够（Lv.1 下面没有关）才用更高的关：近的先出，没见过的先出
+    for (const t of above) if (t) fill(unseenOf(t));
+    for (const t of above) if (t) fill(seenOf(t), true);
 
     // 不在这里记"见过"——那会把没显示过的题也烧掉（能量耗尽、中途退出、刷新）。
     // 改为每道题真正显示出来时再记（practice.js renderCurrentQuestion）。
@@ -483,6 +514,8 @@ export const engine = {
     let correctAnswer = "";
     let altAnswers = [];
     let blanks = null;   // 多空填空题：每个空的 { answers, user, ok }
+    let pairs = null;    // 连线题：每一对正确答案 { text, ok }（ok = 孩子连对了这一对）
+    let userPairsOk = null;   // 连线题：孩子连的每一对对不对，和 userAnswer 一一对应
     const explanation = question.explanation || "";
     // For "error" (click-the-wrong-word) questions, the word that should
     // replace the mistake — surfaced so learners always see the right word.
@@ -526,18 +559,18 @@ export const engine = {
         const stripTags = (s) => String(s).replace(/<[^>]*>/g, " ");
         const leftVal = (i) => normalizeStr(stripTags(left[i] ?? i));
         const rightVal = (i) => normalizeStr(stripTags(right[i] ?? i));
+        const same = (up, pair) => leftVal(up[0]) === leftVal(pair[0]) && rightVal(up[1]) === rightVal(pair[1]);
         correct =
           userPairs.length === expected.length &&
-          expected.every((pair) =>
-            userPairs.some(
-              (up) =>
-                leftVal(up[0]) === leftVal(pair[0]) &&
-                rightVal(up[1]) === rightVal(pair[1])
-            )
-          );
-        correctAnswer = expected
-          .map((p) => `${stripTags(left[p[0]] ?? p[0]).trim()} → ${stripTags(right[p[1]] ?? p[1]).trim()}`)
-          .join(", ");
+          expected.every((pair) => userPairs.some((up) => same(up, pair)));
+        // 逐对给出对错：答错时标出连错的是哪几对，而不是只甩一长串正确答案
+        userPairsOk = userPairs.map((up) => expected.some((pair) => same(up, pair)));
+        pairs = expected.map((p) => ({
+          text: `${stripTags(left[p[0]] ?? p[0]).trim()} → ${stripTags(right[p[1]] ?? p[1]).trim()}`,
+          ok: userPairs.some((up) => same(up, p)),
+        }));
+        // 一对一行：句子自带逗号句号，用逗号连成一串根本分不清哪儿是一对的结尾
+        correctAnswer = pairs.map((p) => p.text).join("\n");
         break;
       }
 
@@ -580,7 +613,7 @@ export const engine = {
         correctAnswer = "";
     }
 
-    return { correct, correctAnswer, altAnswers, blanks, explanation, correction };
+    return { correct, correctAnswer, altAnswers, blanks, pairs, userPairsOk, explanation, correction };
   },
 
   calculateResults(session) {

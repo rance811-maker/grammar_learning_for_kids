@@ -8,6 +8,40 @@ import { confetti } from '../celebrate.js';
 
 let testState = null;
 
+// 做过摸底的账号再做一次，学习计划会按新结果整个重排（计划进度从 0 算）。
+// 这一步该由家长决定：家长专区「重新摸底」确认后发一张一次性的通行条，摸底页凭它放行。
+// 孩子从「这是什么」页、旧链接等别的路进来，只看到一张「已经做过了」的说明，点不出摸底。
+const RETAKE_KEY = 'gq-placement-retake';
+export function allowPlacementRetake() {
+  try { sessionStorage.setItem(RETAKE_KEY, store.account?.userId || '1'); } catch { /* */ }
+}
+// 读一次就作废：中途离开再进来，要家长重新点一次
+function takeRetakePass() {
+  try {
+    const v = sessionStorage.getItem(RETAKE_KEY);
+    sessionStorage.removeItem(RETAKE_KEY);
+    return Boolean(v) && v === (store.account?.userId || '1');
+  } catch { return false; }
+}
+
+function renderAlreadyDone() {
+  return `
+    <div id="placementRoot">
+      <div class="view text-center" style="max-width:560px;margin:0 auto;padding:var(--space-lg) var(--space-md);">
+        <div style="font-size:3rem;margin-bottom:var(--space-md);">✅</div>
+        <h2 class="mb-md">你已经做过摸底啦</h2>
+        <p style="color:var(--color-text-light);margin-bottom:var(--space-lg);line-height:1.8;">
+          上次摸底的结果已经用来安排学习了，接着练就好。<br>
+          重新摸底会把学习计划从头排一遍，要请家长在「家长专区」里操作。
+        </p>
+        <a class="btn btn--primary btn--large" href="#">回到学习地图</a>
+        <div style="margin-top:var(--space-md);">
+          <a href="#parent" style="font-size:var(--text-sm);color:var(--color-secondary);">家长专区 ›</a>
+        </div>
+      </div>
+    </div>`;
+}
+
 function pickQuestions() {
   const questions = [];
   for (let id = 1; id <= 12; id++) {
@@ -99,9 +133,28 @@ function renderResults() {
     </div>`;
 }
 
+// 做到一半离开再回来（点了 🗺️ 学习地图，首页又把没做摸底的人送回这里；或者先去看了别的页面），
+// 接着做，不从头再来。以前每次进来都重新抽题，已经答的几题悄悄作废。
+// 换了账号或课程就不接着做：题是按当时的课程抽的，答案也要记到当时那个账号上。
+function canResume() {
+  return testState && testState.started && !testState.done
+    && testState.owner === (store.account?.userId ?? null)
+    && testState.courseId === store.state.activeCurriculumId;
+}
+
 export function render() {
-  const questions = pickQuestions();
-  testState = { questions, currentIndex: 0, answers: [] };
+  // 做过摸底的账号要凭家长的通行条才能重做（见 allowPlacementRetake），通行条读一次就作废，
+  // 重做到一半离开、再回来（包括按浏览器后退）也要家长重新点。首次摸底不需要通行条，离开再回来接着做。
+  const retake = takeRetakePass();
+  if (store.state.placementCompleted && !retake) {
+    testState = null;
+    return renderAlreadyDone();
+  }
+  if (!canResume()) {
+    testState = { questions: pickQuestions(), currentIndex: 0, answers: [], started: false, done: false,
+      owner: store.account?.userId ?? null, courseId: store.state.activeCurriculumId };
+  }
+  const { questions } = testState;
 
   return `
     <div id="placementRoot">
@@ -112,6 +165,7 @@ export function render() {
           Grammar Quest 不给所有孩子发同一套题。<br>
           这 ${questions.length} 道题每个单元一题，做完就知道哪些语法点已经掌握、哪些还要练——<br>
           后面的学习计划按这个结果来排。
+          ${retake ? '<br><strong>这是重新摸底：做完会按新结果重新安排学习计划；中途离开的话，原来的计划不变。</strong>' : ''}
         </p>
         <button class="btn btn--primary btn--large" id="placementBeginBtn">开始摸底</button>
         <div style="margin-top:var(--space-md);">
@@ -122,9 +176,17 @@ export function render() {
 }
 
 export function mount() {
+  if (!testState) return;   // 「已经做过摸底」那张说明页，没有题
+  if (testState.started) {
+    // 接着上次答到的那题（答完一题、还没跳到下一题就离开的，也从下一题开始）
+    testState.currentIndex = testState.answers.length;
+    showCurrentQuestion();
+    return;
+  }
   const beginBtn = document.getElementById('placementBeginBtn');
   if (beginBtn) {
     beginBtn.addEventListener('click', () => {
+      testState.started = true;
       showCurrentQuestion();
     });
   }
@@ -188,8 +250,11 @@ function handleAnswer(userAnswer) {
       </div>`;
   }
 
+  const st = testState;
   setTimeout(() => {
-    testState.currentIndex++;
+    if (testState !== st) return;   // 已经换成新的一轮摸底了
+    // 按已答题数定位，不用 ++：这 1.2 秒里如果离开又回来，回来时已经跳到下一题了，不能再跳一次
+    st.currentIndex = st.answers.length;
     showCurrentQuestion();
   }, 1200);
 }
@@ -197,6 +262,7 @@ function handleAnswer(userAnswer) {
 function showResultsScreen() {
   const root = document.getElementById('placementRoot');
   if (!root) return;
+  testState.done = true;
 
   const results = testState.answers.map((a, i) => ({
     unitId: a.unitId,

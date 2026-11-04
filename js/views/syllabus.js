@@ -97,7 +97,7 @@ export function render() {
 
     const clickable = o.generated && !p.locked;
     return `
-      <div class="syl-item${clickable ? ' syl-item--link' : ''}" ${clickable ? `data-unit-id="${o.id}"` : ''}>
+      <div class="syl-item${clickable ? ' syl-item--link' : ''}" ${clickable ? `data-unit-id="${o.id}" tabindex="0" role="button"` : ''}>
         <div class="syl-item__head">
           <span class="syl-item__no">Unit ${o.id}</span>
           ${statusHtml}
@@ -115,7 +115,7 @@ export function render() {
         <div class="syl-head__meta">
           ${cefr ? `<span class="badge">CEFR ${esc(cefr)}</span>` : ''}
           <span class="badge">${outline.length} 个单元</span>
-          <span class="badge">已生成 ${generatedCount}/${outline.length}</span>
+          ${isBuiltIn ? '' : `<span class="badge">已生成 ${generatedCount}/${outline.length}</span>`}
         </div>
         ${goal ? `<div class="syl-head__goal">学习目标：${esc(goal)}</div>` : ''}
       </div>
@@ -126,14 +126,17 @@ export function render() {
         <div class="syl-note__title">关于这份提纲</div>
         <p>
           这是一份对照 ${cefr ? `CEFR ${esc(cefr)} ` : 'CEFR '}等级、参考剑桥英语语法纲要（English Grammar Profile）
-          编排的<strong>语法教学提纲</strong>，由 AI 依据你设定的学习目标生成，并按从基础到进阶排序。
+          编排的<strong>语法教学提纲</strong>，${isBuiltIn
+            // 内置的 PET / 雅思课是网站编好的，用户没设过什么目标，不能说成 AI 按目标生成
+            ? '是网站内置的课程'
+            : '由 AI 依据你设定的学习目标生成'}，并按从基础到进阶排序。
         </p>
         <p>
           需要说明的是：<strong>它不是官方考纲</strong>。剑桥并不公布固定的语法清单，
           任何声称"覆盖官方考点百分之多少"的说法都不成立。这份提纲的作用是让你看清孩子在练什么、
           按什么顺序练，而不是替代考试大纲。
         </p>
-        ${isBuiltIn ? '' : '<p>觉得编排不合适，可以到「家长专区 → 定制专属课程」重做一套。</p>'}
+        ${isBuiltIn ? '' : '<p>觉得编排不合适，可以到「家长专区 → 自己定制」重做一套。</p>'}
       </div>
     </div>`;
 }

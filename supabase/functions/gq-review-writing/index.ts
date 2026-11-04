@@ -1,7 +1,7 @@
 // 作文批改云函数：登录用户提交写作任务，用网站自己的 Claude key 逐句批改。
 //
 // - 只给登录用户用（自己核对 token，不靠网关的 verify_jwt）
-// - 每个账号每天（北京时间）最多 DAILY_LIMIT 篇，计数在 public.gq_ai_usage（docs/ai-review-setup.sql）
+// - 每个账号每个自然月（北京时间）最多 MONTHLY_LIMIT 篇，计数在 public.gq_ai_usage（docs/ai-review-setup.sql）
 // - 提示词在服务端拼（review.ts），前端只传写作内容：这个接口不能被当成通用的免费 AI 接口
 // - 批改失败把这一次的额度退回去
 //
@@ -12,7 +12,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import Anthropic from "npm:@anthropic-ai/sdk@0.135.0";
 import { buildUserText, parseReview, systemPromptFor, validateInput } from "./review.ts";
 
-const DAILY_LIMIT = 3;
+// 每个账号每月免费批改几篇。按月还是按天由数据库函数 gq_ai_take 决定（现在按自然月），
+// PERIOD 只是告诉前端怎么措辞（「本月还可以…」），两边要一致。
+const MONTHLY_LIMIT = 5;
+const PERIOD = "month";
 const MODEL = "claude-sonnet-4-6";
 const KIND = "writing";
 
@@ -83,9 +86,9 @@ Deno.serve(async (req: Request) => {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) return json(503, { error: "not_configured" }, origin);
 
-  // 先占一次额度：返回今天已用的次数；到上限时返回 null
-  const used = await rpc("gq_ai_take", { p_user: userId, p_kind: KIND, p_limit: DAILY_LIMIT }) as number | null;
-  if (used == null) return json(429, { error: "daily_limit", limit: DAILY_LIMIT, remaining: 0 }, origin);
+  // 先占一次额度：返回本月已用的次数；到上限时返回 null
+  const used = await rpc("gq_ai_take", { p_user: userId, p_kind: KIND, p_limit: MONTHLY_LIMIT }) as number | null;
+  if (used == null) return json(429, { error: "limit_reached", period: PERIOD, limit: MONTHLY_LIMIT, remaining: 0 }, origin);
 
   const client = new Anthropic({ apiKey });
   try {
@@ -105,7 +108,7 @@ Deno.serve(async (req: Request) => {
       if (response.stop_reason === "max_tokens") { lastErr = new Error("truncated"); continue; }
       try {
         const review = parseReview(text, input.lines.length);
-        return json(200, { ...review, limit: DAILY_LIMIT, remaining: Math.max(0, DAILY_LIMIT - used) }, origin);
+        return json(200, { ...review, period: PERIOD, limit: MONTHLY_LIMIT, remaining: Math.max(0, MONTHLY_LIMIT - used) }, origin);
       } catch (e) {
         lastErr = e;
       }

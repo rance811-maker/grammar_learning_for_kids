@@ -1,6 +1,7 @@
 import { store } from '../store.js';
 import { curriculum } from '../curriculum.js';
 import { skillName, skillEnglish, hasChineseName } from '../data/skill-names.js';
+import { questionPreview } from '../engine.js';
 
 const TYPE_LABELS = {
   choice: '选择',
@@ -13,7 +14,8 @@ const TYPE_LABELS = {
 
 export function render() {
   const mistakes = store.getMistakes();
-  const weakSkills = store.getWeakestSkills(5);
+  // 只列真没掌握的（< 80%），别把 100% 的也标红说成薄弱点
+  const weakSkills = store.getWeakSkills(5);
 
   // --- Error notebook list ---
   let mistakesHtml = '';
@@ -23,9 +25,7 @@ export function render() {
       const typeLabel = TYPE_LABELS[q.type] || q.type;
       const unitTitle = curriculum.getUnit(m.unitId)?.title || `Unit ${m.unitId}`;
       const skill = q.subSkill ? skillName(q.subSkill) : '';
-      const preview = (q.sentence || q.instruction || q.context || '')
-        .replace(/_+/g, '____')
-        .slice(0, 60);
+      const preview = escapeHtml(questionPreview(q));
       return `
         <div class="mistake-item">
           <div class="mistake-item__top">
@@ -67,7 +67,9 @@ export function render() {
       </div>`;
   }
 
-  const canReview = mistakes.length > 0 || weakSkills.length > 0;
+  // 能不能开始复习还按原来的口径：复习题不够时会从掌握度最低的语法点补题（engine.createReviewSession），
+  // 语法点都过了 80% 也照样有题可练，不能因为「薄弱点」列表空了就说「还没有错题」。
+  const canReview = mistakes.length > 0 || store.getWeakestSkills(1).length > 0;
 
   const heroHtml = canReview
     ? `
@@ -106,4 +108,11 @@ export function mount() {
       location.hash = 'practice/review';
     });
   }
+}
+
+// 预览是纯文本（自定义课程的题还是 AI 生成的），里面要是有 <，原样塞进 innerHTML 会把后面的内容吞掉
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
 }

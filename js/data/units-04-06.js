@@ -86,7 +86,7 @@ export const unitsBatch = [
           sentence: "Lucy sings ___ than her brother. She has a beautiful voice.",
           options: ["good", "better", "best", "more good"],
           correct: 1,
-          explanation: "good 是不规则形容词，比较级是 better（不是 gooder 或 more good）。后面有 than，用比较级 better。",
+          explanation: "sings 是动词，说「唱得好」要用副词 well，不能说 sings good。well 的比较级是不规则的 better（不是 more well）。后面有 than，用比较级 better。",
           subSkill: "irregular_comparison"
         },
         {
@@ -133,7 +133,7 @@ export const unitsBatch = [
           sentence: "A cheetah runs ___ than a horse.",
           options: ["fast", "faster", "fastest", "more fast"],
           correct: 1,
-          explanation: "fast 是短形容词，比较级加 -er → faster。后面有 than，用比较级。",
+          explanation: "runs ___ 说的是「跑得快」，这里的 fast 是副词（形容词、副词都是 fast）。fast 是短词，比较级加 -er → faster。后面有 than，用比较级。",
           subSkill: "short_adj_er_est"
         },
         {
@@ -166,10 +166,10 @@ export const unitsBatch = [
         {
           type: "choice",
           instruction: "选择正确的答案",
-          sentence: "My homework was ___ as my sister's, so we both finished at the same time.",
+          sentence: "My homework was ___ my sister's, so we both finished at the same time.",
           options: ["as easy", "easier", "as easy as", "the easiest"],
           correct: 2,
-          explanation: "“和……一样容易”用 as easy as。题目说两人同时完成，表示难度相同，用 as...as 结构。",
+          explanation: "“和……一样容易”用 as easy as，前后两个 as 都不能少。题目说两人同时完成，表示难度相同，用 as...as 结构。",
           subSkill: "as_as"
         },
         {
@@ -225,8 +225,8 @@ export const unitsBatch = [
           instruction: "用括号中单词的正确形式填空",
           sentence: "This is the (exciting) ___ film of the year.",
           answer: "most exciting",
-          acceptableAnswers: ["most exciting", "the most exciting"],
-          explanation: "前面有 the，后面有 of the year，是最高级。exciting 是长形容词，用 most exciting。",
+          acceptableAnswers: ["most exciting"],
+          explanation: "前面有 the，后面有 of the year，是最高级。exciting 是长形容词，用 most exciting（空格前已经有 the，不用再写）。",
           subSkill: "long_adj_more_most"
         },
         {
@@ -257,10 +257,11 @@ export const unitsBatch = [
         },
         {
           type: "reorder",
+          acceptableSentences: ["History is more interesting than English."],
           instruction: "把单词排列成正确的句子",
           words: ["English", "more", "is", "than", "interesting", "history"],
           correct: "English is more interesting than history.",
-          explanation: "长形容词比较级句型：主语 + is + more + 形容词 + than + 比较对象。English is more interesting than history.",
+          explanation: "长形容词比较级句型：主语 + is + more + 形容词 + than + 比较对象。English is more interesting than history.（English 和 history 换个位置也是对的句子。）",
           subSkill: "long_adj_more_most"
         },
         {
@@ -334,10 +335,10 @@ export const unitsBatch = [
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["This", "phone", "is", "as", "expensive", "than", "that", "one"],
+          sentence: ["This","phone","is","as","expensive","than","that","one.","They","cost","the","same."],
           errorIndex: 5,
           correction: "as",
-          explanation: "as...as 结构两边都要用 as，不能用 than。应该是 as expensive as that one. ✓",
+          explanation: "两部手机价格一样（They cost the same）→ 表示「和……一样贵」，用 as...as 结构，两边都要用 as，不能用 than。应该是 as expensive as that one. ✓",
           subSkill: "as_as"
         },
         {
@@ -442,17 +443,13 @@ export const unitsBatch = [
         {
           type: "scenario",
           instruction: "选择最合适的回答",
-          context: "You are writing a review comparing Burger King and McDonald's for your blog.",
+          context: "You tried three burger restaurants in your town. Now you are writing a review for your blog.",
           dialogue: [
             { speaker: "Reader", text: "Which restaurant has the friendliest staff?" }
           ],
-          options: [
-            "McDonald's has the friendliest staff of all.",
-            "McDonald's has more friendlier staff.",
-            "McDonald's has the most friendly than all."
-          ],
+          options: ["Tom's Burgers has the friendliest staff of all.","Tom's Burgers has more friendlier staff.","Tom's Burgers has the most friendly than all."],
           correct: 0,
-          explanation: "friendly 以辅音+y 结尾，最高级把 y 变 i 加 -est → the friendliest。of all 是最高级标志。✓",
+          explanation: "在三家店里选出员工最友好的一家 → 用最高级。friendly 以辅音+y 结尾，最高级把 y 变 i 加 -est → the friendliest，of all 是最高级标志：Tom's Burgers has the friendliest staff of all. ✓ more friendlier 把 more 和 -er 叠在一起用了，而且这里要的是最高级；最高级后面不能接 than。",
           subSkill: "short_adj_er_est"
         },
         {
@@ -747,11 +744,11 @@ export const unitsBatch = [
         },
         {
           type: "fill",
-          instruction: "用 have to 的正确形式填空",
-          sentence: "My brother ___ to wear glasses to read. (use 'have' in correct form)",
+          instruction: "空格后面已经有 to 了，在空格里填 have 的正确形式",
+          sentence: "My brother ___ to wear glasses when he reads.",
           answer: "has",
           acceptableAnswers: ["has"],
-          explanation: "My brother = he，第三人称单数，have to 变成 has to。He has to wear glasses = 他必须戴眼镜。",
+          explanation: "when he reads 说的是现在经常发生的事，用一般现在时。My brother = he，第三人称单数，have to 要变成 has to。My brother has to wear glasses when he reads = 我哥哥看书时必须戴眼镜。",
           subSkill: "obligation_must_haveto"
         },
         {
@@ -765,10 +762,10 @@ export const unitsBatch = [
         {
           type: "fill",
           instruction: "用 might 或 must 填空",
-          sentence: "Look at those dark clouds! It ___ rain very soon.",
+          sentence: "Take some money with you. You ___ need it later.",
           answer: "might",
-          acceptableAnswers: ["might", "may"],
-          explanation: "看到乌云，“也许”很快下雨，表示可能性（不百分百确定），用 might 或 may。",
+          acceptableAnswers: ["might","may","could"],
+          explanation: "带点钱，因为以后“也许”会用到，但说不准，表示可能性用 might（也可以用 may / could）。must 表示“必须”，放在这里说不通。",
           subSkill: "possibility_might"
         },
         {
@@ -872,10 +869,10 @@ export const unitsBatch = [
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["Do", "I", "have", "wear", "a", "tie"],
-          errorIndex: 3,
-          correction: "to wear",
-          explanation: "have to 中间不能省略 to。疑问句是 Do I have to wear a tie? ✓",
+          sentence: ["Does","he","has","to","wear","a","tie"],
+          errorIndex: 2,
+          correction: "have",
+          explanation: "have to 的疑问句用 Do / Does 开头，Does 后面的 have 要用原形，不能用 has。应该是 Does he have to wear a tie? ✓（陈述句才说 He has to wear a tie.）",
           subSkill: "obligation_must_haveto"
         }
       ],
@@ -898,7 +895,7 @@ export const unitsBatch = [
         },
         {
           type: "scenario",
-          instruction: "选择最合适的回答",
+          instruction: "你会怎么说？选出最合适的一句",
           context: "You are at a friend's house and you want to use the bathroom.",
           dialogue: [
             { speaker: "You", text: "..." }
@@ -1313,10 +1310,11 @@ export const unitsBatch = [
         },
         {
           type: "reorder",
+          acceptableSentences: ["Tomorrow we are going to play football.","Are we going to play football tomorrow?"],
           instruction: "把单词排列成正确的句子",
-          words: ["going", "we", "are", "to", "the", "beach", "tomorrow"],
-          correct: "We are going to the beach tomorrow.",
-          explanation: "be going to + 地点表示计划好的活动。We are going to the beach tomorrow = 我们明天打算去海滩。",
+          words: ["going","we","are","to","play","football","tomorrow"],
+          correct: "We are going to play football tomorrow.",
+          explanation: "be going to + 动词原形，表示已经打算好的事。We are going to play football tomorrow = 我们打算明天去踢足球。tomorrow 也可以放在句首：Tomorrow we are going to play football.",
           subSkill: "going_to_plans"
         },
         {
@@ -1350,19 +1348,19 @@ export const unitsBatch = [
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["She", "is", "going", "buy", "a", "new", "phone"],
-          errorIndex: 3,
-          correction: "to buy",
-          explanation: "be going to 中间不能漏掉 to。应该是 She is going to buy a new phone. ✓",
+          sentence: ["She","is","going","to","buys","a","new","phone"],
+          errorIndex: 4,
+          correction: "buy",
+          explanation: "be going to 后面接动词原形，不加 -s。应该是 She is going to buy a new phone. ✓",
           subSkill: "going_to_plans"
         },
         {
           type: "error",
           instruction: "点击句子中的错误单词",
-          sentence: ["We", "will", "going", "to", "watch", "a", "film"],
+          sentence: ["We","will","going","to","stay","at","home","tonight"],
           errorIndex: 1,
-          correction: "(remove)",
-          explanation: "不能 will 和 going to 一起用。要么 We will watch，要么 We are going to watch。这里去掉 will → We are going to watch. ✓",
+          correction: "are",
+          explanation: "will 和 be going to 不能放在一起用。要么说 We will stay at home tonight，要么说 We are going to stay at home tonight。这里把 will 换成 are → We are going to stay at home tonight. ✓",
           subSkill: "going_to_plans"
         },
         {
@@ -1506,9 +1504,9 @@ export const unitsBatch = [
           type: "choice",
           instruction: "选择正确的答案",
           sentence: "You have already decided and booked everything for your trip. You say: '___ explore the old castle on day two.'",
-          options: ["I will maybe", "We are going to", "Shall we", "We explore"],
+          options: ["I will maybe","We are going to","Shall we","We going to"],
           correct: 1,
-          explanation: "已经定好的行程计划用 be going to。We are going to explore the old castle = 我们打算去探索古堡。",
+          explanation: "已经决定好的计划用 be going to：We are going to explore the old castle = 我们打算去探索古堡。We going to 少了 are；I will maybe 和 Shall we 都表示还没决定。",
           subSkill: "going_to_plans"
         },
         {

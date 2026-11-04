@@ -21,7 +21,7 @@ import { initPwa } from './pwa.js';
 import { initAnalytics, trackView } from './analytics.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20261101c';
+const BUILD_VERSION = '20261102a';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // Tiny, unobtrusive build marker (bottom-right). Lets us verify the deployed
@@ -82,14 +82,28 @@ const titles = {
   'about': '这是什么',
 };
 
+// 上一次真正画出来的页面地址：用来分辨「换了页面」和「同一页重绘」
+let lastRenderedHash = null;
+
+// 这个页面加载以来登录过的账号。同一个标签页里换成了另一个账号（登录过期后用别的账号登录），
+// 整页重新加载：口语页的录音、转写和批改这类进行中的任务是按模块变量存的，
+// 不重新加载就会跟着到下一个账号那里，用新账号的身份提交。
+let pageUid = null;
+
 function router() {
   const hash = location.hash.slice(1) || '';
   const parts = hash.split('/');
   const route = parts[0] || '';
   const params = parts.slice(1);
 
-  // 会话在别处没了（另一个标签页退出、续期被拒）：缓存的账号也作废，下面按没登录处理
-  if (store.account && cloud.cloudEnabled() && !cloud.hasSession()) store._refreshAccount();
+  // 会话在别处没了（另一个标签页退出、续期被拒）：缓存的账号也作废，下面按没登录处理；
+  // 家长专区一起上锁，重新登录（哪怕是同一个账号）要重新输家长密码
+  if (store.account && cloud.cloudEnabled() && !cloud.hasSession()) { store._refreshAccount(); parent.lock(); }
+
+  if (store.account) {
+    if (pageUid && pageUid !== store.account.userId) { location.reload(); return; }
+    pageUid = store.account.userId;
+  }
 
   if (route === '' && store.isPlacementNeeded()) {
     location.hash = 'placement';
@@ -114,6 +128,14 @@ function router() {
   else if (route !== 'account') gate.clearReturn();
   const content = gated ? gate.render(route) : view.render(...params);
   app.innerHTML = renderShell(route, content, gated);
+  // 换了页面就从顶上开始看。hash 路由没有对应的锚点，浏览器不会自己滚，新页面会停在上一页的
+  // 滚动位置（读完故事回到单元页，只看到一排锁着的关）。同一个地址重绘（云端同步完、
+  // 切课程后重跑路由）不动，免得正在看的地方被拉回顶上。放在 mount 前：练习、摸底自己的
+  // scrollToStart 照常生效。
+  if (location.hash !== lastRenderedHash) {
+    lastRenderedHash = location.hash;
+    window.scrollTo(0, 0);
+  }
 
   if (!gated && view.mount) {
     view.mount(...params);
@@ -152,12 +174,17 @@ function activeNavRoute(route) {
     // The review-mode practice session belongs under the 复习中心 tab.
     return location.hash.startsWith('#practice/review') ? 'review' : '';
   }
-  return ['oral', 'review', 'portfolio', 'stats', 'parent', 'feedback'].includes(route) ? route : '';
+  if (['oral', 'review', 'portfolio', 'stats', 'parent', 'feedback'].includes(route)) return route;
+  // 账号页高亮账号块；「这是什么」不属于任何一项，不高亮。
+  // 以前一律返回 ''，正好等于「学习地图」，人在账号页，导航却显示还在地图上。
+  if (['account', 'about'].includes(route)) return route;
+  return '';
 }
 
 function renderShell(route, content, gated = false) {
   const topLevelRoutes = ['', 'oral', 'review', 'portfolio', 'stats', 'account', 'parent', 'about', 'feedback'];
-  const showBackBtn = !topLevelRoutes.includes(route);
+  // 还没做过摸底时，「返回」去首页又会被送回摸底、重新开始，等于没有出口，干脆不显示
+  const showBackBtn = !topLevelRoutes.includes(route) && !(route === 'placement' && store.isPlacementNeeded());
   const title = titles[route] || 'Grammar Quest';
   const demo = store.isDemo() && !gated && !NO_DEMO_BANNER.has(route);
   // 宽屏上顶层页面的页面带本来是藏起来的；没登录时它要放注册按钮，得露出来
@@ -303,12 +330,12 @@ function renderSidebar(route) {
       <nav class="sidebar__nav">${items}</nav>
       <div class="sidebar__footer">
         <div class="sidebar__account-panel">
-          <button class="sidebar__account" data-route="account"
+          <button class="sidebar__account${active === 'account' ? ' active' : ''}" data-route="account"
                   aria-label="${escapeHtml(accountLabel)}" title="${escapeHtml(accountLabel)}">${accountLine}</button>
           ${demo ? '' : `<div class="sidebar__stats">
             <span class="sidebar__stat sidebar__stat--rank">${rank.icon} ${rank.name}</span>
             <span class="sidebar__stat sidebar__stat--score">⭐ ${p.totalScore} 积分</span>
-            <span class="sidebar__stat sidebar__stat--streak">🔥 连续 ${p.currentStreak} 天</span>
+            <span class="sidebar__stat sidebar__stat--streak">🔥 连续 ${store.getDisplayStreak()} 天</span>
           </div>`}
         </div>
       </div>
@@ -365,9 +392,17 @@ function mountCloudSaveBanner() {
   });
 }
 
+// 练习做到一半，从导航、顶栏「← 返回」、页面上的站内链接离开，都和练习页的 ✕ 一样先问一句：
+// 以前只有 ✕ 会问，旁边这几个入口一点就走，已经答的题全部作废。
+function confirmLeavePage() {
+  const route = (location.hash.slice(1) || '').split('/')[0];
+  return route !== 'practice' || practice.confirmLeave();
+}
+
 function mountNav() {
   document.querySelectorAll('.sidebar__item, .sidebar__account').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (!confirmLeavePage()) return;
       location.hash = btn.dataset.route;
     });
   });
@@ -438,11 +473,14 @@ function mountBackButton() {
       const parts = hash.split('/');
       const route = parts[0];
 
-      if (route === 'practice' && parts[1] === 'review') {
-        location.hash = 'review';
+      // 练习页的「返回」和 ✕ 是同一件事：没答完先确认，回到该回的地方
+      // （复习 → 复习中心，模拟挑战 → 首页，不再拼出不存在的 #unit/boss）
+      if (route === 'practice') {
+        if (!practice.confirmLeave()) return;
+        location.hash = practice.backTargetFor(parts[1]);
         return;
       }
-      if (route === 'discover' || route === 'practice' || route === 'mission') {
+      if (route === 'discover' || route === 'mission') {
         const unitId = parts[1];
         if (unitId) {
           location.hash = `unit/${unitId}`;
@@ -505,7 +543,7 @@ window.addEventListener('storage', (e) => {
   const u = cloud.currentUser();
   if (u && !u.id) return;   // 另一个标签页正在用确认链接登录，还没拿到账号信息
   const after = (u && u.id) || null;
-  if ((before || null) !== after) location.reload();
+  if ((before || null) !== after) { parent.lock(); location.reload(); }
 });
 
 // Initialize
@@ -513,6 +551,24 @@ store.init();
 initPwa();
 initAnalytics();
 window.addEventListener('hashchange', router);
+
+// 站内链接（站点带的 Grammar Quest、「看完整介绍」、云端保存失败提示里的「重新登录」）：
+// 练习做到一半点到也先确认。捕获阶段处理，赶在浮层自己拦冒泡之前。
+document.addEventListener('click', (e) => {
+  const a = e.target instanceof Element && e.target.closest('a[href^="#"]');
+  if (a && !confirmLeavePage()) e.preventDefault();
+}, true);
+
+// 地图上的单元、单元页的关卡卡片、作品集卡片是 div 做的按钮（role="button" tabindex="0"）：
+// 键盘聚焦到上面，按回车或空格和点一下一样。真正的 <button>、链接浏览器自己会处理。
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target;
+  if (!(el instanceof HTMLElement) || el.getAttribute('role') !== 'button') return;
+  if (el.matches('button, a, input, textarea, select') || el.getAttribute('aria-disabled') === 'true') return;
+  e.preventDefault();   // 空格不要顺带把页面往下翻
+  el.click();
+});
 
 consumeAuthCallback().then(() => {
   router();

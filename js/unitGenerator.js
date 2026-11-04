@@ -11,6 +11,11 @@ function getProvider() {
   try { return localStorage.getItem('gq-ai-provider') || 'gemini'; } catch { return 'gemini'; }
 }
 
+// Gemini 用 Google 维护的「最新 Flash」别名，不写死具体型号。
+// 原来写死 gemini-2.0-flash，2026-06-01 下线后请求一律 404，配 Gemini key 的家长
+// 生成课程、孩子作文批改全部失败。具体型号每年都会退役，别名会跟着换到当前的 Flash。
+const GEMINI_MODEL = 'gemini-flash-latest';
+
 function getAiKey() {
   const p = getProvider();
   const info = PROVIDERS[p];
@@ -119,8 +124,11 @@ export function friendlyAiError(err) {
   const status = err && err.status;
   const raw = String((err && err.message) || err || '').toLowerCase();
   if (raw.includes('abort') || raw.includes('timeout') || raw.includes('timed out')) return 'AI 响应超时了，请检查网络后重试';
-  if (raw.includes('failed to fetch') || raw.includes('networkerror') || raw.includes('network request') || raw.includes('load failed')) return '网络连接不上，检查一下网络再试试';
+  // 'network'：cloud.js 续期令牌时连不上 supabase.co 抛的 NETWORK（作文批改走这条），不能把英文代码露给孩子
+  if (raw.includes('failed to fetch') || raw.includes('networkerror') || raw.includes('network request') || raw.includes('load failed') || raw === 'network') return '网络连接不上，检查一下网络再试试';
   if (status === 401 || status === 403 || raw.includes('api key') || raw.includes('api_key') || raw.includes('unauthorized') || raw.includes('permission denied') || raw.includes('api key not valid')) return 'API key 无效或没有权限，请检查 key 是否填对';
+  // 模型被服务商下线时返回 404（Google 的原话是一长串英文 "models/... is not found"），不能原样给孩子看
+  if (status === 404 || raw.includes('is not found') || raw.includes('not_found')) return 'AI 服务商那边暂时用不了这个模型，过一会儿再试；一直不行的话，家长可以换用另一家的 key';
   if (status === 429 || raw.includes('rate limit') || raw.includes('quota') || raw.includes('resource_exhausted') || raw.includes('too many requests')) return 'AI 调用太频繁或额度用完了，等一会儿再试';
   if ((status && status >= 500) || raw.includes('overloaded') || raw.includes('unavailable') || raw.includes('try again later')) return 'AI 服务暂时繁忙，请稍后重试';
   if (raw.includes('json') || raw.includes('unexpected token') || raw.includes('格式')) return 'AI 返回的内容格式有误，请重试';
@@ -188,13 +196,16 @@ async function callAI(systemPrompt, userText) {
   }
 
   const res = await fetchWithTimeout(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: systemPrompt + '\n\n' + userText }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
+        // 别名指向的是会先「思考」的新 Flash，思考用掉的 token 也算在 maxOutputTokens 里。
+        // 还按老 2.0-flash 的 8192 给，整单元生成常常思考完就没剩多少，JSON 被截断。
+        // 新 Flash 的输出上限是 65536，给 32768 足够；按实际生成的 token 计费，给大不多花钱。
+        generationConfig: { temperature: 0.7, maxOutputTokens: 32768 },
       }),
     }
   );
@@ -307,7 +318,7 @@ function parseJSON(raw) {
 }
 
 // 调用 + 解析 + 校验，必要时自动重试一次。
-// 仅对"格式/结构"类问题重试；鉴权/额度类问题(401/403/429)直接失败，不浪费配额。
+// 仅对"格式/结构"类问题重试；鉴权/额度/模型不存在(401/403/429/404)直接失败，不浪费配额。
 async function generateValidated(systemPrompt, userText, validate, attempts = 2) {
   let lastErr;
   for (let i = 0; i < attempts; i++) {
@@ -318,7 +329,7 @@ async function generateValidated(systemPrompt, userText, validate, attempts = 2)
       return data;
     } catch (e) {
       lastErr = e;
-      if (e.status === 401 || e.status === 403 || e.status === 429) break;
+      if (e.status === 401 || e.status === 403 || e.status === 404 || e.status === 429) break;
     }
   }
   throw lastErr;
@@ -397,7 +408,7 @@ async function callVision(dataUrl) {
   }
 
   const res = await fetchWithTimeout(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [
         { inlineData: { mimeType: mime, data: base64 } },
