@@ -195,7 +195,7 @@ function renderShell(route, content, gated = false) {
     <div class="layout">
       ${renderSidebar(route)}
       <div class="main-col">
-        <header class="topbar${titleOnly ? ' topbar--title-only' : ''}">
+        <header class="topbar${titleOnly ? ' topbar--title-only' : ''}${route === 'about' ? ' topbar--about' : ''}">
           ${showBackBtn
             ? `<button class="topbar__back" id="navBackBtn">← 返回</button>`
             : '<span class="topbar__back-placeholder"></span>'}

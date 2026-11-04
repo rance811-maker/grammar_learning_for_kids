@@ -3686,7 +3686,7 @@ ul, ol {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 260px;
   gap: var(--space-lg);
-  align-items: start;
+  align-items: center;
 }
 .about-step__num {
   width: 28px;
@@ -3716,6 +3716,11 @@ ul, ol {
   border: 1px solid var(--color-border);
   box-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.3);
 }
+/* 被 max-height 截掉的长截图：底边渐隐，不像切在半句话上 */
+.about-shot--crop img {
+  -webkit-mask-image: linear-gradient(#000 85%, transparent);
+  mask-image: linear-gradient(#000 85%, transparent);
+}
 
 .about-faq {
   background: var(--color-card);
@@ -3742,11 +3747,24 @@ ul, ol {
 .about-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-sm);
   margin: var(--space-lg) 0;
 }
 .about-actions .btn { text-decoration: none; }
-.view-about > .about-actions { margin-bottom: var(--space-xl); }
+/* 次要入口用文字链接，不和绿色主按钮抢 */
+.about-actions__link {
+  padding: 10px 4px;
+  color: var(--color-text-light);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+.about-contact {
+  margin: calc(-1 * var(--space-sm)) 0 var(--space-xl);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-light);
+}
 
 @media (max-width: 720px) {
   .about-hero__title { font-size: 1.35rem; }
@@ -3758,7 +3776,19 @@ ul, ol {
   .about-section--split { grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
   .about-shot { max-width: 280px; width: 100%; margin: 0 auto; }
   .about-faq { padding: 0 var(--space-md); }
-  .about-actions .btn { width: 100%; text-align: center; }
+  .about-actions .btn,
+  .about-actions__link { width: 100%; text-align: center; }
+  /* 营销页自己有大标题，手机上不再要「这是什么」那条页面带，首屏按钮往上提 */
+  .topbar--about { display: none; }
+}
+/* 721–959px（iPad 竖屏）：侧栏占掉 240px，左右排会把文字挤成一列字，改回上下排 */
+@media (min-width: 721px) and (max-width: 959px) {
+  .about-step,
+  .about-section--split { grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
+  .about-shot { max-width: 300px; width: 100%; margin: 0 auto; }
+}
+@media (min-width: 721px) and (max-width: 1023px) {
+  .about-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* 与内置课程重名的自定义副本：说清两行的区别，别让家长自己猜 */

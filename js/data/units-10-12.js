@@ -162,7 +162,7 @@ export const unitsBatch = [
             "to help my mum."
           ],
           correctPairs: [[0, 1], [1, 0], [2, 3], [3, 2]],
-          explanation: "enjoy + -ing（swimming）；want + to（to leave）；decide + to（to help）；finish + -ing（reading）。",
+          explanation: "enjoy 和 finish 后面接动名词（-ing），want 和 decide 后面接 to + 动词原形：enjoy swimming，want to leave，decide to help，finish reading。",
           subSkill: "verb_plus_to"
         },
         {
@@ -253,7 +253,7 @@ export const unitsBatch = [
           instruction: "把单词排列成正确的句子",
           words: ["I", "enjoy", "listening", "to", "pop", "music"],
           correct: "I enjoy listening to pop music.",
-          explanation: "enjoy + -ing。I enjoy listening to pop music. ✓",
+          explanation: "enjoy 后面接动名词（-ing），不接 to do：I enjoy listening to pop music.（listen to 是固定搭配，这里的 to 是介词。）",
           subSkill: "verb_plus_ing"
         },
         {
@@ -484,7 +484,7 @@ export const unitsBatch = [
             "becoming / singing"
           ],
           correct: 1,
-          explanation: "hope + to（to become）；practise + -ing（practises singing）。",
+          explanation: "hope 后面接 to + 动词原形（hopes to become）；practise 后面接动名词（practises singing）。所以选 to become / singing。",
           subSkill: "verb_plus_to"
         }
       ]
@@ -710,7 +710,7 @@ export const unitsBatch = [
           left: ["now", "today", "here", "tomorrow"],
           right: ["there", "the next day", "then", "that day"],
           correctPairs: [[0, 2], [1, 3], [2, 0], [3, 1]],
-          explanation: "now→then；today→that day；here→there；tomorrow→the next day。",
+          explanation: "转述别人的话时，时间、地点词要跟着变：now → then，today → that day，here → there，tomorrow → the next day。",
           subSkill: "time_place_change"
         },
         {
@@ -968,7 +968,7 @@ export const unitsBatch = [
             "loved / will"
           ],
           correct: 1,
-          explanation: "love → loved；will → would。Sam said he loved that book and he would lend it to me the next day. ✓",
+          explanation: "转述时动词往过去退一步：love → loved，will → would；this 变成 that，tomorrow 变成 the next day。Sam said he loved that book and he would lend it to me the next day.",
           subSkill: "tense_shift"
         },
         {
