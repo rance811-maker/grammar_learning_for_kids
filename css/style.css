@@ -3635,48 +3635,129 @@ ul, ol {
 }
 
 /* ---------------------------------------------------------------
-   「这是什么」：定位长文案的正式住址，可以单独发给人
+   「这是什么」：营销页，可以单独发给人（/#about）
+   手机上一列：文字在上、截图在下；宽屏上文字和截图左右排
    --------------------------------------------------------------- */
-.view-about { max-width: 44em; margin: 0 auto; }
-.about-hero { padding: var(--space-md) 0 var(--space-lg); }
+.view-about { max-width: 46em; margin: 0 auto; }
+.about-hero { padding: var(--space-md) 0 var(--space-md); }
 .about-hero__title {
   margin: 0 0 var(--space-sm);
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: 800;
   line-height: 1.35;
 }
+.about-hero__hl { color: var(--color-danger); }
 .about-hero__lead {
+  margin: 0 0 var(--space-md);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+.about-facts {
+  list-style: none;
   margin: 0;
-  font-size: 1rem;
-  line-height: 1.85;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+.about-facts li {
+  padding: 10px 12px;
+  background: var(--color-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--text-xs);
+  line-height: 1.5;
   color: var(--color-text-light);
 }
-.about-hero__lead strong { color: var(--color-text); }
+.about-facts b { display: block; font-size: 1rem; color: var(--color-primary-dark); }
+.about-h2 { margin: var(--space-xl) 0 var(--space-md); font-size: 1.2rem; font-weight: 800; }
+
+.about-step,
 .about-section {
-  padding: var(--space-lg);
   margin-bottom: var(--space-md);
+  padding: var(--space-lg);
   background: var(--color-card);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
-.about-section--plain { background: var(--color-bg); box-shadow: none; border: 1px solid var(--color-border); }
-.about-section h2 { margin: 0 0 var(--space-sm); font-size: 1.05rem; font-weight: 800; }
-.about-section p { margin: 0 0 var(--space-sm); font-size: var(--text-sm); line-height: 1.85; color: var(--color-text-light); }
-.about-section p:last-child { margin-bottom: 0; }
-.about-section p strong { color: var(--color-text); }
-.about-note { font-size: var(--text-xs) !important; color: var(--color-muted) !important; }
+.about-step,
+.about-section--split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: var(--space-lg);
+  align-items: start;
+}
+.about-step__num {
+  width: 28px;
+  height: 28px;
+  margin-bottom: var(--space-sm);
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+.about-step h3,
+.about-section h2 { margin: 0 0 var(--space-sm); font-size: 1.08rem; font-weight: 800; line-height: 1.4; }
+.about-step p,
+.about-section p { margin: 0; font-size: var(--text-sm); line-height: 1.85; color: var(--color-text-light); }
+.about-shot { margin: 0; }
+.about-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* 长截图只露上半截，页面不至于太长；要看的重点都在上面 */
+  max-height: 460px;
+  object-fit: cover;
+  object-position: top;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.3);
+}
+
+.about-faq {
+  background: var(--color-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 0 var(--space-lg);
+}
+.about-faq details { border-bottom: 1px solid var(--color-border); }
+.about-faq details:last-child { border-bottom: 0; }
+.about-faq summary {
+  padding: 14px 0;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.about-faq summary::-webkit-details-marker { display: none; }
+.about-faq summary::after { content: "+"; color: var(--color-primary-dark); font-weight: 800; }
+.about-faq details[open] summary::after { content: "−"; }
+.about-faq details p { margin: 0 0 14px; font-size: var(--text-sm); line-height: 1.85; color: var(--color-text-light); }
+
 .about-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-sm);
-  margin: var(--space-lg) 0 var(--space-xl);
+  margin: var(--space-lg) 0;
 }
 .about-actions .btn { text-decoration: none; }
+.view-about > .about-actions { margin-bottom: var(--space-xl); }
 
 @media (max-width: 720px) {
-  .about-hero__title { font-size: 1.22rem; }
-  .about-hero__lead { font-size: var(--text-sm); }
+  .about-hero__title { font-size: 1.35rem; }
+  .about-hero__lead { font-size: 1rem; }
+  .about-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .about-step,
   .about-section { padding: var(--space-md); }
+  .about-step,
+  .about-section--split { grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
+  .about-shot { max-width: 280px; width: 100%; margin: 0 auto; }
+  .about-faq { padding: 0 var(--space-md); }
   .about-actions .btn { width: 100%; text-align: center; }
 }
 
