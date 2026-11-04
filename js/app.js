@@ -21,7 +21,7 @@ import { initPwa } from './pwa.js';
 import { initAnalytics, trackView } from './analytics.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20261104b';
+const BUILD_VERSION = '20261104c';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // 右下角的版本小标：用来确认线上跑的是哪一版。普通用户不需要看到它，默认隐藏；
@@ -452,6 +452,17 @@ function mountSiteWhat() {
 
   // 浮层里点链接要能正常跳转，所以只拦冒泡、不 preventDefault。
   pop.addEventListener('click', (e) => e.stopPropagation());
+
+  // 「看完整介绍」：人已经在「这是什么」页时，地址不变、浏览器什么都不做，
+  // 浮层也不收，看起来就是点了没反应。这时收起浮层、回到页面顶部。
+  pop.querySelector('.siteband__pop-more')?.addEventListener('click', (e) => {
+    close();
+    if (location.hash === '#about') {
+      e.preventDefault();
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+    }
+  });
 
   whatOutsideHandler = () => { if (!pop.hidden) close(); };
   whatKeyHandler = (e) => {
