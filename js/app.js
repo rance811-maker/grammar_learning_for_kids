@@ -21,7 +21,7 @@ import { initPwa } from './pwa.js';
 import { initAnalytics, trackView } from './analytics.js';
 
 // Bump this on every deploy so we can confirm which code is actually live.
-const BUILD_VERSION = '20261104c';
+const BUILD_VERSION = '20261107a';
 console.log('%cGrammar Quest build ' + BUILD_VERSION, 'color:#58CC02;font-weight:bold;font-size:14px');
 
 // 右下角的版本小标：用来确认线上跑的是哪一版。普通用户不需要看到它，默认隐藏；
