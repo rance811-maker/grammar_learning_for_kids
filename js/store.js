@@ -264,7 +264,8 @@ export const store = {
 
     if (!st.startedAt) {
       const first = st.history?.[0]?.date;
-      st.startedAt = first || new Date().toISOString().slice(0, 10);
+      // 本地日期（toISOString 是 UTC：北京时间早上 8 点前第一次打开，会记成前一天，「第 N 天」多算 1）
+      st.startedAt = first || toDateString(new Date());
     }
     if (st.placementCompleted === undefined) {
       st.placementCompleted = false;
